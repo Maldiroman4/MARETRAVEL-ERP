@@ -170,41 +170,39 @@ class OperationsHubModule {
   }
 
   switchTab(tabName) {
-    if (tabName === 'nds') {
-      this.switchTab('cash');
-      if (window.cashRegisterModule) {
-        window.cashRegisterModule.showTabContent('cobranzas');
-        window.cashRegisterModule.switchNdSubView('history');
-      }
-      return;
-    }
-    if (tabName === 'ncs') {
-      this.switchTab('cash');
-      if (window.cashRegisterModule) {
-        window.cashRegisterModule.showTabContent('pagos');
-        window.cashRegisterModule.switchNcSubView('history');
-      }
-      return;
-    }
-
+    // nds y ncs son pestañas de primer nivel con su propio panel
+    // (ya no redirigen a 'cash')
     this.currentTab = tabName;
+
+    // Activar botón de pestaña correspondiente
     document.querySelectorAll('.hub-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.hubTab === tabName);
     });
 
-    // Control de barra de filtros (se oculta en Caja para que coincida exactamente con la Imagen 1)
+    // Barra de filtros: visible solo en pestaña 'all'
     const filterRow = document.getElementById('hub-filters-row');
     if (filterRow) {
-      filterRow.style.display = (tabName === 'cash') ? 'none' : 'flex';
+      filterRow.style.display = (tabName === 'all') ? 'flex' : 'none';
     }
 
-    // Toggle de paneles dedicados
+    // Toggle de paneles
     document.querySelectorAll('.hub-tab-panel').forEach(panel => {
       panel.style.display = 'none';
     });
     const activePanel = document.getElementById(`hub-panel-${tabName}`);
     if (activePanel) {
       activePanel.style.display = 'block';
+    }
+
+    // Si entra a nds, mostrar sub-vista correcta en cash-register
+    if (tabName === 'nds' && window.cashRegisterModule) {
+      window.cashRegisterModule.showTabContent('cobranzas');
+      window.cashRegisterModule.switchNdSubView('history');
+    }
+    // Si entra a ncs, mostrar sub-vista correcta en cash-register
+    if (tabName === 'ncs' && window.cashRegisterModule) {
+      window.cashRegisterModule.showTabContent('pagos');
+      window.cashRegisterModule.switchNcSubView('history');
     }
 
     this.renderActiveTabContent();
@@ -215,7 +213,15 @@ class OperationsHubModule {
     this.currentTab = 'all';
     this.filterService = serviceCode || 'ALL';
 
-    // Sincronizar select en la barra de herramientas si existe
+    // Actualizar etiqueta dinámica de la pestaña de servicio
+    const tabLabel = document.getElementById('hub-tab-service-label');
+    if (tabLabel) {
+      tabLabel.textContent = (serviceCode && serviceCode !== 'ALL')
+        ? this.formatServiceName(serviceCode)
+        : 'Servicio';
+    }
+
+    // Sincronizar select de filtro si existe
     const filterSelect = document.getElementById('hub-filter-service');
     if (filterSelect) {
       let optExists = Array.from(filterSelect.options).some(o => o.value === serviceCode);
@@ -228,7 +234,7 @@ class OperationsHubModule {
       filterSelect.value = serviceCode;
     }
 
-    // Activar pestaña maestra 'all'
+    // Activar pestaña 'all'
     document.querySelectorAll('.hub-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.hubTab === 'all');
     });
@@ -248,6 +254,7 @@ class OperationsHubModule {
     this.renderActiveTabContent();
     if (window.lucide) window.lucide.createIcons();
   }
+
 
   renderActiveTabContent() {
     if (this.currentTab === 'all') {

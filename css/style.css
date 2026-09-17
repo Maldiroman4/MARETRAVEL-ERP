@@ -2537,10 +2537,10 @@ body {
 
 .hub-tabs-bar {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   background: #f1f5f9;
-  padding: 5px;
-  border-radius: 10px;
+  padding: 4px;
+  border-radius: 12px;
   overflow-x: auto;
   border: 1px solid #e2e8f0;
 }
@@ -2548,34 +2548,34 @@ body {
 .hub-tab-btn {
   background: transparent;
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 9px 18px;
+  border-radius: 9px;
   font-size: 0.85rem;
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .hub-tab-btn i {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .hub-tab-btn:hover {
   color: #0f172a;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .hub-tab-btn.active {
-  background: #ffffff;
-  color: #00aeef;
+  background: #00a884;
+  color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 168, 132, 0.35);
 }
 
 .table-actions-inline {
