@@ -3032,7 +3032,7 @@
               1. Cabecera Corporativa de la Operación (Cliente y Términos)
             </div>
 
-            <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 12px;">
+            <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 12px;">
               <div>
                 <label class="form-label" style="font-weight: 700;">Cliente / Empresa a Facturar (Cuentas por Cobrar):</label>
                 <select id="uni-client-select" class="form-control" required>
@@ -3042,36 +3042,6 @@
               <div>
                 <label class="form-label" id="lbl-uni-issue-date" style="font-weight: 700;">Fecha de Emisión:</label>
                 <input type="date" id="uni-issue-date" class="form-control font-mono" required>
-              </div>
-              <div>
-                <label class="form-label" style="font-weight: 700;">Condición de Pago:</label>
-                <select id="uni-payment-term" class="form-control" onchange="window.operationsHubModule.onPaymentTermChange()">
-                  <option value="AL_CONTADO">AL CONTADO (Cobro Inmediato)</option>
-                  <option value="CREDITO_7_DIAS">CRÉDITO 7 DÍAS (CxC Pendiente)</option>
-                  <option value="CREDITO_15_DIAS">CRÉDITO 15 DÍAS (CxC Pendiente)</option>
-                  <option value="CREDITO_30_DIAS">CRÉDITO 30 DÍAS (CxC Pendiente)</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- FILA DE CUENTA FINANCIERA DESTINO (CON GUARDRAIL ESTRICTO) -->
-            <div id="uni-deposit-account-wrap" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
-              <div style="display: grid; grid-template-columns: 1.5fr 1.5fr; gap: 14px; align-items: flex-start;">
-                <div>
-                  <label class="form-label" style="font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                    <i data-lucide="landmark" style="width: 14px; height: 14px; color: #0284c7;"></i>
-                    Cuenta Financiera Destino de Fondos (Obligatorio en Contado):
-                  </label>
-                  <select id="uni-deposit-account" class="form-control font-mono" onchange="window.operationsHubModule.onDepositAccountChange()">
-                    <!-- Poblado con cuentas financieras activas -->
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" style="font-size: 0.75rem; color: #64748b;">Estado de Verificación de Cuenta Financiera:</label>
-                  <div id="uni-account-guard-pill" style="padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; min-height: 38px; display: flex; align-items: center; background: #e2e8f0; color: #475569;">
-                    Seleccione una cuenta para verificar
-                  </div>
-                </div>
               </div>
             </div>
           </div>

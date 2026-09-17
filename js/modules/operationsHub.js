@@ -638,20 +638,22 @@ class OperationsHubModule {
     const data = window.db ? window.db.get() : null;
     const providers = (data?.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR');
     const defaultProv = providers[0] || { id: '', name: 'Proveedor', settlementModel: 'DEDUCCION_DIRECTA' };
+    const firstSub = (defaultProv.providerServices && defaultProv.providerServices.length > 0) ? defaultProv.providerServices[0] : null;
 
     return {
       id: 'NDI-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       serviceType: custom.serviceType || 'BOLETO_AEREO',
       providerId: custom.providerId || defaultProv.id,
       providerName: custom.providerName || defaultProv.name,
+      subServiceName: custom.subServiceName || (firstSub ? firstSub.serviceName : ''),
       settlementModel: custom.settlementModel || defaultProv.settlementModel || 'DEDUCCION_DIRECTA',
       passengerName: custom.passengerName || '',
       passengerDoc: custom.passengerDoc || '',
       voucherNumber: custom.voucherNumber || '',
-      description: custom.description || '',
+      description: custom.description || (firstSub ? firstSub.serviceName : ''),
       fareAmount: parseFloat(custom.fareAmount) || 0,
       feeAmount: parseFloat(custom.feeAmount) || 0,
-      providerCommissionRate: parseFloat(custom.providerCommissionRate) || (custom.serviceType === 'BOLETO_AEREO' ? 0 : 10),
+      providerCommissionRate: (custom.providerCommissionRate !== undefined) ? parseFloat(custom.providerCommissionRate) : ((firstSub && firstSub.defaultCommissionRate !== undefined) ? parseFloat(firstSub.defaultCommissionRate) : (custom.serviceType === 'BOLETO_AEREO' ? 0 : 10)),
       serviceDetails: custom.serviceDetails || {}
     };
   }
@@ -730,6 +732,8 @@ class OperationsHubModule {
 
     container.innerHTML = this.activeNdItems.map((item, idx) => {
       const srvObj = serviceTypes.find(s => (s.code || s.id) === item.serviceType) || { name: item.serviceType, category: 'GENERAL' };
+      const currentProv = providers.find(p => p.id === item.providerId);
+      const provSubServices = (currentProv && currentProv.providerServices) ? currentProv.providerServices : [];
       const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
       const provCommAmt = (item.fareAmount || 0) * ((item.providerCommissionRate || 0) / 100);
       const netCost = isGross ? item.fareAmount : Math.max(0, item.fareAmount - provCommAmt);
@@ -754,8 +758,8 @@ class OperationsHubModule {
             ` : ''}
           </div>
 
-          <!-- Fila 1: Selector de Servicio, Proveedor y Modelo de Liquidación -->
-          <div class="form-row" style="grid-template-columns: 1.2fr 1.2fr 1.6fr; gap: 10px;">
+          <!-- Fila 1: Selector de Servicio, Proveedor, Sub-servicio y Modelo de Liquidación -->
+          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 1.3fr 1.1fr; gap: 8px;">
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Tipo de Servicio:</label>
               <select class="form-control font-bold" onchange="window.operationsHubModule.onItemServiceTypeChange(${idx}, this.value)">
@@ -763,16 +767,27 @@ class OperationsHubModule {
               </select>
             </div>
             <div>
-              <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador Responsable:</label>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
               <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
                 ${providers.map(p => `<option value="${p.id}" ${p.id === item.providerId ? 'selected' : ''}>${p.name} (${p.docNumber || p.code})</option>`).join('')}
               </select>
             </div>
             <div>
-              <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación Proveedor:</label>
+              <label class="form-label font-bold" style="font-size: 0.75rem; color: #0284c7;">Sub-servicio (Ficha Prov.):</label>
+              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSubServiceSelect(${idx}, this.value)">
+                <option value="">${provSubServices.length > 0 ? '-- Seleccionar Sub-servicio --' : '(Sin sub-servicios en ficha)'}</option>
+                ${provSubServices.map(sub => `
+                  <option value="${sub.serviceName}" data-code="${sub.serviceCode || ''}" data-rate="${sub.defaultCommissionRate ?? ''}" ${(item.description === sub.serviceName || item.subServiceName === sub.serviceName) ? 'selected' : ''}>
+                    ${sub.serviceName} ${sub.defaultCommissionRate !== undefined ? `(${sub.defaultCommissionRate}% Com.)` : ''}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
               <select class="form-control" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
-                <option value="DEDUCCION_DIRECTA" ${item.settlementModel === 'DEDUCCION_DIRECTA' ? 'selected' : ''}>Deducción Directa (Neto a pagar / Retención inmediata)</option>
-                <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto (Pago tarifa completa + Comisión por cobrar)</option>
+                <option value="DEDUCCION_DIRECTA" ${item.settlementModel === 'DEDUCCION_DIRECTA' ? 'selected' : ''}>Deducción Directa (Neto)</option>
+                <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto</option>
               </select>
             </div>
           </div>
@@ -800,9 +815,9 @@ class OperationsHubModule {
 
           <!-- Fila 4: Estructura Financiera e Importes -->
           <div style="background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 10px;">
-            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
+            <div class="form-row" style="grid-template-columns: 1.2fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem;">Tarifa Base (BOB):</label>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Tarifa Base (BOB) / Costo Proveedor:</label>
                 <input type="number" step="0.01" class="form-control font-mono font-bold" value="${item.fareAmount || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right;" required>
               </div>
               <div>
@@ -817,13 +832,13 @@ class OperationsHubModule {
                 <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">
                   Costo Prov. (${isGross ? 'Bruto' : 'Neto'}):
                 </label>
-                <div class="font-mono font-bold" style="padding: 7px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 0.88rem; color: #b91c1c;">
+                <div id="uni-item-net-cost-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 0.88rem; color: #b91c1c;">
                   BOB ${netCost.toFixed(2)}
                 </div>
               </div>
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem; color: #0369a1;">Total Ítem (A Cobrar):</label>
-                <div class="font-mono font-bold" style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
+                <div id="uni-item-line-total-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
                   BOB ${lineTotal.toFixed(2)}
                 </div>
               </div>
@@ -974,11 +989,43 @@ class OperationsHubModule {
     if (!this.activeNdItems[index]) return;
     this.activeNdItems[index][field] = value;
     if (field === 'fareAmount' || field === 'feeAmount' || field === 'providerCommissionRate') {
+      const item = this.activeNdItems[index];
+      const fare = parseFloat(item.fareAmount) || 0;
+      const fee = parseFloat(item.feeAmount) || 0;
+      const rate = parseFloat(item.providerCommissionRate) || 0;
+      const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
+      const commAmount = fare * (rate / 100);
+      const netCost = isGross ? fare : Math.max(0, fare - commAmount);
+      item.totalAmount = fare + fee;
+
+      const netCostEl = document.getElementById(`uni-item-net-cost-${index}`);
+      const lineTotalEl = document.getElementById(`uni-item-line-total-${index}`);
+      if (netCostEl) netCostEl.textContent = `BOB ${netCost.toFixed(2)}`;
+      if (lineTotalEl) lineTotalEl.textContent = `BOB ${(fare + fee).toFixed(2)}`;
+
       if (!this._debouncedCalcTotals) {
         this._debouncedCalcTotals = (window.debounce || (fn => fn))(() => this.calculateConsolidatedTotals(), 300);
       }
       this._debouncedCalcTotals();
     }
+  }
+
+  onItemSubServiceSelect(index, val) {
+    if (!this.activeNdItems[index]) return;
+    const item = this.activeNdItems[index];
+    item.subServiceName = val;
+    item.description = val;
+
+    const data = window.db.get();
+    const prov = (data.accounts || []).find(a => a.id === item.providerId);
+    if (prov && prov.providerServices) {
+      const match = prov.providerServices.find(s => s.serviceName === val);
+      if (match && match.defaultCommissionRate !== undefined && match.defaultCommissionRate !== null) {
+        item.providerCommissionRate = parseFloat(match.defaultCommissionRate) || 0;
+      }
+    }
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
   }
 
   onItemDetailChange(index, key, value) {
@@ -1005,6 +1052,16 @@ class OperationsHubModule {
       this.activeNdItems[index].providerName = prov.name;
       if (prov.settlementModel) {
         this.activeNdItems[index].settlementModel = prov.settlementModel;
+      }
+      if (prov.providerServices && prov.providerServices.length > 0) {
+        const first = prov.providerServices[0];
+        this.activeNdItems[index].subServiceName = first.serviceName;
+        this.activeNdItems[index].description = first.serviceName;
+        if (first.defaultCommissionRate !== undefined && first.defaultCommissionRate !== null) {
+          this.activeNdItems[index].providerCommissionRate = parseFloat(first.defaultCommissionRate) || 0;
+        }
+      } else {
+        this.activeNdItems[index].subServiceName = '';
       }
     }
     this.renderItemsRepeater();
@@ -1112,7 +1169,13 @@ class OperationsHubModule {
   }
 
   onPaymentTermChange() {
-    const term = document.getElementById('uni-payment-term')?.value || 'AL_CONTADO';
+    const termEl = document.getElementById('uni-payment-term');
+    const saveBtn = document.getElementById('btn-save-unified-operation');
+    if (!termEl) {
+      if (saveBtn) saveBtn.disabled = false;
+      return;
+    }
+    const term = termEl.value || 'PENDIENTE';
     const isPaid = (term === 'AL_CONTADO');
     const wrap = document.getElementById('uni-deposit-account-wrap');
     const depositSelect = document.getElementById('uni-deposit-account');
@@ -1127,23 +1190,15 @@ class OperationsHubModule {
       }
       this.onDepositAccountChange();
     } else {
-      // Crédito: No requiere cuenta de cobro inmediata
-      const pill = document.getElementById('uni-account-guard-pill');
-      if (pill) {
-        pill.style.background = '#f1f5f9';
-        pill.style.color = '#475569';
-        pill.innerHTML = `<span>Condición Crédito: Se registrará en Cuentas por Cobrar del cliente.</span>`;
-      }
-      const saveBtn = document.getElementById('btn-save-unified-operation');
       if (saveBtn) saveBtn.disabled = false;
     }
   }
 
   onDepositAccountChange() {
+    const select = document.getElementById('uni-deposit-account');
+    if (!select) return;
     const term = document.getElementById('uni-payment-term')?.value;
     if (term !== 'AL_CONTADO') return;
-
-    const select = document.getElementById('uni-deposit-account');
     const pill = document.getElementById('uni-account-guard-pill');
     const saveBtn = document.getElementById('btn-save-unified-operation');
     const accountId = select?.value;
@@ -1211,7 +1266,7 @@ class OperationsHubModule {
           <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="plane"></i> Formato de Vuelo / Boleto Aéreo GDS</span>
           <span class="badge badge-blue">Aéreo</span>
         </div>
-        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr; gap: 8px;">
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr; gap: 8px;">
           <div>
             <label class="form-label">Ruta Aérea (Origen - Destino):</label>
             <input type="text" id="uni-f-route" class="form-control font-mono font-bold" placeholder="Ej: LPB-VVI-LPB o VVI-MIA-VVI" value="${data.flightRoute || data.route || ''}">
@@ -1219,15 +1274,6 @@ class OperationsHubModule {
           <div>
             <label class="form-label">Código PNR / Localizador:</label>
             <input type="text" id="uni-f-pnr" class="form-control font-mono font-bold" placeholder="Ej: AZ44SK" value="${data.pnrCode || data.pnr || ''}">
-          </div>
-          <div>
-            <label class="form-label">Cabina / Clase:</label>
-            <select id="uni-f-cabin" class="form-control">
-              <option value="ECONÓMICA" ${(data.cabinClass === 'ECONÓMICA') ? 'selected' : ''}>Económica</option>
-              <option value="PREMIUM ECONOMY" ${(data.cabinClass === 'PREMIUM ECONOMY') ? 'selected' : ''}>Premium Economy</option>
-              <option value="EJECUTIVA / BUSINESS" ${(data.cabinClass === 'EJECUTIVA / BUSINESS') ? 'selected' : ''}>Ejecutiva / Business</option>
-              <option value="PRIMERA CLASE" ${(data.cabinClass === 'PRIMERA CLASE') ? 'selected' : ''}>Primera Clase</option>
-            </select>
           </div>
         </div>
         <div class="form-row" style="grid-template-columns: 1fr 1fr 1.5fr; gap: 8px; margin-top: 8px;">
@@ -1927,334 +1973,293 @@ class OperationsHubModule {
     try {
       const data = window.db.get();
       const clientId = document.getElementById('uni-client-select')?.value;
-    const issueDate = document.getElementById('uni-issue-date')?.value || new Date().toISOString().split('T')[0];
-    const paymentTerm = document.getElementById('uni-payment-term')?.value || 'AL_CONTADO';
-    const isPaid = (paymentTerm === 'AL_CONTADO');
-    const depositAccountId = document.getElementById('uni-deposit-account')?.value;
-    const observations = (document.getElementById('uni-observations')?.value || '').trim();
+      const issueDate = document.getElementById('uni-issue-date')?.value || new Date().toISOString().split('T')[0];
+      const observations = (document.getElementById('uni-observations')?.value || '').trim();
 
-    // 1. Validar Cliente
-    if (!clientId || clientId === '__NEW_CLIENT__') {
-      window.app.showToast('Debe seleccionar un cliente a facturar para registrar la ND', 'warning');
-      return;
-    }
-    const client = (data.accounts || []).find(a => a.id === clientId) || { name: 'Cliente' };
-
-    // 2. Validar que haya al menos 1 ítem
-    if (!this.activeNdItems || this.activeNdItems.length === 0) {
-      window.app.showToast('La Nota de Débito debe incluir al menos un servicio', 'warning');
-      return;
-    }
-
-    // 3. Validar Pasajero y Proveedor en cada ítem
-    for (let i = 0; i < this.activeNdItems.length; i++) {
-      const it = this.activeNdItems[i];
-      if (!it.passengerName || !it.passengerName.trim()) {
-        window.app.showToast(`Servicio #${i + 1}: Ingrese el nombre del pasajero o titular`, 'warning');
+      // 1. Validar Cliente
+      if (!clientId || clientId === '__NEW_CLIENT__') {
+        window.app.showToast('Debe seleccionar un cliente a facturar para registrar la ND', 'warning');
         return;
       }
-      if (!it.providerId) {
-        window.app.showToast(`Servicio #${i + 1}: Seleccione el proveedor u operador responsable`, 'warning');
+      const client = (data.accounts || []).find(a => a.id === clientId) || { name: 'Cliente' };
+
+      // 2. Validar que haya al menos 1 ítem
+      if (!this.activeNdItems || this.activeNdItems.length === 0) {
+        window.app.showToast('La Nota de Débito debe incluir al menos un servicio', 'warning');
         return;
       }
-    }
 
-    // 4. Guardrail Estricto de Cuenta Financiera en Contado
-    let validatedFinancialAccount = null;
-    if (isPaid) {
-      if (!depositAccountId) {
-        window.app.showToast('Bloqueo de Seguridad Guardrail: Debe seleccionar una Cuenta Financiera para cobrar al contado.', 'error');
-        return;
+      // 3. Validar Pasajero y Proveedor en cada ítem
+      for (let i = 0; i < this.activeNdItems.length; i++) {
+        const it = this.activeNdItems[i];
+        if (!it.passengerName || !it.passengerName.trim()) {
+          window.app.showToast(`Servicio #${i + 1}: Ingrese el nombre del pasajero o titular`, 'warning');
+          return;
+        }
+        if (!it.providerId) {
+          window.app.showToast(`Servicio #${i + 1}: Seleccione el proveedor u operador responsable`, 'warning');
+          return;
+        }
       }
-      validatedFinancialAccount = window.financialGuard ? window.financialGuard.getAccountById(depositAccountId) : null;
-      const check = window.financialGuard ? window.financialGuard.validateAccount(validatedFinancialAccount) : { valid: true };
-      if (!check.valid) {
-        window.app.showToast('Bloqueo de Seguridad: ' + check.summary, 'error');
-        return;
+
+      // 4. Tipo de Cambio Oficial Único Congelado (Single Source of Truth)
+      const { sellRate } = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+
+      // 5. Totales Consolidados
+      let totalConsolidadoBob = 0;
+      this.activeNdItems.forEach(it => {
+        totalConsolidadoBob += (parseFloat(it.fareAmount) || 0) + (parseFloat(it.feeAmount) || 0);
+      });
+      totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
+      const totalConsolidadoUsd = parseFloat((totalConsolidadoBob / sellRate).toFixed(2));
+
+      // EDICIÓN DE OPERACIÓN EXISTENTE
+      if (this.editingOperationId) {
+        const existingNd = (data.debitNotes || []).find(n => n.id === this.editingOperationId);
+        if (existingNd) {
+          existingNd.issueDate = issueDate;
+          existingNd.accountId = clientId;
+          existingNd.accountName = client.name;
+          existingNd.accountNit = client.docNumber || '';
+          existingNd.totalAmountBob = totalConsolidadoBob;
+          existingNd.totalAmountUsd = totalConsolidadoUsd;
+          const paidBob = existingNd.paidAmountBob || 0;
+          const paidUsd = existingNd.paidAmountUsd || 0;
+          existingNd.balanceBob = Math.max(0, totalConsolidadoBob - paidBob);
+          existingNd.balanceUsd = Math.max(0, totalConsolidadoUsd - paidUsd);
+          if (existingNd.balanceBob <= 0 && paidBob > 0) {
+            existingNd.status = 'PAGADA';
+          } else {
+            existingNd.status = 'PENDIENTE';
+          }
+          existingNd.observations = observations;
+
+          existingNd.items = this.activeNdItems.map((it, idx) => {
+            const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
+            const fare = parseFloat(it.fareAmount) || 0;
+            const fee = parseFloat(it.feeAmount) || 0;
+            const provCommRate = parseFloat(it.providerCommissionRate) || 0;
+            const provCommAmount = fare * (provCommRate / 100);
+            const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
+            const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+
+            return {
+              id: it.id || ('NDI-' + Date.now() + '-' + idx),
+              serviceType: it.serviceType,
+              ticketNumber: it.voucherNumber || ('VCH-' + Date.now()),
+              passengerName: it.passengerName,
+              passengerDocId: it.passengerDoc,
+              operatorId: it.providerId,
+              operatorName: prov.name,
+              description: it.description || it.subServiceName || `${it.serviceType} - ${it.passengerName}`,
+              serviceDetails: it.serviceDetails || {},
+              settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
+              fareAmount: fare,
+              feeAmount: fee,
+              totalAmount: fare + fee,
+              providerCommissionRate: provCommRate,
+              providerCommissionAmount: provCommAmount,
+              netCostToProvider: netCost,
+              currency: 'BOB'
+            };
+          });
+
+          window.db.save(data);
+          window.app.closeModal('modal-unified-operation');
+          this.render();
+          window.app.updateDashboardKpis();
+          window.app.showToast(`¡Operación ND #${existingNd.ndNumber} actualizada con éxito!`, 'success');
+          return;
+        }
       }
-    }
 
-    // 5. Tipo de Cambio Oficial Único Congelado (Single Source of Truth)
-    const { sellRate } = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+      // CREACIÓN NUEVA ND CONSOLIDADA (Nace obligatoriamente PENDIENTE con saldo_pendiente = total_venta)
+      const nextNdNumber = (data.debitNotes || []).reduce((max, n) => Math.max(max, n.ndNumber || 0), 1000) + 1;
+      const newNdId = 'ND-' + Date.now();
 
-    // 6. Totales Consolidados
-    let totalConsolidadoBob = 0;
-    this.activeNdItems.forEach(it => {
-      totalConsolidadoBob += (parseFloat(it.fareAmount) || 0) + (parseFloat(it.feeAmount) || 0);
-    });
-    totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
-    const totalConsolidadoUsd = parseFloat((totalConsolidadoBob / sellRate).toFixed(2));
+      const mappedItems = this.activeNdItems.map((it, idx) => {
+        const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
+        const fare = parseFloat(it.fareAmount) || 0;
+        const fee = parseFloat(it.feeAmount) || 0;
+        const provCommRate = parseFloat(it.providerCommissionRate) || 0;
+        const provCommAmount = fare * (provCommRate / 100);
+        const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
+        const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
 
-    // EDICIÓN DE OPERACIÓN EXISTENTE
-    if (this.editingOperationId) {
-      const existingNd = (data.debitNotes || []).find(n => n.id === this.editingOperationId);
-      if (existingNd) {
-        existingNd.issueDate = issueDate;
-        existingNd.accountId = clientId;
-        existingNd.accountName = client.name;
-        existingNd.accountNit = client.docNumber || '';
-        existingNd.paymentTerm = paymentTerm;
-        existingNd.depositAccountId = depositAccountId;
-        existingNd.totalAmountBob = totalConsolidadoBob;
-        existingNd.totalAmountUsd = totalConsolidadoUsd;
-        existingNd.balanceBob = isPaid ? 0 : totalConsolidadoBob;
-        existingNd.balanceUsd = isPaid ? 0 : totalConsolidadoUsd;
-        existingNd.status = isPaid ? 'PAGADA' : 'IMPAGA';
-        existingNd.observations = observations;
-
-        existingNd.items = this.activeNdItems.map((it, idx) => {
-          const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
-          const fare = parseFloat(it.fareAmount) || 0;
-          const fee = parseFloat(it.feeAmount) || 0;
-          const provCommRate = parseFloat(it.providerCommissionRate) || 0;
-          const provCommAmount = fare * (provCommRate / 100);
-          const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
-          const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
-
-          return {
-            id: it.id || ('NDI-' + Date.now() + '-' + idx),
-            serviceType: it.serviceType,
-            ticketNumber: it.voucherNumber || ('VCH-' + Date.now()),
+        let ticketId = null;
+        if (it.serviceType === 'BOLETO_AEREO' || it.serviceType === 'BOLETO_GDS') {
+          ticketId = 'TKT-' + Date.now() + '-' + idx;
+          data.gdsTickets.push({
+            id: ticketId,
+            ticketNumber: it.voucherNumber || ('TKT-' + Date.now()),
+            gdsSource: 'BOLETO_AEREO',
+            counter: '',
+            issueDate: issueDate,
             passengerName: it.passengerName,
             passengerDocId: it.passengerDoc,
+            route: it.serviceDetails?.flightRoute || 'Ruta Aérea',
+            airlineCode: (prov.code || 'AEREO').substring(0, 4),
             operatorId: it.providerId,
-            operatorName: prov.name,
-            description: it.description || `${it.serviceType} - ${it.passengerName}`,
-            serviceDetails: it.serviceDetails || {},
-            settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
             fareAmount: fare,
+            ticketPrice: fare,
+            netAmount: netCost,
+            taxAmount: 0,
+            totalAmount: fare,
+            currency: 'BOB',
+            commissionRate: provCommRate,
+            commissionAmount: provCommAmount,
             feeAmount: fee,
-            totalAmount: fare + fee,
-            providerCommissionRate: provCommRate,
-            providerCommissionAmount: provCommAmount,
-            netCostToProvider: netCost,
-            currency: 'BOB'
-          };
-        });
+            totalWithFee: fare + fee,
+            status: 'FACTURADO',
+            createdAt: new Date().toLocaleString()
+          });
+        }
 
-        window.db.save(data);
-        window.app.closeModal('modal-unified-operation');
-        this.render();
-        window.app.updateDashboardKpis();
-        window.app.showToast(`¡Operación ND #${existingNd.ndNumber} actualizada con éxito!`, 'success');
-        return;
-      }
-    }
-
-    // CREACIÓN NUEVA ND CONSOLIDADA
-    const nextNdNumber = (data.debitNotes || []).reduce((max, n) => Math.max(max, n.ndNumber || 0), 1000) + 1;
-    const newNdId = 'ND-' + Date.now();
-
-    const mappedItems = this.activeNdItems.map((it, idx) => {
-      const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
-      const fare = parseFloat(it.fareAmount) || 0;
-      const fee = parseFloat(it.feeAmount) || 0;
-      const provCommRate = parseFloat(it.providerCommissionRate) || 0;
-      const provCommAmount = fare * (provCommRate / 100);
-      const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
-      const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
-
-      let ticketId = null;
-      if (it.serviceType === 'BOLETO_AEREO' || it.serviceType === 'BOLETO_GDS') {
-        ticketId = 'TKT-' + Date.now() + '-' + idx;
-        data.gdsTickets.push({
-          id: ticketId,
-          ticketNumber: it.voucherNumber || ('TKT-' + Date.now()),
-          gdsSource: 'BOLETO_AEREO',
-          counter: '',
-          issueDate: issueDate,
+        return {
+          id: 'NDI-' + Date.now() + '-' + idx,
+          serviceType: it.serviceType,
+          gdsTicketId: ticketId,
+          ticketNumber: it.voucherNumber || ('VCH-' + Date.now().toString().slice(-6)),
           passengerName: it.passengerName,
           passengerDocId: it.passengerDoc,
-          route: it.serviceDetails?.flightRoute || 'Ruta Aérea',
-          airlineCode: (prov.code || 'AEREO').substring(0, 4),
           operatorId: it.providerId,
+          operatorName: prov.name,
+          description: it.description || it.subServiceName || `${it.serviceType} - ${it.passengerName}`,
+          serviceDetails: it.serviceDetails || {},
+          settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
           fareAmount: fare,
-          ticketPrice: fare,
-          netAmount: netCost,
-          taxAmount: 0,
-          totalAmount: fare,
-          currency: 'BOB',
-          commissionRate: provCommRate,
-          commissionAmount: provCommAmount,
           feeAmount: fee,
-          totalWithFee: fare + fee,
-          status: 'FACTURADO',
-          createdAt: new Date().toLocaleString()
-        });
-      }
+          totalAmount: fare + fee,
+          providerCommissionRate: provCommRate,
+          providerCommissionAmount: provCommAmount,
+          clientCommissionRate: 0,
+          clientCommissionAmount: 0,
+          counterCommissionAmount: 0,
+          netCostToProvider: netCost,
+          currency: 'BOB'
+        };
+      });
 
-      return {
-        id: 'NDI-' + Date.now() + '-' + idx,
-        serviceType: it.serviceType,
-        gdsTicketId: ticketId,
-        ticketNumber: it.voucherNumber || ('VCH-' + Date.now().toString().slice(-6)),
-        passengerName: it.passengerName,
-        passengerDocId: it.passengerDoc,
-        operatorId: it.providerId,
-        operatorName: prov.name,
-        description: it.description || `${it.serviceType} - ${it.passengerName}`,
-        serviceDetails: it.serviceDetails || {},
-        settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
-        fareAmount: fare,
-        feeAmount: fee,
-        totalAmount: fare + fee,
-        providerCommissionRate: provCommRate,
-        providerCommissionAmount: provCommAmount,
-        clientCommissionRate: 0,
-        clientCommissionAmount: 0,
-        counterCommissionAmount: 0,
-        netCostToProvider: netCost,
-        currency: 'BOB'
-      };
-    });
+      const firstPax = mappedItems[0]?.passengerName || 'Pasajero';
+      const paxSummary = mappedItems.length > 1 ? `${firstPax} (+${mappedItems.length - 1} servicios)` : firstPax;
 
-    const firstPax = mappedItems[0]?.passengerName || 'Pasajero';
-    const paxSummary = mappedItems.length > 1 ? `${firstPax} (+${mappedItems.length - 1} servicios)` : firstPax;
-
-    const newNd = {
-      id: newNdId,
-      ndNumber: nextNdNumber,
-      accountId: clientId,
-      accountName: client.name,
-      accountNit: client.docNumber || '',
-      requesterId: null,
-      solicitante: client.name,
-      passengerName: paxSummary,
-      issueDate: issueDate,
-      paymentTerm: paymentTerm,
-      currency: 'BOB',
-      frozenExchangeRate: sellRate,
-      exchangeRateUsed: sellRate,
-      totalAmountBob: totalConsolidadoBob,
-      totalAmountUsd: totalConsolidadoUsd,
-      paidAmountBob: isPaid ? totalConsolidadoBob : 0,
-      paidAmountUsd: isPaid ? totalConsolidadoUsd : 0,
-      balanceBob: isPaid ? 0 : totalConsolidadoBob,
-      balanceUsd: isPaid ? 0 : totalConsolidadoUsd,
-      status: isPaid ? 'PAGADA' : 'IMPAGA',
-      depositAccountId: isPaid ? depositAccountId : null,
-      financialAccountId: isPaid ? depositAccountId : null,
-      observations: observations || `ND Consolidada (${mappedItems.length} servicios)`,
-      createdById: 'USR-001',
-      createdByName: 'Luis',
-      items: mappedItems,
-      createdAt: new Date().toLocaleString()
-    };
-    data.debitNotes.push(newNd);
-
-    // Si fue al contado, generar Recibo de Caja Oficial con cuenta verificada y T/C congelado
-    if (isPaid && validatedFinancialAccount) {
-      const nextRcpNum = (data.cashReceipts || []).length + 1;
-      data.cashReceipts.push({
-        id: 'RCP-' + Date.now(),
-        receiptNumber: nextRcpNum,
-        date: issueDate,
-        receiptDate: issueDate,
+      const newNd = {
+        id: newNdId,
+        ndNumber: nextNdNumber,
         accountId: clientId,
         accountName: client.name,
-        debitNoteId: newNdId,
-        debitNoteNumber: nextNdNumber,
-        totalPaidBob: totalConsolidadoBob,
-        totalPaidUsd: totalConsolidadoUsd,
-        exchangeRateUsed: sellRate,
+        accountNit: client.docNumber || '',
+        requesterId: null,
+        solicitante: client.name,
+        passengerName: paxSummary,
+        issueDate: issueDate,
+        paymentTerm: 'PENDIENTE',
+        currency: 'BOB',
         frozenExchangeRate: sellRate,
-        paymentMethod: validatedFinancialAccount.bankName || validatedFinancialAccount.cashDeskName || 'Cuenta Financiera',
-        financialAccountId: depositAccountId,
-        bankAccountId: depositAccountId,
-        status: 'VALIDO',
+        exchangeRateUsed: sellRate,
+        totalAmountBob: totalConsolidadoBob,
+        totalAmountUsd: totalConsolidadoUsd,
+        paidAmountBob: 0,
+        paidAmountUsd: 0,
+        balanceBob: totalConsolidadoBob,
+        balanceUsd: totalConsolidadoUsd,
+        status: 'PENDIENTE',
+        depositAccountId: null,
+        financialAccountId: null,
+        observations: observations || `ND Consolidada (${mappedItems.length} servicios)`,
         createdById: 'USR-001',
-        createdByName: 'Luis (Admin)',
-        notes: `Cobro Total Contado ND #${nextNdNumber} (${mappedItems.length} servicios)`,
+        createdByName: 'Luis',
+        items: mappedItems,
         createdAt: new Date().toLocaleString()
+      };
+      data.debitNotes.push(newNd);
+
+      // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician PENDIENTE)
+      const providerGroups = {};
+      mappedItems.forEach(item => {
+        const pId = item.operatorId;
+        if (!providerGroups[pId]) {
+          providerGroups[pId] = {
+            providerId: pId,
+            providerName: item.operatorName,
+            items: [],
+            totalGross: 0,
+            totalNet: 0,
+            totalComm: 0,
+            settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
+          };
+        }
+        providerGroups[pId].items.push(item);
+        providerGroups[pId].totalGross += item.fareAmount;
+        providerGroups[pId].totalNet += item.netCostToProvider;
+        providerGroups[pId].totalComm += item.providerCommissionAmount;
+        if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
+          providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
+        }
       });
-    }
 
-    // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR
-    const providerGroups = {};
-    mappedItems.forEach(item => {
-      const pId = item.operatorId;
-      if (!providerGroups[pId]) {
-        providerGroups[pId] = {
-          providerId: pId,
-          providerName: item.operatorName,
-          items: [],
-          totalGross: 0,
-          totalNet: 0,
-          totalComm: 0,
-          settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
-        };
-      }
-      providerGroups[pId].items.push(item);
-      providerGroups[pId].totalGross += item.fareAmount;
-      providerGroups[pId].totalNet += item.netCostToProvider;
-      providerGroups[pId].totalComm += item.providerCommissionAmount;
-      if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
-        providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
-      }
-    });
+      let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 500);
 
-    let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 500);
+      Object.values(providerGroups).forEach((grp, gIdx) => {
+        nextNcNumber++;
+        const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
+        const provAmount = isGross ? grp.totalGross : grp.totalNet;
+        const provAcc = (data.accounts || []).find(a => a.id === grp.providerId) || {};
 
-    Object.values(providerGroups).forEach((grp, gIdx) => {
-      nextNcNumber++;
-      const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
-      const provAmount = isGross ? grp.totalGross : grp.totalNet;
-      const provAcc = (data.accounts || []).find(a => a.id === grp.providerId) || {};
+        if (provAmount > 0) {
+          data.creditNotes.push({
+            id: 'NC-' + Date.now() + '-' + gIdx,
+            ncNumber: nextNcNumber,
+            providerId: grp.providerId,
+            providerName: grp.providerName,
+            providerNit: provAcc.docNumber || '',
+            originDebitNoteId: newNdId,
+            originDebitNoteNumber: nextNdNumber,
+            issueDate: issueDate,
+            concept: isGross
+              ? `Liquidación Bruta Consolidador por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Proveedor Bruto]`
+              : `Liquidación Directa Neta por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Deducción Directa / Neto]`,
+            currency: 'BOB',
+            frozenExchangeRate: sellRate,
+            settlementModel: grp.settlementModel,
+            totalAmount: parseFloat(provAmount.toFixed(2)),
+            paidAmount: 0,
+            balance: parseFloat(provAmount.toFixed(2)),
+            status: 'PENDIENTE',
+            isAutoGenerated: true,
+            createdById: 'USR-001',
+            createdAt: new Date().toLocaleString()
+          });
+        }
 
-      if (provAmount > 0) {
-        data.creditNotes.push({
-          id: 'NC-' + Date.now() + '-' + gIdx,
-          ncNumber: nextNcNumber,
-          providerId: grp.providerId,
-          providerName: grp.providerName,
-          providerNit: provAcc.docNumber || '',
-          originDebitNoteId: newNdId,
-          originDebitNoteNumber: nextNdNumber,
-          issueDate: issueDate,
-          concept: isGross
-            ? `Liquidación Bruta Consolidador por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Proveedor Bruto]`
-            : `Liquidación Directa Neta por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Deducción Directa / Neto]`,
-          currency: 'BOB',
-          frozenExchangeRate: sellRate,
-          settlementModel: grp.settlementModel,
-          totalAmount: parseFloat(provAmount.toFixed(2)),
-          paidAmount: 0,
-          balance: parseFloat(provAmount.toFixed(2)),
-          status: 'IMPAGA',
-          isAutoGenerated: true,
-          createdById: 'USR-001',
-          createdAt: new Date().toLocaleString()
-        });
-      }
+        // Si el modelo es Consolidador Bruto y hay comisión, registrarla como Comisión por Cobrar diferida
+        if (isGross && grp.totalComm > 0) {
+          data.otherIncomes.push({
+            id: 'INC-' + Date.now() + '-' + gIdx,
+            originType: 'COMISION_PLATAFORMA',
+            operatorId: grp.providerId,
+            operatorName: grp.providerName,
+            issueDate: issueDate,
+            passengerName: grp.items[0]?.passengerName || 'Pax',
+            route: `Comisión diferida por ND #${nextNdNumber}`,
+            amount: parseFloat(grp.totalComm.toFixed(2)),
+            currency: 'BOB',
+            frozenExchangeRate: sellRate,
+            description: `Comisión por Cobrar a Proveedor Consolidador ${grp.providerName} por ND #${nextNdNumber}`,
+            status: 'PENDIENTE',
+            createdAt: new Date().toLocaleString()
+          });
+        }
+      });
 
-      // Si el modelo es Consolidador Bruto y hay comisión, registrarla como Comisión por Cobrar diferida
-      if (isGross && grp.totalComm > 0) {
-        data.otherIncomes.push({
-          id: 'INC-' + Date.now() + '-' + gIdx,
-          originType: 'COMISION_PLATAFORMA',
-          operatorId: grp.providerId,
-          operatorName: grp.providerName,
-          issueDate: issueDate,
-          passengerName: grp.items[0]?.passengerName || 'Pax',
-          route: `Comisión diferida por ND #${nextNdNumber}`,
-          amount: parseFloat(grp.totalComm.toFixed(2)),
-          currency: 'BOB',
-          frozenExchangeRate: sellRate,
-          description: `Comisión por Cobrar a Proveedor Consolidador ${grp.providerName} por ND #${nextNdNumber}`,
-          status: 'IMPAGA',
-          createdAt: new Date().toLocaleString()
-        });
-      }
-    });
+      window.db.save(data);
+      window.app.closeModal('modal-unified-operation');
+      this.render();
+      window.app.updateDashboardKpis();
+      if (window.creditNotesModule) window.creditNotesModule.render();
 
-    window.db.save(data);
-    window.app.closeModal('modal-unified-operation');
-    this.render();
-    window.app.updateDashboardKpis();
-    if (window.creditNotesModule) window.creditNotesModule.render();
-
-    const providerCount = Object.keys(providerGroups).length;
-    window.app.showToast(`¡ND #${nextNdNumber} consolidada con éxito (${mappedItems.length} servicios)! Se bifurcaron ${providerCount} Cuentas por Pagar (NCs) a proveedores.`, 'success');
+      const providerCount = Object.keys(providerGroups).length;
+      window.app.showToast(`¡ND #${nextNdNumber} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');
     } catch (err) {
       console.error('Error al procesar y guardar la operación:', err);
       window.app.showToast('Error al guardar la operación: ' + (err.message || err), 'error');
@@ -2289,15 +2294,16 @@ class OperationsHubModule {
       `;
     }
 
-    document.getElementById('uni-client-select').value = nd.accountId || '';
-    document.getElementById('uni-issue-date').value = nd.issueDate || new Date().toISOString().split('T')[0];
-    document.getElementById('uni-payment-term').value = nd.paymentTerm || 'AL_CONTADO';
-    if (document.getElementById('uni-deposit-account')) {
-      document.getElementById('uni-deposit-account').value = nd.depositAccountId || nd.financialAccountId || '';
-    }
-    if (document.getElementById('uni-observations')) {
-      document.getElementById('uni-observations').value = nd.observations || '';
-    }
+    const clientSelect = document.getElementById('uni-client-select');
+    if (clientSelect) clientSelect.value = nd.accountId || '';
+    const dateInput = document.getElementById('uni-issue-date');
+    if (dateInput) dateInput.value = nd.issueDate || new Date().toISOString().split('T')[0];
+    const termEl = document.getElementById('uni-payment-term');
+    if (termEl) termEl.value = nd.paymentTerm || 'PENDIENTE';
+    const depEl = document.getElementById('uni-deposit-account');
+    if (depEl) depEl.value = nd.depositAccountId || nd.financialAccountId || '';
+    const obsEl = document.getElementById('uni-observations');
+    if (obsEl) obsEl.value = nd.observations || '';
 
     if (Array.isArray(nd.items) && nd.items.length > 0) {
       this.activeNdItems = nd.items.map(it => ({
@@ -2305,6 +2311,7 @@ class OperationsHubModule {
         serviceType: it.serviceType || 'BOLETO_AEREO',
         providerId: it.operatorId || it.providerId || '',
         providerName: it.operatorName || it.providerName || '',
+        subServiceName: it.subServiceName || it.description || '',
         settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
         passengerName: it.passengerName || nd.passengerName || '',
         passengerDoc: it.passengerDocId || it.passengerDoc || '',

@@ -1964,10 +1964,6 @@ window.debitNotesModule = {
                 <td class="nd-lbl-cell">Empresa/Cliente :</td>
                 <td class="nd-val-cell font-bold">${clientNameUpper}</td>
               </tr>
-              <tr>
-                <td class="nd-lbl-cell">T/C Aplicado :</td>
-                <td class="nd-val-cell font-mono font-bold" style="color: #047857;">1 USD = ${Number(tcUsed).toFixed(2)} BOB (Fijado)</td>
-              </tr>
             </table>
           </div>
 
@@ -2000,15 +1996,13 @@ window.debitNotesModule = {
               <thead>
                 <tr>
                   <th style="background: transparent; border: none;"></th>
-                  <th class="nd-th-currency">USD</th>
                   <th class="nd-th-currency">BOB</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td class="nd-td-total-label">Importe Total ND:</td>
-                  <td class="nd-td-total-val font-mono">${totalUsdFormatted}</td>
-                  <td class="nd-td-total-val font-mono">${totalBobFormatted}</td>
+                  <td class="nd-td-total-val font-mono">BOB ${totalBobFormatted}</td>
                 </tr>
               </tbody>
             </table>
@@ -2018,8 +2012,6 @@ window.debitNotesModule = {
             <span class="nd-obs-badge">Observaciones ND:</span>
             <span class="nd-obs-content font-bold">${obsText}</span>
           </div>
-          ${depositInfoHtml}
-          ${bankListHtml}
         </div>
 
         <!-- 4. FIRMAS -->

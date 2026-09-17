@@ -163,7 +163,7 @@ window.cashRegisterModule = {
     tbody.innerHTML = filtered.map(nd => {
       const statusBadge = nd.status === 'PAGADA' ? 'badge-emerald' :
                           nd.status === 'PARCIAL' ? 'badge-blue' :
-                          nd.status === 'IMPAGA' ? 'badge-amber' :
+                          (nd.status === 'IMPAGA' || nd.status === 'PENDIENTE') ? 'badge-amber' :
                           nd.status === 'CERRADA' ? 'badge-indigo' :
                           nd.status === 'BORRADOR' ? 'badge-slate' : 'badge-rose';
 
@@ -241,7 +241,7 @@ window.cashRegisterModule = {
     }
 
     const data = window.db.get();
-    const pendingNds = data.debitNotes.filter(n => n.accountId === clientId && (n.status === 'IMPAGA' || n.status === 'PARCIAL' || n.status === 'CERRADA') && n.balanceBob > 0);
+    const pendingNds = data.debitNotes.filter(n => n.accountId === clientId && (n.status === 'PENDIENTE' || n.status === 'IMPAGA' || n.status === 'PARCIAL' || n.status === 'CERRADA') && n.balanceBob > 0);
 
     if (pendingNds.length === 0) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #15803d; font-weight: 600;">Este cliente no tiene Notas de Débito pendientes de pago. ¡Al día!</td></tr>`;
@@ -812,10 +812,6 @@ window.cashRegisterModule = {
         btn.style.cursor = 'not-allowed';
       }
     }
-  },
-
-    // Cargar historial de NCs integrado
-    this.renderNcHistory();
   },
 
   switchNcSubView(subview) {
