@@ -47,9 +47,9 @@ window.settingsModule = {
       inputImport.addEventListener('change', (e) => this.handleImportBackup(e));
     }
 
-    const btnReset = document.getElementById('btn-reset-database');
+    const btnReset = document.getElementById('btnRestablecerDatosPrueba') || document.getElementById('btn-reset-database');
     if (btnReset) {
-      btnReset.addEventListener('click', () => this.handleResetDatabase());
+      btnReset.addEventListener('click', () => this.handleResetDatosPrueba());
     }
   },
 
@@ -236,15 +236,62 @@ window.settingsModule = {
     reader.readAsText(file);
   },
 
-  async handleResetDatabase() {
-    if (confirm('¿ATENCIÓN: Está seguro de limpiar y reiniciar toda la base de datos a 0 en el servidor y disco?\n\nSe vaciarán todas las cuentas, boletos, notas de débito y movimientos, dejando el sistema completamente limpio para registrar todo desde cero.')) {
-      const ok = await window.db.reset();
-      if (ok) {
-        window.app.showToast('Base de datos restablecida en disco a sus valores limpios iniciales', 'info');
-        setTimeout(() => location.reload(), 600);
-      } else {
-        window.app.showToast('Error al restablecer la base de datos en disco', 'error');
+  async handleResetDatosPrueba() {
+    const confirmed = confirm('ADVERTENCIA: Esta acción eliminará todas las operaciones, cobros y cambios actuales para volver a los datos iniciales de fábrica. ¿Deseas continuar?');
+    if (!confirmed) return;
+
+    const btn = document.getElementById('btnRestablecerDatosPrueba') || document.getElementById('btn-reset-database');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Restableciendo...';
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
       }
     }
+
+    try {
+      const response = await fetch('/api/admin/reset-datos-prueba', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && (result.ok || result.success)) {
+        // Limpieza de almacenamiento local y caché en cliente
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('MARETRAVEL_ERP_DB_V2');
+          localStorage.removeItem('MARETRAVEL_ERP_DB');
+        }
+        if (window.db && typeof window.db.syncWithServerFile === 'function') {
+          await window.db.syncWithServerFile();
+        }
+
+        const msg = result.mensaje || 'Sistema restablecido a datos de prueba con éxito';
+        if (window.app && typeof window.app.showToast === 'function') {
+          window.app.showToast(msg, 'success');
+        }
+        alert(msg);
+        window.location.reload();
+      } else {
+        throw new Error(result.error || result.mensaje || 'Error en el servidor al restablecer');
+      }
+    } catch (err) {
+      console.error('[RESET ERROR]:', err);
+      alert('Error al restablecer los datos de prueba: ' + err.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
+    }
+  },
+
+  async handleResetDatabase() {
+    return this.handleResetDatosPrueba();
   }
 };

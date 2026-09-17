@@ -241,11 +241,18 @@ class LocalDatabase {
 
   async reset() {
     try {
-      const res = await fetch('/api/db/reset', {
+      let res = await fetch('/api/admin/reset-datos-prueba', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true })
       });
+      if (!res.ok) {
+        res = await fetch('/api/db/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: true })
+        });
+      }
       if (res.ok) {
         const fresh = await res.json();
         this.cachedData = fresh.data || null;

@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const DB_PATH = path.join(DATA_DIR, 'database.json');
+const SEED_PATH = path.join(DATA_DIR, 'seedData.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
 // Asegurar directorios de persistencia física
@@ -124,12 +125,28 @@ const INITIAL_SEED_DATABASE = {
 // ============================================================================
 
 /**
+ * Obtiene la plantilla semilla de datos de prueba desde seedData.json o la constante inicial.
+ */
+function getSeedData() {
+  if (fs.existsSync(SEED_PATH)) {
+    try {
+      const raw = fs.readFileSync(SEED_PATH, 'utf-8');
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('[SEED] Error leyendo data/seedData.json:', e.message);
+    }
+  }
+  return INITIAL_SEED_DATABASE;
+}
+
+/**
  * Lee la base de datos física desde disco. Si no existe, inicializa con la plantilla persistente.
  */
 function readDbSync() {
   if (!fs.existsSync(DB_PATH)) {
-    saveDbSync(INITIAL_SEED_DATABASE);
-    return JSON.parse(JSON.stringify(INITIAL_SEED_DATABASE));
+    const seed = getSeedData();
+    saveDbSync(seed);
+    return JSON.parse(JSON.stringify(seed));
   }
   const raw = fs.readFileSync(DB_PATH, 'utf-8');
   return JSON.parse(raw);
@@ -610,33 +627,43 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // RESTABLECER A DATOS INICIALES (RESET CONTROLADO): /api/db/reset
-  if (pathname === '/api/db/reset' && req.method === 'POST') {
+  // RESTABLECER A DATOS DE PRUEBA INICIALES: /api/admin/reset-datos-prueba (y alias /api/db/reset)
+  if ((pathname === '/api/admin/reset-datos-prueba' || pathname === '/api/db/reset') && req.method === 'POST') {
     try {
-      const payload = await parseRequestBody(req);
-      if (!payload.confirm) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Se requiere confirmación explícita (confirm: true) para restablecer la base de datos a 0.' }));
-        return;
-      }
-
-      // Crear copia de seguridad antes del reseteo
+      // 1. Crear copia de seguridad preventiva antes del reseteo
       createBackupCopy('pre_reset');
 
-      // Restablecer archivo físico con la plantilla limpia
-      saveDbSync(INITIAL_SEED_DATABASE);
+      // 2. Obtener estructura semilla de prueba inicial
+      const seedData = getSeedData();
 
-      console.log(`[RESET] Base de datos restablecida a valores iniciales limpios en data/database.json`);
+      // 3. Sobrescribir atómica y sincrónicamente el archivo central data/database.json
+      saveDbSync(seedData);
+
+      // 4. Sobrescribir archivos físicos individuales en /data/ usando fs.promises.writeFile
+      await Promise.all([
+        fs.promises.writeFile(path.join(DATA_DIR, 'seedData.json'), JSON.stringify(seedData, null, 2), 'utf-8'),
+        fs.promises.writeFile(path.join(DATA_DIR, 'operaciones.json'), JSON.stringify(seedData.debitNotes || [], null, 2), 'utf-8'),
+        fs.promises.writeFile(path.join(DATA_DIR, 'cuentas.json'), JSON.stringify(seedData.accounts || [], null, 2), 'utf-8'),
+        fs.promises.writeFile(path.join(DATA_DIR, 'boletos.json'), JSON.stringify(seedData.gdsTickets || [], null, 2), 'utf-8'),
+        fs.promises.writeFile(path.join(DATA_DIR, 'config.json'), JSON.stringify(seedData.systemSettings || {}, null, 2), 'utf-8')
+      ]);
+
+      console.log(`[RESET] Sistema restablecido a datos de prueba iniciales con persistencia en disco.`);
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
+        ok: true,
         success: true,
-        message: 'Base de datos restablecida en disco a sus valores iniciales limpios.',
-        data: INITIAL_SEED_DATABASE
+        mensaje: 'Sistema restablecido a datos de prueba con éxito',
+        data: seedData
       }));
     } catch (err) {
       console.error('[RESET ERROR]:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Error al restablecer base de datos en disco: ' + err.message }));
+      res.end(JSON.stringify({
+        ok: false,
+        error: 'Error al restablecer sistema a datos de prueba en disco: ' + err.message
+      }));
     }
     return;
   }
