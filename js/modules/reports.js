@@ -797,7 +797,7 @@ window.reportsModule = {
     printArea.innerHTML = `
       <div class="print-page" style="max-width: 270mm;"> <!-- Formato Horizontal -->
         <div class="print-header">
-          <img src="assets/logo.jpg" class="print-logo" alt="MARETRAVEL Logo">
+          <img src="${window.maretravelLogoBase64 || (settings && settings.logoBase64) || 'assets/logo.png'}" class="print-logo" alt="MARETRAVEL Logo">
           <div class="print-agency-info">
             <div class="print-agency-title">${settings.agencyCommercialName}</div>
             <div>NIT: ${settings.agencyNit}</div>
@@ -899,7 +899,7 @@ window.reportsModule = {
     printArea.innerHTML = `
       <div class="print-page" style="max-width: 270mm;">
         <div class="print-header">
-          <img src="assets/logo.jpg" class="print-logo" alt="MARETRAVEL Logo" onerror="this.style.display='none'">
+          <img src="${window.maretravelLogoBase64 || (settings && settings.logoBase64) || 'assets/logo.png'}" class="print-logo" alt="MARETRAVEL Logo" onerror="this.src='assets/logo.png'">
           <div class="print-agency-info">
             <div class="print-agency-title">${settings.agencyCommercialName || 'MARETRAVEL S.R.L.'}</div>
             <div>NIT: ${settings.agencyNit || '1028374021'}</div>

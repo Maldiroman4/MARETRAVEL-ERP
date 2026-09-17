@@ -478,7 +478,7 @@ window.calendarModule = {
       <div class="print-page">
         <!-- Membrete Oficial MARETRAVEL -->
         <div class="print-header">
-          <img src="assets/logo.jpg" class="print-logo" alt="MARETRAVEL Logo">
+          <img src="${window.maretravelLogoBase64 || (settings && settings.logoBase64) || 'assets/logo.png'}" class="print-logo" alt="MARETRAVEL Logo">
           <div class="print-agency-info">
             <div class="print-agency-title">${settings.agencyCommercialName}</div>
             <div>NIT: ${settings.agencyNit}</div>

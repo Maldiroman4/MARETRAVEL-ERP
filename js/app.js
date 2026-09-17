@@ -19,6 +19,19 @@ window.app = {
       }
     }
 
+    // Carga proactiva del logo oficial en Base64 para vistas de impresión
+    try {
+      const dbSettings = window.db && window.db.get() && window.db.get().systemSettings;
+      if (dbSettings && dbSettings.logoBase64) {
+        window.maretravelLogoBase64 = dbSettings.logoBase64;
+      } else {
+        fetch('/api/logo-base64')
+          .then(r => r.json())
+          .then(d => { if (d && d.logoBase64) window.maretravelLogoBase64 = d.logoBase64; })
+          .catch(() => {});
+      }
+    } catch (e) {}
+
     if (this.isAuthenticated()) {
       this.showApp();
       if (!this.initialized) {

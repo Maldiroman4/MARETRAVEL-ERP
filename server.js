@@ -8,6 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { renderOfficialPrintDocument } = require('./printRenderer');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -122,7 +123,28 @@ const INITIAL_SEED_DATABASE = {
 
 // ============================================================================
 // GESTOR DE PERSISTENCIA TRANSACCIONAL EN DISCO
-// ============================================================================
+/**
+ * Lectura y Conversión en Backend del Logo Oficial a Base64.
+ * Previene que las rutas relativas fallen en diálogos de impresión nativos, iframes o generadores PDF.
+ */
+function obtenerLogoBase64() {
+  try {
+    // Busca la imagen dentro de la carpeta assets (logo.png o logo.jpg)
+    const rutaLogoPng = path.join(__dirname, 'assets', 'logo.png');
+    if (fs.existsSync(rutaLogoPng)) {
+      const buffer = fs.readFileSync(rutaLogoPng);
+      return `data:image/png;base64,${buffer.toString('base64')}`;
+    }
+    const rutaLogoJpg = path.join(__dirname, 'assets', 'logo.jpg');
+    if (fs.existsSync(rutaLogoJpg)) {
+      const buffer = fs.readFileSync(rutaLogoJpg);
+      return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    }
+  } catch (err) {
+    console.error('Error al cargar logo:', err);
+  }
+  return ''; // Fallback si no existe
+}
 
 /**
  * Obtiene la plantilla semilla de datos de prueba desde seedData.json o la constante inicial.
@@ -297,6 +319,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/db' && req.method === 'GET') {
     try {
       const dbData = readDbSync();
+      if (dbData && dbData.systemSettings) {
+        dbData.systemSettings.logoBase64 = obtenerLogoBase64();
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(dbData));
     } catch (err) {
@@ -492,8 +517,10 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/config') {
     const db = readDbSync();
     if (req.method === 'GET') {
+      const settings = { ...(db.systemSettings || {}) };
+      settings.logoBase64 = obtenerLogoBase64();
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(db.systemSettings || {}));
+      res.end(JSON.stringify(settings));
       return;
     }
     if (req.method === 'POST') {
@@ -508,6 +535,44 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: err.message }));
       }
       return;
+    }
+  }
+
+  // CARGA DINÁMICA DEL LOGO EN BASE64: /api/logo-base64
+  if ((pathname === '/api/logo-base64' || pathname === '/api/logo' || pathname === '/api/print/logo') && req.method === 'GET') {
+    const logoBase64 = obtenerLogoBase64();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, logoBase64 }));
+    return;
+  }
+
+  // INYECCIÓN O RENDERIZACIÓN DE IMPRESIÓN CON LOGO BASE64 EN SERVIDOR: /api/print/nd/:id, /api/print/nc/:id, /api/print/:id
+  if (pathname.startsWith('/api/print/')) {
+    const parts = pathname.split('/').filter(Boolean);
+    const subRoute = parts[2];
+    const docId = parts[3] || parts[2];
+    if (docId && docId !== 'logo') {
+      const db = readDbSync();
+      const isNc = (subRoute && subRoute.toLowerCase() === 'nc') || String(docId).startsWith('NC');
+      let doc = isNc 
+        ? (db.creditNotes || []).find(n => n.id === docId)
+        : (db.debitNotes || []).find(n => n.id === docId);
+
+      if (!doc) {
+        doc = (db.creditNotes || []).find(n => n.id === docId) || (db.debitNotes || []).find(n => n.id === docId);
+      }
+
+      if (doc) {
+        const logoBase64 = obtenerLogoBase64();
+        const html = renderOfficialPrintDocument(doc, isNc ? 'NC' : 'ND', logoBase64);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+        return;
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Documento no encontrado para impresión: ' + docId);
+        return;
+      }
     }
   }
 

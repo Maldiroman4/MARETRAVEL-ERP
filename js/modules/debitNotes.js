@@ -8,8 +8,38 @@ window.debitNotesModule = {
   currentStatusFilter: 'TODOS',
   currentEditingNdId: null,
   activeItems: [], // Items temporales en creación/edición de ND
+  cachedLogoBase64: null,
+
+  async cargarLogoBase64() {
+    if (this.cachedLogoBase64) return this.cachedLogoBase64;
+    if (window.maretravelLogoBase64) {
+      this.cachedLogoBase64 = window.maretravelLogoBase64;
+      return this.cachedLogoBase64;
+    }
+    const dbSettings = window.db && window.db.get() && window.db.get().systemSettings;
+    if (dbSettings && dbSettings.logoBase64) {
+      this.cachedLogoBase64 = dbSettings.logoBase64;
+      window.maretravelLogoBase64 = dbSettings.logoBase64;
+      return dbSettings.logoBase64;
+    }
+    try {
+      const res = await fetch('/api/logo-base64');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.logoBase64) {
+          this.cachedLogoBase64 = json.logoBase64;
+          window.maretravelLogoBase64 = json.logoBase64;
+          return json.logoBase64;
+        }
+      }
+    } catch (e) {
+      console.warn('[LOGO] No se pudo cargar logo base64:', e);
+    }
+    return 'assets/logo.png';
+  },
 
   init() {
+    this.cargarLogoBase64();
     this.bindEvents();
     this.render();
   },
@@ -1967,12 +1997,18 @@ window.debitNotesModule = {
       obsText = (doc.observations || doc.concept || (doc.items && doc.items[0] && doc.items[0].description) || 'OPERACIÓN REGISTRADA').toUpperCase();
     }
 
+    // Carga e inyección dinámica del logo en Base64 para vista de impresión / PDF
+    const logoSrc = this.cachedLogoBase64 
+      || window.maretravelLogoBase64 
+      || (window.db && window.db.get() && window.db.get().systemSettings && window.db.get().systemSettings.logoBase64) 
+      || 'assets/logo.png';
+
     return `
       <div class="nd-official-container">
         <!-- 1. ENCABEZADO DE 3 COLUMNAS -->
         <div class="nd-official-header">
           <div class="nd-header-brand">
-            <img src="assets/logo.jpg" class="nd-official-logo" alt="MARETRAVEL" onerror="this.style.display='none'">
+            <img src="${logoSrc}" class="nd-official-logo" alt="MARETRAVEL" onerror="this.src='assets/logo.png'">
           </div>
 
           <div class="nd-header-title-box">
@@ -2151,16 +2187,22 @@ window.debitNotesModule = {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            .nd-obs-badge {
-              background-color: #00a884 !important;
-              color: #ffffff !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+            .nd-official-logo {
+              max-width: 165px !important;
+              height: 65px !important;
+              object-fit: contain !important;
+              display: block !important;
             }
           </style>
         </head>
         <body>
-          ${voucherHtml}
+          ${(() => {
+            const logo = this.cachedLogoBase64 || window.maretravelLogoBase64;
+            if (logo) {
+              return voucherHtml.replace(/src=["']assets\/logo\.(?:jpg|png|jpeg)["']/gi, `src="${logo}"`);
+            }
+            return voucherHtml;
+          })()}
         </body>
         </html>
       `);
