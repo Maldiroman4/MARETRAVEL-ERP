@@ -7,7 +7,7 @@
 
 class OperationsHubModule {
   constructor() {
-    this.currentTab = 'all'; // 'all', 'tickets', 'nds', 'ncs', 'accounts', 'cash'
+    this.currentTab = 'nds'; // 'nds', 'ncs', 'cash'
     this.editingOperationId = null;
     this.editingServiceTypeId = null;
     this.searchQuery = '';
@@ -170,8 +170,6 @@ class OperationsHubModule {
   }
 
   switchTab(tabName) {
-    // nds y ncs son pestañas de primer nivel con su propio panel
-    // (ya no redirigen a 'cash')
     this.currentTab = tabName;
 
     // Activar botón de pestaña correspondiente
@@ -179,47 +177,43 @@ class OperationsHubModule {
       btn.classList.toggle('active', btn.dataset.hubTab === tabName);
     });
 
-    // Barra de filtros: visible solo en pestaña 'all'
+    // Barra de filtros: visible solo en pestaña 'nds' (Nota Débito)
     const filterRow = document.getElementById('hub-filters-row');
     if (filterRow) {
-      filterRow.style.display = (tabName === 'all') ? 'flex' : 'none';
+      filterRow.style.display = (tabName === 'nds' || tabName === 'all') ? 'flex' : 'none';
     }
 
     // Toggle de paneles
     document.querySelectorAll('.hub-tab-panel').forEach(panel => {
       panel.style.display = 'none';
     });
-    const activePanel = document.getElementById(`hub-panel-${tabName}`);
-    if (activePanel) {
-      activePanel.style.display = 'block';
+
+    if (tabName === 'nds' || tabName === 'all') {
+      const activePanel = document.getElementById('hub-panel-all');
+      if (activePanel) {
+        activePanel.style.display = 'block';
+        this.renderAllOperations(activePanel);
+      }
+    } else if (tabName === 'ncs') {
+      const activePanel = document.getElementById('hub-panel-ncs');
+      if (activePanel) {
+        activePanel.style.display = 'block';
+        this.renderNcsSubView(activePanel);
+      }
+    } else if (tabName === 'cash') {
+      const activePanel = document.getElementById('hub-panel-cash');
+      if (activePanel) {
+        activePanel.style.display = 'block';
+        this.renderCashSubView();
+      }
     }
 
-    // Si entra a nds, mostrar sub-vista correcta en cash-register
-    if (tabName === 'nds' && window.cashRegisterModule) {
-      window.cashRegisterModule.showTabContent('cobranzas');
-      window.cashRegisterModule.switchNdSubView('history');
-    }
-    // Si entra a ncs, mostrar sub-vista correcta en cash-register
-    if (tabName === 'ncs' && window.cashRegisterModule) {
-      window.cashRegisterModule.showTabContent('pagos');
-      window.cashRegisterModule.switchNcSubView('history');
-    }
-
-    this.renderActiveTabContent();
     if (window.lucide) window.lucide.createIcons();
   }
 
   filterByService(serviceCode) {
-    this.currentTab = 'all';
+    this.currentTab = 'nds';
     this.filterService = serviceCode || 'ALL';
-
-    // Actualizar etiqueta dinámica de la pestaña de servicio
-    const tabLabel = document.getElementById('hub-tab-service-label');
-    if (tabLabel) {
-      tabLabel.textContent = (serviceCode && serviceCode !== 'ALL')
-        ? this.formatServiceName(serviceCode)
-        : 'Servicio';
-    }
 
     // Sincronizar select de filtro si existe
     const filterSelect = document.getElementById('hub-filter-service');
@@ -234,9 +228,9 @@ class OperationsHubModule {
       filterSelect.value = serviceCode;
     }
 
-    // Activar pestaña 'all'
+    // Activar pestaña 'nds' (Nota Débito)
     document.querySelectorAll('.hub-tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.hubTab === 'all');
+      btn.classList.toggle('active', btn.dataset.hubTab === 'nds');
     });
 
     const filterRow = document.getElementById('hub-filters-row');
@@ -244,28 +238,26 @@ class OperationsHubModule {
 
     document.querySelectorAll('.hub-tab-panel').forEach(p => p.style.display = 'none');
     const panelAll = document.getElementById('hub-panel-all');
-    if (panelAll) panelAll.style.display = 'block';
+    if (panelAll) {
+      panelAll.style.display = 'block';
+      this.renderAllOperations(panelAll);
+    }
 
     const titleEl = document.getElementById('current-page-title');
     if (titleEl && serviceCode && serviceCode !== 'ALL') {
       titleEl.textContent = `Servicios: ${this.formatServiceName(serviceCode)}`;
     }
 
-    this.renderActiveTabContent();
     if (window.lucide) window.lucide.createIcons();
   }
 
-
   renderActiveTabContent() {
-    if (this.currentTab === 'all') {
+    if (this.currentTab === 'nds' || this.currentTab === 'all') {
       const container = document.getElementById('hub-panel-all');
       if (container) this.renderAllOperations(container);
     } else if (this.currentTab === 'tickets') {
       const container = document.getElementById('hub-panel-tickets');
       if (container) this.renderTicketsSubView(container);
-    } else if (this.currentTab === 'nds') {
-      const container = document.getElementById('hub-panel-nds');
-      if (container) this.renderNdsSubView(container);
     } else if (this.currentTab === 'ncs') {
       const container = document.getElementById('hub-panel-ncs');
       if (container) this.renderNcsSubView(container);
