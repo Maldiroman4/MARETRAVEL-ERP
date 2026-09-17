@@ -461,24 +461,117 @@ class OperationsHubModule {
   }
 
   renderAccountsSubView(container) {
-    container.innerHTML = `<div id="hub-accounts-subview"></div>`;
-    if (window.accountsModule) {
-      window.accountsModule.render();
-      const originTable = document.querySelector('#view-cuentas .table-container');
-      if (originTable) {
-        document.getElementById('hub-accounts-subview').innerHTML = `
-          <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <h4 style="margin: 0; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-              <i data-lucide="users" style="color: #059669;"></i> Directorio de Cuentas (Clientes y Proveedores)
-            </h4>
-            <button class="btn btn-primary btn-sm" onclick="window.accountsModule.openNewAccountModal()">
-              <i data-lucide="plus"></i> Nueva Cuenta
-            </button>
-          </div>
-          ${originTable.outerHTML}
+    const data = window.db.get();
+    const accounts = data.accounts || [];
+    const q = (this.searchQuery || '').toLowerCase();
+
+    let filtered = accounts.filter(acc => {
+      if (!q) return true;
+      return (acc.name && acc.name.toLowerCase().includes(q)) ||
+             (acc.code && acc.code.toLowerCase().includes(q)) ||
+             (acc.docNumber && String(acc.docNumber).toLowerCase().includes(q)) ||
+             (acc.nit && String(acc.nit).toLowerCase().includes(q)) ||
+             (acc.legalName && acc.legalName.toLowerCase().includes(q)) ||
+             (acc.commercialName && acc.commercialName.toLowerCase().includes(q));
+    });
+
+    let rowsHtml = '';
+    if (filtered.length === 0) {
+      rowsHtml = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 28px; color: #64748b;">
+            <i data-lucide="users" style="width: 36px; height: 36px; color: #94a3b8; display: block; margin: 0 auto 8px;"></i>
+            <div style="font-weight: 600;">No se encontraron cuentas registradas</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Utiliza el botón "+ Nueva Cuenta" para registrar clientes o proveedores.</div>
+          </td>
+        </tr>
+      `;
+    } else {
+      rowsHtml = filtered.map(acc => {
+        const isProvider = acc.relationType === 'PROVEEDOR' || acc.relationType === 'AMBOS';
+        const servicesCount = acc.providerServices?.length || 0;
+        
+        const relationBadge = acc.relationType === 'CLIENTE' ? 'badge-blue' :
+                              acc.relationType === 'PROVEEDOR' ? 'badge-amber' : 'badge-emerald';
+
+        const ratingBadge = acc.rating === 'VIP' ? 'badge-emerald' :
+                            acc.rating === 'CRITICA' ? 'badge-rose' :
+                            acc.rating === 'IMPORTANTE' ? 'badge-blue' : 'badge-slate';
+
+        const isCorporate = acc.accountType === 'EMPRESA' || acc.relationType === 'CLIENTE' || acc.relationType === 'AMBOS';
+        const contacts = (data.companyContacts || []).filter(c => c.companyId === acc.id);
+        const contactCount = contacts.length;
+
+        return `
+          <tr>
+            <td class="font-mono" style="font-weight: 700; color: var(--navy);">${acc.code}</td>
+            <td>
+              <div style="font-weight: 600;">${acc.name}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${acc.legalName || acc.commercialName || 'Sin Razón Social'}</div>
+            </td>
+            <td class="font-mono">${acc.nit || acc.docNumber || '-'}</td>
+            <td><span class="badge ${relationBadge}">${acc.relationType}</span></td>
+            <td><span class="badge ${ratingBadge}">${acc.rating || 'NORMAL'}</span></td>
+            <td>${acc.city || acc.department || '-'}</td>
+            <td>
+              ${isProvider ? `<span class="badge badge-slate">${servicesCount} serv.</span>` : (isCorporate ? `<span class="badge ${contactCount > 0 ? 'badge-blue' : 'badge-slate'}"><i data-lucide="users" style="width:11px;height:11px;display:inline-block;vertical-align:middle;"></i> ${contactCount} cont.</span>` : '<span style="color:#94a3b8;">-</span>')}
+            </td>
+            <td>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.accountsModule.openModal('${acc.id}')" title="Editar cuenta">
+                  <i data-lucide="edit-3"></i> Editar
+                </button>
+                ${isCorporate ? `
+                  <button type="button" class="btn btn-primary btn-sm" onclick="window.accountsModule.openCompanyContactsModal('${acc.id}')" title="Administrar Contactos / Solicitantes">
+                    <i data-lucide="users"></i> Contactos
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="window.accountsModule.openCompanyHistoryModal('${acc.id}')" title="Historial de Emisiones de Boletos y ND">
+                    <i data-lucide="file-text"></i> Historial ND
+                  </button>
+                ` : ''}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.accountsModule.showAuditHistory('${acc.id}')" title="Auditoría de cambios">
+                  <i data-lucide="history"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
         `;
-      }
+      }).join('');
     }
+
+    container.innerHTML = `
+      <div id="hub-accounts-subview">
+        <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <h4 style="margin: 0; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="users" style="color: #059669;"></i> Directorio de Cuentas (Clientes y Proveedores)
+          </h4>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-hub-new-account" onclick="window.accountsModule ? window.accountsModule.openModal() : window.app.openModal('modal-account')" style="font-weight: 700; box-shadow: 0 2px 6px rgba(0, 174, 239, 0.3); padding: 8px 16px;">
+            <i data-lucide="plus"></i> Nueva Cuenta
+          </button>
+        </div>
+        <div class="table-container" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th>CÓDIGO</th>
+                <th>NOMBRE / RAZÓN SOCIAL</th>
+                <th>NIT / CI</th>
+                <th>RELACIÓN</th>
+                <th>CALIFICACIÓN</th>
+                <th>CIUDAD</th>
+                <th>SERVICIOS</th>
+                <th>ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   renderCashSubView() {

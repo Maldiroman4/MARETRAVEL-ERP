@@ -212,6 +212,10 @@ window.accountsModule = {
     window.app.openModal('modal-account');
   },
 
+  openNewAccountModal() {
+    this.openModal(null);
+  },
+
   addServiceRow(code = '', name = '', rate = 0.00) {
     const container = document.getElementById('provider-services-list');
     if (!container) return;
@@ -340,6 +344,9 @@ window.accountsModule = {
     window.db.save(data);
     window.app.closeModal('modal-account');
     this.render();
+    if (window.operationsHubModule && window.operationsHubModule.currentTab === 'accounts') {
+      window.operationsHubModule.renderActiveTabContent();
+    }
   },
 
   showAuditHistory(accountId) {

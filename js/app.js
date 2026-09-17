@@ -153,6 +153,7 @@ window.app = {
     this.bindNavigation();
     this.bindGlobalEvents();
     this.updateExchangeRateWidget();
+    this.updateTopbarDate();
     this.updateDashboardKpis();
 
     // Inicializar submódulos
@@ -273,6 +274,16 @@ window.app = {
     const sellEl = document.getElementById('topbar-tc-sell');
     if (buyEl) buyEl.textContent = Number(buy).toFixed(2);
     if (sellEl) sellEl.textContent = Number(sell).toFixed(2);
+  },
+
+  updateTopbarDate() {
+    const el = document.getElementById('topbar-current-date-text');
+    if (!el) return;
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    el.textContent = `${day}/${month}/${year}`;
   },
 
   updateDashboardKpis() {

@@ -5,9 +5,9 @@
  */
 
 window.calendarModule = {
-  currentDate: new Date(2026, 8, 12), // Septiembre 2026 (mes 8 en JS)
-  viewYear: 2026,
-  viewMonth: 8, // 0 = Enero, 8 = Septiembre
+  currentDate: new Date(),
+  viewYear: new Date().getFullYear(),
+  viewMonth: new Date().getMonth(),
   selectedReminderId: null,
 
   init() {
@@ -68,8 +68,9 @@ window.calendarModule = {
   },
 
   goToToday() {
-    this.viewYear = 2026;
-    this.viewMonth = 8;
+    const now = new Date();
+    this.viewYear = now.getFullYear();
+    this.viewMonth = now.getMonth();
     this.render();
   },
 
@@ -133,10 +134,13 @@ window.calendarModule = {
       grid.appendChild(cell);
     }
 
+    const nowCal = new Date();
+    const todayStr = `${nowCal.getFullYear()}-${String(nowCal.getMonth() + 1).padStart(2, '0')}-${String(nowCal.getDate()).padStart(2, '0')}`;
+
     // Días del mes activo
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${this.viewYear}-${String(this.viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const isToday = (dateStr === '2026-09-12');
+      const isToday = (dateStr === todayStr);
 
       // Buscar eventos de salida (Ida) o retorno (Vuelta)
       const dayReminders = reminders.filter(r => {
@@ -213,8 +217,11 @@ window.calendarModule = {
   getUrgentReminders() {
     const data = window.db.get();
     const reminders = data.travelReminders || [];
-    const today = '2026-09-12';
-    const tomorrow = '2026-09-13';
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const tmrw = new Date(now);
+    tmrw.setDate(now.getDate() + 1);
+    const tomorrow = `${tmrw.getFullYear()}-${String(tmrw.getMonth() + 1).padStart(2, '0')}-${String(tmrw.getDate()).padStart(2, '0')}`;
 
     const alerts = [];
 
@@ -570,11 +577,17 @@ window.calendarModule = {
         clients.map(c => `<option value="${c.id}" data-phone="${c.cellphone || c.phone || ''}" data-name="${c.name}">${c.name} (${c.code})</option>`).join('');
     }
 
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const retDate = new Date(now);
+    retDate.setDate(now.getDate() + 3);
+    const retStr = `${retDate.getFullYear()}-${String(retDate.getMonth() + 1).padStart(2, '0')}-${String(retDate.getDate()).padStart(2, '0')}`;
+
     document.getElementById('trv-has-return').checked = true;
     document.getElementById('trv-return-fields-row').style.display = 'grid';
-    document.getElementById('trv-departure-date').value = '2026-09-12';
+    document.getElementById('trv-departure-date').value = todayStr;
     document.getElementById('trv-departure-time').value = '09:00';
-    document.getElementById('trv-return-date').value = '2026-09-15';
+    document.getElementById('trv-return-date').value = retStr;
     document.getElementById('trv-return-time').value = '18:00';
 
     window.app.openModal('modal-new-travel-reminder');

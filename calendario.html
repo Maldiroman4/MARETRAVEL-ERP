@@ -45,7 +45,7 @@
       </button>
 
       <div style="background: rgba(0, 174, 239, 0.2); border: 1px solid #00aeef; border-radius: 8px; padding: 4px 12px; font-size: 0.8rem; font-family: monospace;">
-        <i data-lucide="clock" style="width: 13px; height: 13px; vertical-align: -2px;"></i> 12/09/2026
+        <i data-lucide="clock" style="width: 13px; height: 13px; vertical-align: -2px;"></i> <span id="cal-popout-date-text">17/09/2026</span>
       </div>
     </div>
   </header>
@@ -282,6 +282,14 @@
         }
         if (window.lucide) window.lucide.createIcons();
       };
+
+      const nowCal = new Date();
+      const popDateEl = document.getElementById('cal-popout-date-text');
+      if (popDateEl) {
+        const d = String(nowCal.getDate()).padStart(2, '0');
+        const m = String(nowCal.getMonth() + 1).padStart(2, '0');
+        popDateEl.textContent = `${d}/${m}/${nowCal.getFullYear()}`;
+      }
 
       renderSideAlerts();
 
