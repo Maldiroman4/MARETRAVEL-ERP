@@ -1,0 +1,17 @@
+﻿{
+  "name": "maretravel-erp",
+  "version": "1.0.0",
+  "description": "MARETRAVEL ERP Comercial y Operativo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "erp",
+    "travel",
+    "maretravel"
+  ],
+  "author": "MARETRAVEL",
+  "license": "ISC"
+}

@@ -135,19 +135,19 @@ server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.warn(`[AVISO] El puerto ${PORT} está en uso. Intentando en ${Number(PORT) + 1}...`);
     setTimeout(() => {
-      server.listen(Number(PORT) + 1);
+      server.listen(Number(PORT) + 1, '0.0.0.0');
     }, 500);
   } else {
     console.error('Error en el servidor:', err);
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   const activePort = server.address().port;
   console.log('================================================================');
   console.log('       MARETRAVEL ERP - SERVIDOR LOCAL CON PERSISTENCIA');
   console.log('================================================================');
-  console.log(`  Servidor corriendo en:    http://localhost:${activePort}`);
+  console.log(`  Servidor corriendo en:    http://0.0.0.0:${activePort}`);
   console.log(`  Base de datos vinculada: ${DB_PATH}`);
   console.log('  Cualquier cambio se guarda automáticamente en la carpeta.');
   console.log('================================================================');
