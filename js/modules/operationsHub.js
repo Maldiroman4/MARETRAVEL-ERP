@@ -294,12 +294,12 @@ class OperationsHubModule {
                 ${serviceName} ${totalItemsCount > 1 ? `(+${totalItemsCount - 1})` : ''}
               </span>
             </td>
-            <td>
-              <strong>${passName}</strong>
-              <div style="font-size: 0.75rem; color: #64748b;">${firstItem.description || '-'}</div>
+            <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <strong style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${passName}">${passName}</strong>
+              <div style="font-size: 0.75rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstItem.description || '-'}">${firstItem.description || '-'}</div>
             </td>
-            <td>
-              <span style="font-weight: 600; color: #1e293b;">${nd.accountName || '-'}</span>
+            <td style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span style="font-weight: 600; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${nd.accountName || '-'}">${nd.accountName || '-'}</span>
             </td>
             <td>
               <span style="font-size: 0.82rem; color: #475569;">${operatorName}</span>
@@ -313,20 +313,20 @@ class OperationsHubModule {
             <td>
               <span class="badge ${badgeClass}">${nd.status}</span>
             </td>
-            <td style="text-align: center; white-space: nowrap;">
-              <div class="table-actions-inline" style="display: inline-flex; gap: 4px;">
-                <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openEditOperationModal('${nd.id}')" title="Editar Operación Integral">
+            <td style="white-space: nowrap; width: 1%; min-width: 140px; text-align: right;">
+              <div class="table-actions-inline" style="display: inline-flex; align-items: center; gap: 4px;">
+                <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openEditOperationModal('${nd.id}')" title="Editar Operación Integral" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="edit-3"></i> Editar
                 </button>
-                <button type="button" class="btn btn-secondary btn-xs" onclick="window.debitNotesModule.printVoucher('${nd.id}')" title="Imprimir Nota / Voucher">
+                <button type="button" class="btn btn-secondary btn-xs" onclick="window.debitNotesModule.printVoucher('${nd.id}')" title="Imprimir Nota / Voucher" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="printer"></i>
                 </button>
                 ${nd.status !== 'ANULADA' ? `
-                  <button type="button" class="btn btn-warning btn-xs" onclick="window.operationsHubModule.voidOperation('${nd.id}')" title="Anular Operación">
+                  <button type="button" class="btn btn-warning btn-xs" onclick="window.operationsHubModule.voidOperation('${nd.id}')" title="Anular Operación" style="padding: 4px 6px; font-size: 12px;">
                     <i data-lucide="ban"></i>
                   </button>
                 ` : ''}
-                <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.deleteOperation('${nd.id}')" title="Borrar Definitivamente del Sistema">
+                <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.deleteOperation('${nd.id}')" title="Borrar Definitivamente del Sistema" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="trash-2"></i>
                 </button>
               </div>
@@ -337,20 +337,20 @@ class OperationsHubModule {
     }
 
     container.innerHTML = `
-      <div class="table-container" style="background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+      <div class="table-container" style="background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow-x: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
         <table class="erp-table">
           <thead>
             <tr>
               <th>Nro ND / Ref</th>
               <th>Fecha</th>
               <th>Tipo Servicio</th>
-              <th>Pasajero / Detalle</th>
-              <th>Cliente Facturado</th>
+              <th style="max-width: 180px;">Pasajero / Detalle</th>
+              <th style="max-width: 160px;">Cliente Facturado</th>
               <th>Operador / Prov.</th>
               <th style="text-align: right;">Total Venta</th>
               <th style="text-align: right;">Saldo Pendiente</th>
               <th>Estado</th>
-              <th style="text-align: center; min-width: 220px;">Acciones Operativas</th>
+              <th style="white-space: nowrap; width: 1%; min-width: 140px; text-align: right;">Acciones Operativas</th>
             </tr>
           </thead>
           <tbody>
