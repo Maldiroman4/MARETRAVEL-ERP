@@ -3017,11 +3017,11 @@
               </select>
             </div>
             <div>
-              <label class="form-label">Fecha de Emisión:</label>
+              <label class="form-label" id="lbl-uni-issue-date">Fecha de Emisión:</label>
               <input type="date" id="uni-issue-date" class="form-control font-mono" required>
             </div>
             <div>
-              <label class="form-label">Nro Voucher / Reserva / Boleto:</label>
+              <label class="form-label" id="lbl-uni-voucher-number">Nro Voucher / Reserva / Boleto:</label>
               <input type="text" id="uni-voucher-number" class="form-control font-mono" placeholder="Ej: 930-4581959448 o RES-8841">
             </div>
           </div>
@@ -3029,19 +3029,27 @@
           <!-- Fila 2: Pasajero / Titular -->
           <div class="form-row" style="margin-top: 10px; grid-template-columns: 2fr 1fr;">
             <div>
-              <label class="form-label">Nombre del Pasajero / Titular:</label>
+              <label class="form-label" id="lbl-uni-pax-name">Nombre del Pasajero / Titular:</label>
               <input type="text" id="uni-pax-name" class="form-control font-mono" placeholder="APELLIDO / NOMBRE" required>
             </div>
             <div>
-              <label class="form-label">Doc. Identidad / Pasaporte:</label>
+              <label class="form-label" id="lbl-uni-pax-doc">Doc. Identidad / Pasaporte:</label>
               <input type="text" id="uni-pax-doc" class="form-control font-mono" placeholder="Ej: 4820192 LP">
             </div>
           </div>
 
-          <!-- Fila 3: Descripción / Ruta -->
+          <!-- CONTENEDOR DINÁMICO DE CAMPOS ESPECÍFICOS SEGÚN TIPO DE SERVICIO -->
+          <div id="uni-service-specific-container" style="margin-top: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+            <!-- Renderizado dinámico según el servicio seleccionado -->
+          </div>
+
+          <!-- Fila 3: Descripción / Resumen Autocompletado -->
           <div class="form-group" style="margin-top: 10px;">
-            <label class="form-label">Descripción / Ruta / Detalle del Servicio:</label>
-            <input type="text" id="uni-description" class="form-control" placeholder="Ej: Boleto LPB-VVI-LPB / Hotel 3 noches / Paquete Cancún Todo Incluido">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="form-label" style="margin-bottom: 0;">Descripción / Glosa Operativa (Autocompletado):</label>
+              <span style="font-size: 0.72rem; color: #64748b;">Generado automáticamente según el servicio, editable</span>
+            </div>
+            <input type="text" id="uni-description" class="form-control" placeholder="Ej: Detalle específico de la operación">
           </div>
 
           <!-- Fila 4: Cliente Facturado y Proveedor Operador -->
@@ -3068,7 +3076,7 @@
             </div>
             <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
               <div>
-                <label class="form-label">AIR FARE / Tarifa Neta:</label>
+                <label class="form-label" id="lbl-uni-fare-amount">AIR FARE / Tarifa Neta:</label>
                 <input type="number" step="0.01" id="uni-fare-amount" class="form-control font-mono" placeholder="0.00" value="0.00" oninput="window.operationsHubModule.calculateUnifiedTotals()" required>
               </div>
               <div>

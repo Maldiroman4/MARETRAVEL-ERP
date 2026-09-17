@@ -1166,87 +1166,722 @@ window.debitNotesModule = {
       `;
     } else {
       itemsHtml = items.map((it, idx) => {
+        const sd = it.serviceDetails || {};
+        const srvType = (it.serviceType || (it.description && it.description.toLowerCase().includes('hotel') ? 'HOTEL' : 'BOLETO_AEREO')).toUpperCase();
+        
         let opCode = it.operatorCode;
         if (!opCode) {
-          const opLower = (it.operatorName || '').toLowerCase();
+          const opLower = ((it.operatorName || '') + ' ' + (sd.airlineFlight || '') + ' ' + (sd.hotelName || '')).toLowerCase();
           if (opLower.includes('boa') || opLower.includes('boliviana')) opCode = 'OB';
           else if (opLower.includes('amaszonas') || opLower.includes('z8')) opCode = 'Z8';
           else if (opLower.includes('latam')) opCode = 'LA';
           else if (opLower.includes('avianca')) opCode = 'AV';
           else if (opLower.includes('copa')) opCode = 'CM';
-          else opCode = 'OB';
+          else if (srvType === 'HOTEL' || srvType === 'HOTEL_HOSPEDAJE') opCode = 'HTL';
+          else if (srvType === 'PAQUETE_TURISTICO') opCode = 'PAQ';
+          else if (srvType === 'PAQUETE_CRUCERO') opCode = 'CRU';
+          else if (srvType === 'PAQUETE_CONCIERTO') opCode = 'CCT';
+          else if (srvType === 'ASESORAMIENTO_VISAS') opCode = 'VISA';
+          else if (srvType === 'CERTIFICACION_FA') opCode = 'IFA';
+          else if (srvType === 'RENT_A_CAR') opCode = 'CAR';
+          else if (srvType === 'SEGURO_VIAJE') opCode = 'SEG';
+          else opCode = 'SRV';
         }
 
-        const opName = (it.operatorName || 'BOLIVIANA DE AVIACIÓN NAL').toUpperCase();
-        const srvDesc = (it.description || it.serviceType || 'BOLETO AEREO NAL').toUpperCase();
-        const srvRoute = it.route || (it.origin && it.destination ? `${it.origin}-${it.destination}` : 'VVI-LPB-VVI');
-        
-        let srvDates = it.travelDates || '';
-        if (!srvDates && it.departureDate) {
-          srvDates = `DEL ${this.formatSlashDate(it.departureDate)} AL ${this.formatSlashDate(it.returnDate || it.departureDate)}`;
-        } else if (!srvDates) {
-          srvDates = 'DEL 27/07/2026 AL 28/07/2026';
-        }
-
-        const pnrCode = it.pnr || it.locator || it.ticketCode || 'AZ44SK';
+        const opName = (it.operatorName || sd.hotelName || sd.cruiseShip || sd.tourName || 'OPERADOR').toUpperCase();
         const currSymbol = (it.currency === 'USD' || nd.currency === 'USD') ? '$us' : 'Bs';
         const totalSrvFormatted = Number(it.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const passName = (it.passengerName || nd.passengerName || 'SOSSA LINO JOSE LUIS').toUpperCase();
+        const passName = (it.passengerName || nd.passengerName || '-').toUpperCase();
+        const passDoc = (it.passengerDocId || '').toUpperCase();
         const ticketDate = this.formatServiceDate(it.serviceDate || it.issueDate || nd.issueDate);
-        const ticketNum = it.ticketNumber || it.voucherNumber || '930 9496370496';
+        const ticketNum = it.ticketNumber || it.voucherNumber || '-';
 
-        return `
-          <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
-            <!-- Columna 1 -->
-            <div class="nd-item-col nd-col-left">
-              <div class="nd-kv-row">
-                <span class="nd-k" style="width: 100px;">Cod.Operador</span>
-                <span class="nd-v font-mono font-bold">${opCode}</span>
+        // 1. FORMATO: BOLETO AÉREO / GDS
+        if (srvType === 'BOLETO_AEREO' || srvType === 'BOLETO_GDS') {
+          const srvRoute = (sd.flightRoute || it.route || 'VVI-LPB-VVI').toUpperCase();
+          let srvDates = sd.travelDates || '';
+          if (!srvDates && sd.flightDepDate) {
+            srvDates = `DEL ${this.formatSlashDate(sd.flightDepDate)} AL ${this.formatSlashDate(sd.flightRetDate || sd.flightDepDate)}`;
+          } else if (!srvDates && it.departureDate) {
+            srvDates = `DEL ${this.formatSlashDate(it.departureDate)} AL ${this.formatSlashDate(it.returnDate || it.departureDate)}`;
+          } else if (!srvDates) {
+            srvDates = '-';
+          }
+          const pnrCode = (sd.pnrCode || it.pnr || it.locator || it.ticketCode || 'AZ44SK').toUpperCase();
+          const cabinClass = (sd.cabinClass || 'ECONÓMICA').toUpperCase();
+          const flightNum = (sd.flightNumber || '').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Operador :</span>
+                  <span class="nd-v font-bold">${opName}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #0284c7;">BOLETO AÉREO / GDS</div>
+                    <div class="nd-srv-line">RUTA: ${srvRoute}</div>
+                    ${srvDates !== '-' ? `<div class="nd-srv-line">FECHAS: ${srvDates}</div>` : ''}
+                    <div class="nd-srv-line">LOCALIZADOR: ${pnrCode} | CABINA: ${cabinClass}</div>
+                  </div>
+                </div>
               </div>
-              <div class="nd-kv-row" style="margin-top: 3px;">
-                <span class="nd-k" style="width: 100px;">Operador :</span>
-                <span class="nd-v font-bold">${opName}</span>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Servicio :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Pasajero :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
               </div>
-              <div class="nd-kv-row nd-service-row" style="margin-top: 8px; align-items: flex-start;">
-                <span class="nd-k" style="width: 100px;">Servicio :</span>
-                <div class="nd-v nd-service-details font-bold">
-                  <div class="nd-srv-line">${srvDesc}</div>
-                  <div class="nd-srv-line">${srvRoute}</div>
-                  <div class="nd-srv-line">${srvDates}</div>
-                  <div class="nd-srv-line">CODIGO: ${pnrCode}</div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fec. Emisión :</span>
+                  <span class="nd-v font-bold">${ticketDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Boleto :</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+                ${flightNum ? `
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Nro Vuelo :</span>
+                  <span class="nd-v font-mono">${flightNum}</span>
+                </div>` : ''}
+              </div>
+            </div>
+          `;
+        }
+
+        // 2. FORMATO: HOTEL / HOSPEDAJE
+        else if (srvType === 'HOTEL' || srvType === 'HOTEL_HOSPEDAJE') {
+          const hotelName = (sd.hotelName || opName).toUpperCase();
+          const hotelCity = (sd.hotelCity || '').toUpperCase();
+          const checkIn = sd.checkIn ? this.formatSlashDate(sd.checkIn) : ticketDate;
+          const checkOut = sd.checkOut ? this.formatSlashDate(sd.checkOut) : '-';
+          const nights = sd.nights || '1';
+          const roomType = (sd.roomType || 'DOBLE ESTÁNDAR').toUpperCase();
+          const boardBasis = (sd.boardBasis || 'DESAYUNO INCLUIDO').toUpperCase();
+          const guests = (sd.guestsCount || '1 Huésped').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Hotel / Cadena:</span>
+                  <span class="nd-v font-bold">${hotelName}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #059669;">HOSPEDAJE EN HOTEL ${hotelCity ? `(${hotelCity})` : ''}</div>
+                    <div class="nd-srv-line">HABITACIÓN: ${roomType}</div>
+                    <div class="nd-srv-line">RÉGIMEN: ${boardBasis}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Hospedaje:</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Huésped Titular:</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Huéspedes :</span>
+                  <span class="nd-v">${guests}</span>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Check-In :</span>
+                  <span class="nd-v font-bold font-mono">${checkIn}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Check-Out :</span>
+                  <span class="nd-v font-bold font-mono">${checkOut}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Estadía :</span>
+                  <span class="nd-v font-bold" style="color: #059669;">${nights} NOCHES</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Confirmación:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
                 </div>
               </div>
             </div>
+          `;
+        }
 
-            <!-- Columna 2 -->
-            <div class="nd-item-col nd-col-center">
-              <div class="nd-kv-row">
-                <span class="nd-k" style="width: 105px;">Moneda :</span>
-                <span class="nd-v">${currSymbol}</span>
+        // 3. FORMATO: PAQUETE TURÍSTICO
+        else if (srvType === 'PAQUETE_TURISTICO') {
+          const tourName = (sd.tourName || it.description || 'PAQUETE TURÍSTICO').toUpperCase();
+          const destination = (sd.destination || '-').toUpperCase();
+          const tourStart = sd.tourStartDate ? this.formatSlashDate(sd.tourStartDate) : ticketDate;
+          const tourEnd = sd.tourEndDate ? this.formatSlashDate(sd.tourEndDate) : '-';
+          const tourIncludes = (sd.includes || 'VUELOS + HOTEL + TRASLADOS').toUpperCase();
+          const paxCount = (sd.paxCount || '1 Pax').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Operador Mayor.:</span>
+                  <span class="nd-v font-bold">${opName}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #d97706;">PAQUETE TURÍSTICO: ${tourName}</div>
+                    <div class="nd-srv-line">DESTINO: ${destination}</div>
+                    <div class="nd-srv-line">INCLUYE: ${tourIncludes}</div>
+                  </div>
+                </div>
               </div>
-              <div class="nd-kv-row" style="margin-top: 3px;">
-                <span class="nd-k" style="width: 105px;">Total Servicio :</span>
-                <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Paquete :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Titular Grupo :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Cantidad Pax :</span>
+                  <span class="nd-v">${paxCount}</span>
+                </div>
               </div>
-              <div class="nd-kv-row" style="margin-top: 8px;">
-                <span class="nd-k" style="width: 105px;">Pasajero :</span>
-                <span class="nd-v font-bold">${passName}</span>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fecha Inicio :</span>
+                  <span class="nd-v font-bold font-mono">${tourStart}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Fecha Fin :</span>
+                  <span class="nd-v font-bold font-mono">${tourEnd}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Reserva :</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
               </div>
             </div>
+          `;
+        }
 
-            <!-- Columna 3 -->
-            <div class="nd-item-col nd-col-right">
-              <div class="nd-kv-row">
-                <span class="nd-k" style="width: 120px;">Fec.Boleto/Serv. :</span>
-                <span class="nd-v font-bold">${ticketDate}</span>
+        // 4. FORMATO: PAQUETE CRUCERO
+        else if (srvType === 'PAQUETE_CRUCERO') {
+          const cruiseShip = (sd.cruiseShip || opName).toUpperCase();
+          const cruiseItinerary = (sd.cruiseItinerary || '-').toUpperCase();
+          const cruisePort = (sd.departurePort || '-').toUpperCase();
+          const cruiseCabin = (sd.cabinType || 'BALCÓN').toUpperCase();
+          const embark = sd.embarkDate ? this.formatSlashDate(sd.embarkDate) : ticketDate;
+          const disembark = sd.disembarkDate ? this.formatSlashDate(sd.disembarkDate) : '-';
+          const board = (sd.cruiseBoard || 'PENSIÓN COMPLETA').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Naviera / Barco:</span>
+                  <span class="nd-v font-bold">${cruiseShip}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #0284c7;">CRUCERO: ${cruiseItinerary}</div>
+                    <div class="nd-srv-line">CABINA: ${cruiseCabin}</div>
+                    <div class="nd-srv-line">RÉGIMEN: ${board}</div>
+                  </div>
+                </div>
               </div>
-              <div class="nd-kv-row" style="margin-top: 3px;">
-                <span class="nd-k" style="width: 120px;">No.Boleto/Voucher :</span>
-                <span class="nd-v font-mono font-bold">${ticketNum}</span>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Crucero :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Huésped Princ.:</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Nro Pasaporte:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Embarque :</span>
+                  <span class="nd-v font-bold font-mono">${embark}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Puerto Salida :</span>
+                  <span class="nd-v">${cruisePort}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Desembarque :</span>
+                  <span class="nd-v font-bold font-mono">${disembark}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Booking Naviera:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
               </div>
             </div>
-          </div>
-        `;
+          `;
+        }
+
+        // 5. FORMATO: PAQUETE CONCIERTO
+        else if (srvType === 'PAQUETE_CONCIERTO') {
+          const artist = (sd.concertArtist || it.description || 'CONCIERTO').toUpperCase();
+          const venue = (sd.concertVenue || '-').toUpperCase();
+          const showDate = sd.concertDate ? this.formatSlashDate(sd.concertDate) : ticketDate;
+          const sector = (sd.ticketSector || 'SECTOR GENERAL').toUpperCase();
+          const qty = sd.concertQty || '1';
+          const includes = (sd.concertIncludes || 'ENTRADA OFICIAL').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Productora :</span>
+                  <span class="nd-v font-bold">${opName}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #8b5cf6;">CONCIERTO: ${artist}</div>
+                    <div class="nd-srv-line">RECINTO: ${venue}</div>
+                    <div class="nd-srv-line">SECTOR: ${sector}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Evento :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Asistente :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Cantidad :</span>
+                  <span class="nd-v">${qty} ENTRADA(S)</span>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fecha Show :</span>
+                  <span class="nd-v font-bold font-mono">${showDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Ticket :</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Adicionales :</span>
+                  <span class="nd-v">${includes}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 6. FORMATO: ASESORAMIENTO DE VISAS
+        else if (srvType === 'ASESORAMIENTO_VISAS') {
+          const country = (sd.visaCountry || 'ESTADOS UNIDOS').toUpperCase();
+          const visaType = (sd.visaType || 'B1/B2 TURISMO').toUpperCase();
+          const consulate = (sd.consulate || 'SECCIÓN CONSULAR LA PAZ').toUpperCase();
+          const appDate = sd.appointmentDate ? this.formatSlashDate(sd.appointmentDate) : '-';
+          const appTime = sd.appointmentTime || '';
+          const visaStatus = (sd.visaStatus || 'CITA AGENDADA').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Entidad :</span>
+                  <span class="nd-v font-bold">ASESORÍA CONSULAR & MIGRATORIA</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #dc2626;">TRÁMITE DE VISA: ${country}</div>
+                    <div class="nd-srv-line">TIPO VISA: ${visaType}</div>
+                    <div class="nd-srv-line">CONSULADO: ${consulate}</div>
+                    <div class="nd-srv-line">ESTADO: ${visaStatus}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Asesoría:</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Solicitante :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Nro Pasaporte:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fec. Trámite :</span>
+                  <span class="nd-v font-bold">${ticketDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Cita Consular :</span>
+                  <span class="nd-v font-bold font-mono" style="color: #dc2626;">${appDate} ${appTime}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Formulario:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 7. FORMATO: CERTIFICACIÓN FA
+        else if (srvType === 'CERTIFICACION_FA') {
+          const certName = (sd.certCourse || it.description || 'CERTIFICACIÓN INTERNACIONAL FA').toUpperCase();
+          const entity = (sd.certInstitution || opName).toUpperCase();
+          const certDate = sd.certDate ? this.formatSlashDate(sd.certDate) : ticketDate;
+          const hours = (sd.certHours || '120 HORAS ACADÉMICAS').toUpperCase();
+          const validity = (sd.certValidity || 'VIGENCIA 2 AÑOS').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Entidad Emisora:</span>
+                  <span class="nd-v font-bold">${entity}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #4338ca;">CERTIFICACIÓN: ${certName}</div>
+                    <div class="nd-srv-line">CARGA HORARIA: ${hours}</div>
+                    <div class="nd-srv-line">VIGENCIA: ${validity}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Matrícula:</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Postulante :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fec. Certif. :</span>
+                  <span class="nd-v font-bold font-mono">${certDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Certificado:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 8. FORMATO: RENT A CAR
+        else if (srvType === 'RENT_A_CAR') {
+          const comp = (sd.rentalCompany || opName).toUpperCase();
+          const category = (sd.carCategory || 'AUTO COMPACTO').toUpperCase();
+          const pickup = `${sd.pickUpLocation || '-'} ${sd.pickUpDate ? `(${sd.pickUpDate})` : ''}`.trim().toUpperCase();
+          const dropoff = `${sd.dropOffLocation || '-'} ${sd.dropOffDate ? `(${sd.dropOffDate})` : ''}`.trim().toUpperCase();
+          const days = sd.rentalDays || '1';
+          const insurance = (sd.rentalInsurance || 'CDW COBERTURA TOTAL').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Arrendadora :</span>
+                  <span class="nd-v font-bold">${comp}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #0284c7;">ALQUILER VEHÍCULO: ${category}</div>
+                    <div class="nd-srv-line">RETIRO: ${pickup}</div>
+                    <div class="nd-srv-line">DEVOLUCIÓN: ${dropoff}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Alquiler :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Conductor :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Licencia/Doc :</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Días Renta :</span>
+                  <span class="nd-v font-bold">${days} DÍAS</span>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fec. Voucher :</span>
+                  <span class="nd-v font-bold">${ticketDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Confirmación:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Seguros :</span>
+                  <span class="nd-v">${insurance}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 9. FORMATO: SEGURO DE VIAJE / ASISTENCIA
+        else if (srvType === 'SEGURO_VIAJE') {
+          const comp = (sd.insuranceCompany || opName).toUpperCase();
+          const plan = (sd.insurancePlan || 'COBERTURA INTERNACIONAL').toUpperCase();
+          const dest = (sd.insuranceDestination || 'MUNDIAL').toUpperCase();
+          const start = sd.coverageStartDate ? this.formatSlashDate(sd.coverageStartDate) : ticketDate;
+          const end = sd.coverageEndDate ? this.formatSlashDate(sd.coverageEndDate) : '-';
+          const days = sd.coverageDays || '15';
+          const emergency = (sd.insuranceEmergency || '').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Aseguradora :</span>
+                  <span class="nd-v font-bold">${comp}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line" style="color: #059669;">SEGURO DE VIAJE & ASISTENCIA</div>
+                    <div class="nd-srv-line">PLAN: ${plan}</div>
+                    <div class="nd-srv-line">DESTINO: ${dest}</div>
+                    ${emergency ? `<div class="nd-srv-line">EMERGENCIA 24H: ${emergency}</div>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Prima :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Asegurado :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Pasaporte/Doc :</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Vigencia :</span>
+                  <span class="nd-v font-bold font-mono">${start} AL ${end}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">Total Días :</span>
+                  <span class="nd-v font-bold" style="color: #059669;">${days} DÍAS</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Póliza :</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 10. FORMATO: OTRO O SERVICIO PERSONALIZADO
+        else {
+          const concept = (sd.customDetails || it.description || 'SERVICIO ESPECIALIZADO').toUpperCase();
+          const location = (sd.customLocation || '').toUpperCase();
+          const srvDate = sd.customDates ? this.formatSlashDate(sd.customDates) : ticketDate;
+          const notes = (sd.customNotes || '').toUpperCase();
+
+          return `
+            <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
+              <div class="nd-item-col nd-col-left">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 100px;">Cod.Operador</span>
+                  <span class="nd-v font-mono font-bold">${opCode}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 100px;">Operador/Prov.:</span>
+                  <span class="nd-v font-bold">${opName}</span>
+                </div>
+                <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
+                  <span class="nd-k" style="width: 100px;">Servicio :</span>
+                  <div class="nd-v nd-service-details font-bold">
+                    <div class="nd-srv-line">${concept}</div>
+                    ${location ? `<div class="nd-srv-line">UBICACIÓN: ${location}</div>` : ''}
+                    ${notes ? `<div class="nd-srv-line">DETALLES: ${notes}</div>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="nd-item-col nd-col-center">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 105px;">Moneda :</span>
+                  <span class="nd-v">${currSymbol}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 105px;">Total Servicio :</span>
+                  <span class="nd-v font-mono font-bold">${totalSrvFormatted}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 6px;">
+                  <span class="nd-k" style="width: 105px;">Beneficiario :</span>
+                  <span class="nd-v font-bold">${passName}</span>
+                </div>
+                ${passDoc ? `
+                <div class="nd-kv-row" style="margin-top: 2px;">
+                  <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
+                  <span class="nd-v font-mono">${passDoc}</span>
+                </div>` : ''}
+              </div>
+              <div class="nd-item-col nd-col-right">
+                <div class="nd-kv-row">
+                  <span class="nd-k" style="width: 120px;">Fec. Servicio :</span>
+                  <span class="nd-v font-bold font-mono">${srvDate}</span>
+                </div>
+                <div class="nd-kv-row" style="margin-top: 3px;">
+                  <span class="nd-k" style="width: 120px;">No. Comprobante:</span>
+                  <span class="nd-v font-mono font-bold">${ticketNum}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
       }).join('<div class="nd-item-subdivider"></div>');
     }
 
@@ -1525,6 +2160,13 @@ window.debitNotesModule = {
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
     } catch(e) {}
+  },
+
+  /**
+   * Alias para imprimir voucher desde el Hub Unificado
+   */
+  printVoucher(ndId) {
+    this.printPreview(ndId);
   },
 
   /**
