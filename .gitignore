@@ -1,0 +1,20 @@
+﻿# Dependencias
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos de Sistema Operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos comprimidos y copias duplicadas
+*.rar
+*.zip
+MARETRAVEL-ERP/
+
+# Copias de seguridad automáticas
+data/backups/*
+!data/backups/.gitkeep

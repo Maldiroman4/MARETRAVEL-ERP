@@ -1,0 +1,200 @@
+{
+  "systemSettings": {
+    "agencyName": "MARETRAVEL",
+    "agencyCommercialName": "MARETRAVEL - Agencia de Viajes y Turismo",
+    "agencyNit": "1028374021",
+    "agencyAddress": "Av. 16 de Julio #1440, Edif. San Pablo Piso 4, Of. 402, La Paz - Bolivia",
+    "agencyPhone": "+591 (2) 244-1234 / Cel: 772-98765",
+    "agencyEmail": "administracion@maretravel.bo",
+    "vatRate": 14.94,
+    "gdsLookbackDays": 30,
+    "activeExchangeBuy": 10.15,
+    "activeExchangeSell": 10.15
+  },
+  "currentUser": {
+    "id": "USR-001",
+    "name": "Luis",
+    "username": "luis",
+    "role": "ADMIN",
+    "email": "luis@maretravel.bo"
+  },
+  "exchangeRates": [
+    {
+      "id": "TC-1789647714388",
+      "date": "2026-09-17",
+      "buyRate": 10.15,
+      "sellRate": 10.15,
+      "createdById": "USR-001",
+      "createdByName": "Luis",
+      "createdAt": "17/9/2026, 8:21:54"
+    },
+    {
+      "id": "TC-001",
+      "date": "2026-09-16",
+      "buyRate": 6.86,
+      "sellRate": 6.96,
+      "createdById": "USR-001",
+      "createdByName": "Luis",
+      "createdAt": "16/9/2026, 18:41:45"
+    }
+  ],
+  "paymentMethods": [
+    {
+      "id": "PM-01",
+      "code": "BS-01",
+      "name": "Efectivo Moneda Nacional (BOB)",
+      "currency": "BOB",
+      "type": "COBRANZAS",
+      "bankAccount": "-",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-02",
+      "code": "US-01",
+      "name": "Efectivo Dólares Americanos (USD)",
+      "currency": "USD",
+      "type": "COBRANZAS",
+      "bankAccount": "-",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-03",
+      "code": "BS-02",
+      "name": "Banco Nacional de Bolivia BNB BOB",
+      "currency": "BOB",
+      "type": "AMBOS",
+      "bankAccount": "Cta. Cte. 100-29384-2",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-04",
+      "code": "BS-03",
+      "name": "Banco Mercantil Santa Cruz BMSC BOB",
+      "currency": "BOB",
+      "type": "AMBOS",
+      "bankAccount": "Cta. Cte. 401-09823-1",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-05",
+      "code": "US-02",
+      "name": "Banco Bisa USD",
+      "currency": "USD",
+      "type": "AMBOS",
+      "bankAccount": "Cta. Dólares 029-91823-7",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-06",
+      "code": "BS-04",
+      "name": "Cobro Simple QR BNB BOB",
+      "currency": "BOB",
+      "type": "COBRANZAS",
+      "bankAccount": "Cta. Cte. 100-29384-2",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-07",
+      "code": "BS-05",
+      "name": "Cheque de Gerencia BOB",
+      "currency": "BOB",
+      "type": "COBRANZAS",
+      "bankAccount": "-",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-08",
+      "code": "BS-06",
+      "name": "Banco Ganadero S.A. BOB",
+      "currency": "BOB",
+      "type": "AMBOS",
+      "bankAccount": "Cta. Cte. 1051-20948-3",
+      "status": "ACTIVO"
+    },
+    {
+      "id": "PM-09",
+      "code": "US-03",
+      "name": "Binance P2P (USDT / Cripto)",
+      "currency": "USD",
+      "type": "AMBOS",
+      "bankAccount": "Wallet ID: 89410293 (Pay)",
+      "status": "ACTIVO"
+    }
+  ],
+  "bankAccounts": [],
+  "accounts": [],
+  "accountHistory": [],
+  "companyContacts": [],
+  "gdsTickets": [],
+  "debitNotes": [],
+  "creditNotes": [],
+  "cashReceipts": [],
+  "cashTransactions": [],
+  "expenses": [],
+  "travelReminders": [],
+  "auditLog": [],
+  "accountingModifications": [],
+  "otherIncomes": [],
+  "serviceTypes": [
+    {
+      "id": "SRV-BOLETO",
+      "code": "BOLETO_AEREO",
+      "name": "BOLETO AÉREO / GDS",
+      "category": "AÉREO"
+    },
+    {
+      "id": "SRV-HOTEL",
+      "code": "HOTEL",
+      "name": "HOTEL",
+      "category": "HOSPEDAJE"
+    },
+    {
+      "id": "SRV-PAQ-TUR",
+      "code": "PAQUETE_TURISTICO",
+      "name": "PAQUETE TURÍSTICO",
+      "category": "PAQUETES"
+    },
+    {
+      "id": "SRV-PAQ-CRU",
+      "code": "PAQUETE_CRUCERO",
+      "name": "PAQUETE CRUCERO",
+      "category": "PAQUETES"
+    },
+    {
+      "id": "SRV-PAQ-CON",
+      "code": "PAQUETE_CONCIERTO",
+      "name": "PAQUETE CONCIERTO",
+      "category": "PAQUETES"
+    },
+    {
+      "id": "SRV-VISA",
+      "code": "ASESORAMIENTO_VISAS",
+      "name": "ASESORAMIENTO DE VISAS",
+      "category": "VISAS"
+    },
+    {
+      "id": "SRV-FA",
+      "code": "CERTIFICACION_FA",
+      "name": "CERTIFICACIÓN INTERNACIONAL FA",
+      "category": "CERTIFICACIONES"
+    },
+    {
+      "id": "SRV-AUTO",
+      "code": "RENT_A_CAR",
+      "name": "RENT A CAR",
+      "category": "VEHÍCULOS"
+    },
+    {
+      "id": "SRV-SEG",
+      "code": "SEGURO_VIAJE",
+      "name": "SEGURO DE VIAJE",
+      "category": "SEGUROS"
+    },
+    {
+      "id": "SRV-OTRO",
+      "code": "OTRO",
+      "name": "OTRO SERVICIO",
+      "category": "VARIOS"
+    }
+  ]
+}

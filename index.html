@@ -1,0 +1,3271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARETRAVEL - Sistema ERP Contable y Comercial</title>
+  <!-- Estilos y Tipografía -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js para Gráficos Estadísticos (Local) -->
+  <script src="js/chart.min.js"></script>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       PANTALLA DE INICIO DE SESIÓN OFICIAL MARETRAVEL
+       Acceso exclusivo con credenciales autorizadas (luis / 585858)
+       ========================================================================== -->
+  <div id="login-screen" class="login-screen-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <img src="assets/logo.jpg" alt="MARETRAVEL Logo" class="login-logo" onerror="this.style.display='none'">
+        <h2 class="login-title">MARETRAVEL S.R.L.</h2>
+        <span class="login-badge">SISTEMA ERP COMERCIAL &amp; CONTABLE</span>
+        <p class="login-subtitle">Control de Emisiones, Facturación, Tesorería y Cobranzas</p>
+      </div>
+
+      <form id="login-form" onsubmit="event.preventDefault(); window.app.handleLogin(event); return false;">
+        <div id="login-error-alert" class="login-error-alert" style="display: none;">
+          <i data-lucide="alert-triangle"></i>
+          <span id="login-error-text">Usuario o contraseña incorrectos.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="login-username">Usuario Autorizado:</label>
+          <div class="input-icon-wrapper">
+            <i data-lucide="user" class="input-icon"></i>
+            <input type="text" id="login-username" class="form-control font-mono" placeholder="Ingrese su usuario..." required autofocus autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label" for="login-password">Contraseña de Acceso:</label>
+          <div class="input-icon-wrapper">
+            <i data-lucide="lock" class="input-icon"></i>
+            <input type="password" id="login-password" class="form-control font-mono" placeholder="••••••" required autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-login-submit" onclick="window.app.handleLogin(event);" style="margin-top: 22px; width: 100%; justify-content: center; padding: 12px; font-weight: 700;">
+          <i data-lucide="log-in"></i> Iniciar Sesión en el ERP
+        </button>
+
+        <div class="login-footer-hint">
+          <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: -2px; color: #10b981;"></i>
+          Acceso protegido para administración y contabilidad de MARETRAVEL
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="app-layout" style="display: none;">
+    <!-- ==========================================================================
+         SIDEBAR DE NAVEGACIÓN
+         ========================================================================== -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="assets/logo.jpg" class="sidebar-logo" alt="MARETRAVEL">
+        <div class="brand-text">
+          <h1>MARETRAVEL</h1>
+          <span>ERP Comercial &amp; Boletos</span>
+        </div>
+      </div>
+
+      <ul class="sidebar-menu">
+        <li class="menu-category">Operaciones &amp; Ventas</li>
+        <li>
+          <a class="nav-item active" data-view="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="operaciones">
+            <i data-lucide="layers"></i>
+            <span>Ventas &amp; Emisiones (Todo en Uno)</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="calendario">
+            <i data-lucide="calendar-clock"></i>
+            <span>Calendario de Viajes</span>
+          </a>
+        </li>
+
+        <li class="menu-category">Tesorería &amp; Contabilidad</li>
+        <li>
+          <a class="nav-item" data-view="otros-ingresos">
+            <i data-lucide="trending-up"></i>
+            <span>Otros Ingresos Operativos</span>
+          </a>
+        </li>
+
+        <li class="menu-category">Administración</li>
+        <li>
+          <a class="nav-item" data-view="cuentas-bancarias">
+            <i data-lucide="building-2"></i>
+            <span>Cuentas Bancarias</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item" data-view="configuracion">
+            <i data-lucide="settings"></i>
+            <span>Configuración &amp; T/C</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="user-badge" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="avatar-circle">LU</div>
+            <div class="user-info-text">
+              <div class="user-name" id="sidebar-user-name">Luis</div>
+              <div class="user-role">Administrador General</div>
+            </div>
+          </div>
+          <button type="button" class="btn-logout" id="btn-logout" title="Cerrar Sesión del ERP">
+            <i data-lucide="log-out" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==========================================================================
+         ÁREA PRINCIPAL DE CONTENIDO
+         ========================================================================== -->
+    <div class="main-wrapper">
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 class="page-title" id="current-page-title">Panel de Control Ejecutivo</h2>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Indicador de Persistencia en Carpeta (data/database.json) -->
+          <div id="storage-status-pill" class="badge badge-emerald" style="display: flex; align-items: center; gap: 5px; padding: 6px 12px; font-weight: 600; cursor: pointer;" title="Sincronización en vivo con data/database.json. Click para descargar copia de seguridad." onclick="window.db.exportBackup()">
+            <i data-lucide="hard-drive" style="width: 14px; height: 14px;"></i>
+            <span>Guardado en Carpeta: Activo</span>
+          </div>
+
+          <!-- Botón Abrir Calendario en Ventana Aparte -->
+          <button class="btn btn-secondary btn-sm" id="btn-open-calendar-popout" title="Abrir Calendario en Ventana Aparte" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+            <i data-lucide="external-link" style="width: 15px; height: 15px; color: #00aeef;"></i>
+            <span>Monitor de Vuelos</span>
+          </button>
+
+          <!-- Campana de Notificaciones / Alertas de Viaje -->
+          <div class="bell-btn-wrapper" id="topbar-bell-btn" title="Alertas de Vuelos y Recordatorios">
+            <button class="btn btn-secondary btn-sm" style="position: relative; width: 36px; height: 36px; padding: 0; border-radius: 8px;">
+              <i data-lucide="bell" style="width: 18px; height: 18px; color: #0f2742;"></i>
+              <span class="bell-badge" id="bell-counter-badge" style="display: none;">0</span>
+            </button>
+          </div>
+
+          <!-- Widget Tipo de Cambio -->
+          <div class="exchange-rate-pill" id="topbar-tc-pill" title="Click para ajustar T/C Oficial">
+            <div class="tc-label">
+              <i data-lucide="arrow-left-right" style="width:14px; height:14px;"></i> T/C Hoy:
+            </div>
+            <div class="tc-rate">
+              C: <span id="topbar-tc-buy">6.86</span> | V: <span id="topbar-tc-sell">6.96</span>
+            </div>
+          </div>
+
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 500;">
+            <i data-lucide="calendar" style="width:14px; height:14px; vertical-align: -2px;"></i> Hoy: 12/09/2026
+          </div>
+        </div>
+      </header>
+
+      <!-- Cuerpo de Vistas -->
+      <main class="content-body">
+
+        <!-- ======================================================================
+             VISTA 1: DASHBOARD
+             ====================================================================== -->
+        <section id="view-dashboard" class="view-section active">
+          <!-- SECCIÓN 1: PANTALLA COMPLETA DE 4 KPI CARDS GIGANTES -->
+          <div class="kpi-hero-container">
+            <div class="kpi-grid-fullscreen">
+              <!-- Card 1: Ventas Facturadas -->
+              <div class="kpi-card-hero kpi-hero-blue">
+                <div class="kpi-hero-header">
+                  <div class="kpi-hero-icon icon-blue">
+                    <i data-lucide="trending-up"></i>
+                  </div>
+                  <div class="kpi-hero-meta">
+                    <span class="kpi-hero-tag">Total Facturado</span>
+                    <h3 class="kpi-hero-title">Ventas Facturadas (ND)</h3>
+                  </div>
+                </div>
+                <div class="kpi-hero-body">
+                  <div class="kpi-hero-value" id="kpi-total-sales">BOB 0.00</div>
+                  <div class="kpi-hero-sub">Total de emisiones facturadas del período</div>
+                </div>
+              </div>
+
+              <!-- Card 2: Cuentas por Cobrar -->
+              <div class="kpi-card-hero kpi-hero-danger">
+                <div class="kpi-hero-header">
+                  <div class="kpi-hero-icon icon-red">
+                    <i data-lucide="receipt"></i>
+                  </div>
+                  <div class="kpi-hero-meta">
+                    <span class="kpi-hero-tag tag-red">Por Cobrar</span>
+                    <h3 class="kpi-hero-title">Cuentas por Cobrar</h3>
+                  </div>
+                </div>
+                <div class="kpi-hero-body">
+                  <div class="kpi-hero-value text-danger" id="kpi-total-receivable">BOB 0.00</div>
+                  <div class="kpi-hero-sub">Saldo exigible pendiente a clientes y agencias</div>
+                </div>
+              </div>
+
+              <!-- Card 3: Cuentas por Pagar -->
+              <div class="kpi-card-hero kpi-hero-gold">
+                <div class="kpi-hero-header">
+                  <div class="kpi-hero-icon icon-amber">
+                    <i data-lucide="truck"></i>
+                  </div>
+                  <div class="kpi-hero-meta">
+                    <span class="kpi-hero-tag tag-amber">Por Pagar</span>
+                    <h3 class="kpi-hero-title">Cuentas por Pagar</h3>
+                  </div>
+                </div>
+                <div class="kpi-hero-body">
+                  <div class="kpi-hero-value text-amber" id="kpi-total-payable">BOB 0.00</div>
+                  <div class="kpi-hero-sub">Saldo por liquidar a aerolíneas y proveedores</div>
+                </div>
+              </div>
+
+              <!-- Card 4: Recaudado en Caja Hoy -->
+              <div class="kpi-card-hero kpi-hero-emerald">
+                <div class="kpi-hero-header">
+                  <div class="kpi-hero-icon icon-emerald">
+                    <i data-lucide="wallet"></i>
+                  </div>
+                  <div class="kpi-hero-meta">
+                    <span class="kpi-hero-tag tag-emerald">Tesorería</span>
+                    <h3 class="kpi-hero-title">Recaudado en Caja Hoy</h3>
+                  </div>
+                </div>
+                <div class="kpi-hero-body">
+                  <div class="kpi-hero-value text-emerald" id="kpi-cash-today">BOB 0.00</div>
+                  <div class="kpi-hero-sub" id="kpi-cash-today-usd-sub">Equivalente: USD 0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Indicador visual de desplazamiento hacia abajo -->
+            <div class="scroll-down-indicator" onclick="document.getElementById('dashboard-charts-section').scrollIntoView({ behavior: 'smooth' })">
+              <span>Desplace hacia abajo para ver gráficos estadísticos</span>
+              <i data-lucide="chevron-down"></i>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 2: GRÁFICOS ESTADÍSTICOS (ESCROLEANDO HACIA ABAJO) -->
+          <div id="dashboard-charts-section" class="dashboard-charts-section">
+            <div class="section-title-bar">
+              <div class="section-title-left">
+                <i data-lucide="bar-chart-3"></i>
+                <div>
+                  <h3>Estadísticas y Rendimiento Operativo</h3>
+                  <p>Métricas de servicios solicitados, clientes recurrentes y proveedores principales</p>
+                </div>
+              </div>
+              <span class="badge badge-blue" id="dashboard-services-month-badge">Mes Actual</span>
+            </div>
+
+            <div class="dashboard-charts-grid">
+              <!-- Gráfico 1: Servicios más solicitados durante el mes -->
+              <div class="dashboard-chart-card">
+                <div class="dashboard-chart-header">
+                  <div class="dashboard-chart-title">
+                    <div class="chart-header-icon chart-icon-blue">
+                      <i data-lucide="pie-chart"></i>
+                    </div>
+                    <div>
+                      <h4>Servicios Más Solicitados</h4>
+                      <span class="chart-header-sub">Emisiones y servicios del mes</span>
+                    </div>
+                  </div>
+                  <span class="badge badge-blue">Servicios</span>
+                </div>
+                <div class="chart-canvas-wrapper">
+                  <canvas id="chart-services-canvas"></canvas>
+                </div>
+                <div id="chart-services-list" class="chart-ranking-list">
+                  <!-- Dinámico -->
+                </div>
+              </div>
+
+              <!-- Gráfico 2: Clientes más frecuentes o con más débitos realizados -->
+              <div class="dashboard-chart-card">
+                <div class="dashboard-chart-header">
+                  <div class="dashboard-chart-title">
+                    <div class="chart-header-icon chart-icon-emerald">
+                      <i data-lucide="users"></i>
+                    </div>
+                    <div>
+                      <h4>Clientes Más Frecuentes</h4>
+                      <span class="chart-header-sub">Mayor cantidad de débitos emitidos</span>
+                    </div>
+                  </div>
+                  <span class="badge badge-emerald">Top Clientes ND</span>
+                </div>
+                <div class="chart-canvas-wrapper">
+                  <canvas id="chart-clients-canvas"></canvas>
+                </div>
+                <div id="chart-clients-list" class="chart-ranking-list">
+                  <!-- Dinámico -->
+                </div>
+              </div>
+
+              <!-- Gráfico 3: Proveedores con más notas de crédito realizadas -->
+              <div class="dashboard-chart-card">
+                <div class="dashboard-chart-header">
+                  <div class="dashboard-chart-title">
+                    <div class="chart-header-icon chart-icon-amber">
+                      <i data-lucide="building-2"></i>
+                    </div>
+                    <div>
+                      <h4>Proveedores con Más NC</h4>
+                      <span class="chart-header-sub">Notas de crédito emitidas</span>
+                    </div>
+                  </div>
+                  <span class="badge badge-amber">Top Proveedores NC</span>
+                </div>
+                <div class="chart-canvas-wrapper">
+                  <canvas id="chart-providers-canvas"></canvas>
+                </div>
+                <div id="chart-providers-list" class="chart-ranking-list">
+                  <!-- Dinámico -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA CENTRALIZADA: VENTAS & EMISIONES (TODO EN UNO)
+             Unifica: Boletos Aéreos, Notas de Débito, Notas de Crédito, Cuentas y Caja
+             ====================================================================== -->
+        <section id="view-operaciones" class="view-section">
+          <!-- BARRA DE KPIS OPERATIVOS -->
+          <div class="hub-stats-bar">
+            <div class="hub-kpi-card">
+              <div class="hub-kpi-icon icon-blue">
+                <i data-lucide="layers"></i>
+              </div>
+              <div class="hub-kpi-info">
+                <span class="hub-kpi-label">Total Operaciones</span>
+                <span class="hub-kpi-val font-mono" id="hub-kpi-total-ops">0</span>
+              </div>
+            </div>
+            <div class="hub-kpi-card">
+              <div class="hub-kpi-icon icon-emerald">
+                <i data-lucide="trending-up"></i>
+              </div>
+              <div class="hub-kpi-info">
+                <span class="hub-kpi-label">Ventas Totales</span>
+                <span class="hub-kpi-val font-mono" id="hub-kpi-total-sales">BOB 0.00</span>
+              </div>
+            </div>
+            <div class="hub-kpi-card">
+              <div class="hub-kpi-icon icon-amber">
+                <i data-lucide="clock"></i>
+              </div>
+              <div class="hub-kpi-info">
+                <span class="hub-kpi-label">Saldos por Cobrar (Clientes)</span>
+                <span class="hub-kpi-val font-mono" id="hub-kpi-total-receivable" style="color: #dc2626;">BOB 0.00</span>
+              </div>
+            </div>
+            <div class="hub-kpi-card">
+              <div class="hub-kpi-icon icon-purple">
+                <i data-lucide="file-minus-2"></i>
+              </div>
+              <div class="hub-kpi-info">
+                <span class="hub-kpi-label">Saldos por Pagar (Proveedores)</span>
+                <span class="hub-kpi-val font-mono" id="hub-kpi-total-payable" style="color: #d97706;">BOB 0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARRA SUPERIOR DE ACCIONES RÁPIDAS -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                  <i data-lucide="layers" style="color: #00aeef;"></i> Centro de Operaciones &amp; Emisiones
+                </h3>
+                <p style="margin: 2px 0 0; font-size: 0.82rem; color: #64748b;">
+                  Emisión integral, control de servicios, gestión de cobranzas y cuentas en un solo lugar.
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" onclick="window.operationsHubModule.openManageServiceTypesModal()">
+                  <i data-lucide="settings-2"></i> Gestionar Servicios
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.operationsHubModule.openNewServiceTypeModal()">
+                  <i data-lucide="plus"></i> + Añadir Tipo de Servicio
+                </button>
+                <button type="button" class="btn btn-primary btn-lg" onclick="window.operationsHubModule.openNewUnifiedModal()" style="font-weight: 700; box-shadow: 0 4px 12px rgba(0, 174, 239, 0.3);">
+                  <i data-lucide="plus-circle"></i> + Nueva Venta / Emisión Integral
+                </button>
+              </div>
+            </div>
+
+            <!-- PESTAÑAS SUB-VISTAS INTEGRADAS -->
+            <div class="hub-tabs-bar" style="margin-top: 18px;">
+              <button type="button" class="hub-tab-btn active" data-hub-tab="all" onclick="window.operationsHubModule.switchTab('all')">
+                <i data-lucide="list"></i> Todas las Operaciones (Maestra)
+              </button>
+              <button type="button" class="hub-tab-btn" data-hub-tab="tickets" onclick="window.operationsHubModule.switchTab('tickets')">
+                <i data-lucide="plane-takeoff"></i> Boletos Aéreos (GDS)
+              </button>
+              <button type="button" class="hub-tab-btn" data-hub-tab="accounts" onclick="window.operationsHubModule.switchTab('accounts')">
+                <i data-lucide="users"></i> Directorio de Cuentas
+              </button>
+              <button type="button" class="hub-tab-btn" data-hub-tab="cash" onclick="window.operationsHubModule.switchTab('cash')">
+                <i data-lucide="wallet"></i> Caja &amp; Cobranzas
+              </button>
+            </div>
+
+            <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+            <div id="hub-filters-row" style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
+              <div style="flex: 2; min-width: 260px;">
+                <input type="text" id="hub-search-input" class="form-control" placeholder="Buscar por Nro ND, Pasajero, Documento, Cliente o Proveedor...">
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <select id="hub-filter-service" class="form-control">
+                  <option value="ALL">Todos los Servicios</option>
+                </select>
+              </div>
+              <div style="width: 180px;">
+                <select id="hub-filter-status" class="form-control">
+                  <option value="ALL">Todos los Estados</option>
+                  <option value="PAGADA">PAGADA</option>
+                  <option value="PARCIAL">PARCIAL</option>
+                  <option value="IMPAGA">IMPAGA</option>
+                  <option value="ANULADA">ANULADA</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- ÁREA DE CONTENIDO DE LA SUB-PESTAÑA ACTIVA -->
+          <div id="hub-tab-content-area">
+            <!-- PANEL 1: TODAS LAS OPERACIONES (MAESTRA) -->
+            <div id="hub-panel-all" class="hub-tab-panel"></div>
+
+            <!-- PANEL 2: BOLETOS AÉREOS (GDS) -->
+            <div id="hub-panel-tickets" class="hub-tab-panel" style="display: none;"></div>
+
+            <!-- PANEL 3: NOTAS DE DÉBITO (ND) -->
+            <div id="hub-panel-nds" class="hub-tab-panel" style="display: none;"></div>
+
+            <!-- PANEL 4: NOTAS DE CRÉDITO (NC) -->
+            <div id="hub-panel-ncs" class="hub-tab-panel" style="display: none;"></div>
+
+            <!-- PANEL 5: DIRECTORIO DE CUENTAS -->
+            <div id="hub-panel-accounts" class="hub-tab-panel" style="display: none;"></div>
+
+            <!-- PANEL: CAJA, COBRANZAS, NDs Y NCs (INTEGRACIÓN TOTAL) -->
+            <div id="hub-panel-cash" class="hub-tab-panel" style="display: none;">
+              <!-- Sub-tabs de Caja -->
+              <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary cash-tab-btn active" data-tab="cobranzas">
+                  <i data-lucide="file-spreadsheet"></i> Notas de Débito (ND) &amp; Cobranzas
+                </button>
+                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="pagos">
+                  <i data-lucide="file-minus-2"></i> Notas de Crédito (NC) &amp; Liquidaciones
+                </button>
+                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="historial">
+                  <i data-lucide="receipt"></i> Historial de Recibos &amp; Reversión
+                </button>
+                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="arqueo">
+                  <i data-lucide="wallet"></i> Arqueo Diario de Caja
+                </button>
+              </div>
+
+              <!-- SUB-VIEW 1: NOTAS DE DÉBITO (ND) & COBRANZAS -->
+              <div id="cash-view-cobranzas" class="cash-subview">
+                <!-- Barra de Navegación Interna y Acciones Rápidas de ND -->
+                <div class="card" style="padding: 12px 16px; margin-bottom: 14px; background: #fff;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 8px;">
+                      <button type="button" class="btn btn-primary btn-sm nd-subview-toggle active" data-subview="collection" onclick="window.cashRegisterModule.switchNdSubView('collection')">
+                        <i data-lucide="dollar-sign"></i> Cobranza a Clientes
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm nd-subview-toggle" data-subview="history" onclick="window.cashRegisterModule.switchNdSubView('history')">
+                        <i data-lucide="list"></i> Historial de Notas de Débito (<span id="cash-nd-badge">0</span>)
+                      </button>
+                    </div>
+                    <div>
+                      <button type="button" class="btn btn-primary btn-sm" onclick="window.debitNotesModule.openNewModal()" style="font-weight: 700; box-shadow: 0 3px 8px rgba(0, 174, 239, 0.3);">
+                        <i data-lucide="plus-circle"></i> + Nueva Nota de Débito
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SECCIÓN 1A: COBRANZAS A CLIENTES (MULTIMONEDA) -->
+                <div id="nd-subview-collection" class="nd-subview-panel">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">
+                        <i data-lucide="dollar-sign"></i> Cobranza de Notas de Débito (Cobro Multimoneda Mixto)
+                      </div>
+                    </div>
+
+                    <!-- Selector de Cliente -->
+                    <div class="form-group">
+                      <label class="form-label">Seleccione el Cliente a Cobrar:</label>
+                      <select id="cash-client-select" class="form-control" style="font-size: 1rem; font-weight: 600;">
+                        <!-- Dinámico -->
+                      </select>
+                    </div>
+
+                    <!-- Tabla de NDs pendientes del cliente -->
+                    <div style="margin: 16px 0;">
+                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Notas de Débito Pendientes de Pago:</label>
+                      <div class="table-container">
+                        <table class="erp-table">
+                          <thead>
+                            <tr>
+                              <th style="width: 40px; text-align: center;">Sel.</th>
+                              <th>Nro ND</th>
+                              <th>Emisión</th>
+                              <th style="text-align: right;">Total ND</th>
+                              <th style="text-align: right;">Saldo Actual</th>
+                              <th style="text-align: right;">Importe a Amortizar (BOB)</th>
+                              <th>Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody id="client-pending-nds-table-body">
+                            <tr>
+                              <td colspan="7" style="text-align:center; padding: 20px; color: var(--text-muted);">
+                                Selecciona un cliente arriba para ver sus deudas pendientes.
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <!-- Formas de Pago Mixtas -->
+                    <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin: 20px 0;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <label class="form-label" style="font-weight: 700; color: var(--navy); margin-bottom: 0;">
+                          Desglose de Formas de Pago (Soporte Multimoneda Mixto BOB / USD):
+                        </label>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-payment-method-row">
+                          <i data-lucide="plus"></i> Añadir Forma de Pago
+                        </button>
+                      </div>
+
+                      <div id="payment-methods-breakdown-list">
+                        <!-- Dinámico -->
+                      </div>
+
+                      <!-- Resumen de Cuadre de Cobranza -->
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed #cbd5e1;">
+                        <div>
+                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">TOTAL DEUDA SELECCIONADA:</span>
+                          <div id="sum-total-nds-bob" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: var(--navy);">BOB 0.00</div>
+                        </div>
+                        <div>
+                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">TOTAL MEDIOS DE PAGO (BOB):</span>
+                          <div id="sum-total-entered-bob" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: #0369a1;">BOB 0.00</div>
+                        </div>
+                        <div>
+                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">EQUIVALENTE EN USD:</span>
+                          <div id="sum-total-entered-usd" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: #0369a1;">USD 0.00</div>
+                        </div>
+                        <div>
+                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">ESTADO / SALDO RESTANTE:</span>
+                          <div id="sum-diff-bob" class="font-mono" style="font-size: 1.05rem; font-weight: 800; color: #15803d;">CUADRADO (0.00)</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Botón Finalizar Cobro -->
+                    <div style="text-align: right;">
+                      <button type="button" class="btn btn-primary" id="btn-process-collection" style="padding: 12px 24px; font-size: 0.95rem;">
+                        <i data-lucide="check-circle-2"></i> Procesar Cobro y Emitir Recibo Oficial
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SECCIÓN 1B: HISTORIAL COMPLETO DE NOTAS DE DÉBITO -->
+                <div id="nd-subview-history" class="nd-subview-panel" style="display: none;">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">
+                        <i data-lucide="file-spreadsheet"></i> Historial Completo de Notas de Débito (Cuentas por Cobrar)
+                      </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                      <div style="flex: 2; min-width: 240px;">
+                        <input type="text" id="cash-nd-search-input" class="form-control" placeholder="Buscar por Nro ND, Cliente o Solicitante..." oninput="window.cashRegisterModule.renderNdHistory()">
+                      </div>
+                      <div style="flex: 1; min-width: 180px;">
+                        <select id="cash-nd-status-filter" class="form-control" onchange="window.cashRegisterModule.renderNdHistory()">
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="IMPAGA">IMPAGA</option>
+                          <option value="PARCIAL">PARCIAL</option>
+                          <option value="PAGADA">PAGADA</option>
+                          <option value="CERRADA">CERRADA</option>
+                          <option value="BORRADOR">BORRADOR</option>
+                          <option value="ANULADA">ANULADA</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="table-container">
+                      <table class="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Nro ND</th>
+                            <th>Emisión</th>
+                            <th>Cliente / Solicitante</th>
+                            <th>Plazo</th>
+                            <th style="text-align: right;">Total Facturado</th>
+                            <th style="text-align: right;">Saldo Exigible</th>
+                            <th>Estado</th>
+                            <th>Ítems</th>
+                            <th style="text-align: center;">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cash-nd-history-table-body">
+                          <!-- Dinámico -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUB-VIEW 2: NOTAS DE CRÉDITO (NC) & LIQUIDACIONES -->
+              <div id="cash-view-pagos" class="cash-subview" style="display: none;">
+                <!-- Barra de Navegación Interna y Acciones Rápidas de NC -->
+                <div class="card" style="padding: 12px 16px; margin-bottom: 14px; background: #fff;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 8px;">
+                      <button type="button" class="btn btn-primary btn-sm nc-subview-toggle active" data-subview="payment" onclick="window.cashRegisterModule.switchNcSubView('payment')">
+                        <i data-lucide="arrow-up-circle"></i> Liquidación a Proveedores
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm nc-subview-toggle" data-subview="history" onclick="window.cashRegisterModule.switchNcSubView('history')">
+                        <i data-lucide="list"></i> Historial de Notas de Crédito (<span id="cash-nc-badge">0</span>)
+                      </button>
+                    </div>
+                    <div>
+                      <button type="button" class="btn btn-primary btn-sm" onclick="window.creditNotesModule.openNewModal()" style="font-weight: 700; box-shadow: 0 3px 8px rgba(0, 174, 239, 0.3);">
+                        <i data-lucide="plus-circle"></i> + Registrar NC Manual
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SECCIÓN 2A: LIQUIDACIÓN A PROVEEDORES -->
+                <div id="nc-subview-payment" class="nc-subview-panel">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">
+                        <i data-lucide="arrow-up-circle"></i> Pago y Liquidación de Notas de Crédito a Proveedores
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label">Seleccione el Proveedor / Aerolínea:</label>
+                      <select id="cash-prov-select" class="form-control" style="font-size: 1rem; font-weight: 600;">
+                        <!-- Dinámico -->
+                      </select>
+                    </div>
+
+                    <div style="margin: 16px 0;">
+                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Notas de Crédito Pendientes de Liquidación:</label>
+                      <div class="table-container">
+                        <table class="erp-table">
+                          <thead>
+                            <tr>
+                              <th style="width: 40px; text-align: center;">Sel.</th>
+                              <th>Nro NC</th>
+                              <th>Fecha</th>
+                              <th>Concepto / Origen</th>
+                              <th style="text-align: right;">Total NC</th>
+                              <th style="text-align: right;">Saldo Pendiente</th>
+                              <th style="text-align: right;">Monto a Liquidar</th>
+                            </tr>
+                          </thead>
+                          <tbody id="provider-pending-ncs-table-body">
+                            <!-- Dinámico -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 16px; background: #f8fafc; padding: 16px; border-radius: 8px;">
+                      <div>
+                        <label class="form-label">Cuenta de Origen / Medio de Pago:</label>
+                        <select id="prov-payment-method-select" class="form-control">
+                          <!-- Solo cuentas bancarias / pagos -->
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label">Nro de Referencia / Transferencia Bancaria:</label>
+                        <input type="text" id="prov-pay-ref" class="form-control" placeholder="Ej: Transf. BNB #9201948">
+                      </div>
+                    </div>
+
+                    <div style="text-align: right; margin-top: 16px;">
+                      <button type="button" class="btn btn-primary" id="btn-process-prov-payment" style="padding: 12px 24px;">
+                        <i data-lucide="check"></i> Confirmar Pago a Proveedor
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SECCIÓN 2B: HISTORIAL COMPLETO DE NOTAS DE CRÉDITO -->
+                <div id="nc-subview-history" class="nc-subview-panel" style="display: none;">
+                  <div class="card">
+                    <div class="card-header">
+                      <div class="card-title">
+                        <i data-lucide="file-minus-2"></i> Historial Completo de Notas de Crédito (Cuentas por Pagar)
+                      </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                      <div style="flex: 2; min-width: 240px;">
+                        <input type="text" id="cash-nc-search-input" class="form-control" placeholder="Buscar por Nro NC, Proveedor, Concepto u Origen..." oninput="window.cashRegisterModule.renderNcHistory()">
+                      </div>
+                      <div style="flex: 1; min-width: 180px;">
+                        <select id="cash-nc-status-filter" class="form-control" onchange="window.cashRegisterModule.renderNcHistory()">
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="IMPAGA">IMPAGA</option>
+                          <option value="PARCIAL">PARCIAL</option>
+                          <option value="PAGADA">PAGADA</option>
+                          <option value="ANULADA">ANULADA</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="table-container">
+                      <table class="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Nro NC</th>
+                            <th>Emisión</th>
+                            <th>Proveedor &amp; Concepto</th>
+                            <th>Origen</th>
+                            <th style="text-align: right;">Total NC</th>
+                            <th style="text-align: right;">Monto Pagado</th>
+                            <th style="text-align: right;">Saldo Pendiente</th>
+                            <th>Estado</th>
+                            <th style="text-align: center;">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cash-nc-history-table-body">
+                          <!-- Dinámico -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUB-VIEW 3: HISTORIAL DE RECIBOS Y REVERSIÓN -->
+              <div id="cash-view-historial" class="cash-subview" style="display: none;">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      <i data-lucide="history"></i> Historial de Recibos de Caja Emitidos
+                    </div>
+                  </div>
+
+                  <div class="table-container">
+                    <table class="erp-table">
+                      <thead>
+                        <tr>
+                          <th>Nro Recibo</th>
+                          <th>Fecha / Hora</th>
+                          <th>Cliente</th>
+                          <th style="text-align: right;">Total BOB</th>
+                          <th style="text-align: right;">Total USD</th>
+                          <th>Estado</th>
+                          <th>Cajero</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="receipts-history-table-body">
+                        <!-- Dinámico -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUB-VIEW 4: ARQUEO DIARIO DE CAJA (CONSERVADO Y CENTRALIZADO) -->
+              <div id="cash-view-arqueo" class="cash-subview" style="display: none;">
+                <!-- Barra de Filtros del Arqueo Diario -->
+                <div class="card" style="padding: 16px; margin-bottom: 16px; background: #fff;">
+                  <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div>
+                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Desde:</label>
+                      <input type="date" id="cash-arqueo-date-from" class="form-control font-mono">
+                    </div>
+                    <div>
+                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Hasta:</label>
+                      <input type="date" id="cash-arqueo-date-to" class="form-control font-mono">
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-filter-cash-arqueo" onclick="window.cashRegisterModule.renderArqueo()" style="height: 38px;">
+                      <i data-lucide="filter"></i> Filtrar Período
+                    </button>
+                    <button type="button" class="btn btn-success" id="btn-export-cash-arqueo-csv" onclick="window.cashRegisterModule.exportArqueoCsv()" style="height: 38px;">
+                      <i data-lucide="file-spreadsheet"></i> Descargar Excel (.CSV)
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-print-cash-arqueo" onclick="window.cashRegisterModule.printArqueo()" style="height: 38px;">
+                      <i data-lucide="printer"></i> Imprimir Reporte Oficial
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      <i data-lucide="wallet"></i> Arqueo y Movimiento Diario de Caja
+                    </div>
+                  </div>
+
+                  <!-- 1. Resumen por Medio de Pago -->
+                  <div style="margin-bottom: 24px;">
+                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 10px;">
+                      1. Recaudación Consolidada por Medio de Pago
+                    </h3>
+                    <div class="table-container">
+                      <table class="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Medio de Pago / Cuenta</th>
+                            <th>Moneda</th>
+                            <th style="text-align: center;">Transacciones</th>
+                            <th style="text-align: right;">Total Recaudado</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cash-arqueo-summary-tbody">
+                          <!-- Dinámico -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- 2. Detalle Cronológico -->
+                  <div>
+                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 10px;">
+                      2. Detalle Cronológico de Movimientos de Caja
+                    </h3>
+                    <div class="table-container">
+                      <table class="erp-table">
+                        <thead>
+                          <tr>
+                            <th>Recibo</th>
+                            <th>ND Cobrada</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th style="text-align: right;">Monto Cobrado</th>
+                            <th style="text-align: right;">Saldo Rest.</th>
+                            <th>Forma de Pago</th>
+                            <th>Tipo</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cash-arqueo-details-tbody">
+                          <!-- Dinámico -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 2: CUENTAS (CLIENTES Y PROVEEDORES)
+             ====================================================================== -->
+        <section id="view-cuentas" class="view-section">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="users"></i> Directorio de Cuentas (Clientes y Proveedores)
+              </div>
+              <button class="btn btn-primary" id="btn-new-account">
+                <i data-lucide="plus"></i> Nueva Cuenta
+              </button>
+            </div>
+
+            <!-- Filtros -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 240px;">
+                <input type="text" id="account-search-input" class="form-control" placeholder="Buscar por Código, Nombre, Razón Social o NIT...">
+              </div>
+              <div style="width: 200px;">
+                <select id="account-relation-filter" class="form-control">
+                  <option value="TODOS">Todos los tipos</option>
+                  <option value="CLIENTE">Solo Clientes</option>
+                  <option value="PROVEEDOR">Solo Proveedores</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Grilla ERP -->
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nombre / Razón Social</th>
+                    <th>NIT / CI</th>
+                    <th>Relación</th>
+                    <th>Calificación</th>
+                    <th>Ciudad</th>
+                    <th>Servicios</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="accounts-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 3: BOLETOS AÉREOS
+             ====================================================================== -->
+        <section id="view-gds" class="view-section">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="plane-takeoff"></i> Control de Boletos Aéreos Emitidos
+              </div>
+              <button class="btn btn-primary" id="btn-simulate-gds">
+                <i data-lucide="plus-circle"></i> Nuevo Boleto Aéreo
+              </button>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <input type="text" id="gds-search-input" class="form-control" placeholder="Buscar por Nro de Boleto, Pasajero o Ruta...">
+              </div>
+              <div style="width: 200px;">
+                <select id="gds-status-filter" class="form-control">
+                  <option value="TODOS">Todos los estados</option>
+                  <option value="DISPONIBLE">DISPONIBLE</option>
+                  <option value="ASIGNADO">ASIGNADO</option>
+                  <option value="ANULADO">ANULADO</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Nro de Boleto</th>
+                    <th>Operador</th>
+                    <th>Emisión</th>
+                    <th>Pasajero</th>
+                    <th>Ruta (Línea)</th>
+                    <th style="text-align: right;">Precio Boleto</th>
+                    <th style="text-align: right;">Comisión Plataforma</th>
+                    <th>Estado</th>
+                    <th style="text-align: center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="gds-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 4: NOTAS DE DÉBITO (FACTURACIÓN Y VENTAS)
+             ====================================================================== -->
+        <section id="view-notas-debito" class="view-section">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="file-spreadsheet"></i> Notas de Débito a Clientes (Ventas / Facturación)
+              </div>
+              <button class="btn btn-primary" id="btn-new-nd">
+                <i data-lucide="plus"></i> Crear Nota de Débito
+              </button>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <input type="text" id="nd-search-input" class="form-control" placeholder="Buscar por Nro de ND, Cliente o Solicitante...">
+              </div>
+              <div style="width: 200px;">
+                <select id="nd-status-filter" class="form-control">
+                  <option value="TODOS">Todos los estados</option>
+                  <option value="BORRADOR">BORRADOR</option>
+                  <option value="IMPAGA">IMPAGA</option>
+                  <option value="PARCIAL">PARCIAL</option>
+                  <option value="PAGADA">PAGADA</option>
+                  <option value="CERRADA">CERRADA</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Nro ND</th>
+                    <th>Emisión</th>
+                    <th>Cliente / Solicitante</th>
+                    <th>Plazo</th>
+                    <th style="text-align: right;">Total Facturado</th>
+                    <th style="text-align: right;">Saldo Exigible</th>
+                    <th>Estado</th>
+                    <th>Ítems</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="nd-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 5: NOTAS DE CRÉDITO A PROVEEDORES
+             ====================================================================== -->
+        <section id="view-notas-credito" class="view-section">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="file-minus-2"></i> Notas de Crédito a Proveedores (Cuentas por Pagar)
+              </div>
+              <button class="btn btn-secondary" id="btn-new-nc">
+                <i data-lucide="plus"></i> Registrar NC Manual
+              </button>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <input type="text" id="nc-search-input" class="form-control" placeholder="Buscar por Nro de NC, Proveedor, Concepto o ND Origen...">
+              </div>
+              <div style="width: 200px;">
+                <select id="nc-status-filter" class="form-control">
+                  <option value="TODOS">Todos los estados</option>
+                  <option value="IMPAGA">IMPAGA</option>
+                  <option value="PARCIAL">PARCIAL</option>
+                  <option value="PAGADA">PAGADA</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Nro NC</th>
+                    <th>Fecha</th>
+                    <th>Proveedor / Operador</th>
+                    <th>Origen</th>
+                    <th style="text-align: right;">Total NC</th>
+                    <th style="text-align: right;">Pagado</th>
+                    <th style="text-align: right;">Saldo a Pagar</th>
+                    <th>Estado</th>
+                    <th style="text-align: center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="nc-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA: CALENDARIO DE VIAJES Y RECORDATORIOS
+             ====================================================================== -->
+        <section id="view-calendario" class="view-section">
+          <div class="card" style="display: flex; flex-direction: column; min-height: 650px; padding: 16px;">
+            <!-- Cabecera del Calendario -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="card-title" style="margin-bottom: 0;">
+                  <i data-lucide="calendar-clock"></i> Calendario de Itinerarios y Fechas de Vuelo
+                </div>
+                <div style="display: flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 2px 8px; gap: 6px;">
+                  <button class="btn btn-secondary btn-sm" id="cal-btn-prev" style="border:none; background:transparent;">
+                    <i data-lucide="chevron-left"></i>
+                  </button>
+                  <h3 id="cal-month-title" style="font-size: 0.95rem; font-weight: 700; min-width: 140px; text-align: center; color: var(--navy); margin-bottom: 0;">
+                    Septiembre 2026
+                  </h3>
+                  <button class="btn btn-secondary btn-sm" id="cal-btn-next" style="border:none; background:transparent;">
+                    <i data-lucide="chevron-right"></i>
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="cal-btn-today" style="margin-left: 4px;">
+                    Hoy
+                  </button>
+                </div>
+              </div>
+
+              <!-- Acciones y Filtros -->
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="cal-search-input" class="form-control font-mono" placeholder="Filtrar por pasajero o ruta..." style="width: 220px; font-size: 0.82rem;">
+                <button class="btn btn-primary" id="btn-new-travel-reminder">
+                  <i data-lucide="plus-circle"></i> Nuevo Itinerario
+                </button>
+                <button class="btn btn-secondary" onclick="window.calendarModule.openInSeparateWindow()" title="Abrir en Ventana Aparte">
+                  <i data-lucide="external-link"></i> Ventana Aparte
+                </button>
+              </div>
+            </div>
+
+            <!-- Leyenda de Colores -->
+            <div style="display: flex; gap: 16px; font-size: 0.75rem; margin-bottom: 10px; padding: 6px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #00aeef; border-radius: 3px;"></span>
+                <strong>Vuelo de Salida (Ida 🛫)</strong>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></span>
+                <strong>Vuelo de Retorno (Vuelta 🛬)</strong>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-left: auto; color: #64748b;">
+                * Haz clic sobre cualquier tarjeta de vuelo para ver el contacto, enviar WhatsApp o imprimir itinerario.
+              </div>
+            </div>
+
+            <!-- Días de la semana -->
+            <div class="cal-weekdays-header">
+              <div>Domingo</div>
+              <div>Lunes</div>
+              <div>Martes</div>
+              <div>Miércoles</div>
+              <div>Jueves</div>
+              <div>Viernes</div>
+              <div>Sábado</div>
+            </div>
+
+            <!-- Grilla mensual -->
+            <div class="cal-grid" id="calendar-days-grid" style="min-height: 520px;">
+              <!-- Dinámico -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 6: CAJA, COBRANZAS Y PAGOS (REDIRECCIONADA A VENTAS & EMISIONES -> SUB-PESTAÑA CAJA)
+             ====================================================================== -->
+        <section id="view-caja" class="view-section" style="display: none;">
+          <!-- Integrado de forma centralizada en #hub-panel-cash dentro de Ventas & Emisiones -->
+        </section>
+
+        <!-- ======================================================================
+             VISTA: OTROS INGRESOS OPERATIVOS (COMISIONES DE PLATAFORMA)
+             ====================================================================== -->
+        <section id="view-otros-ingresos" class="view-section">
+          <!-- KPIs de Otros Ingresos -->
+          <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+            <div class="kpi-card" style="border-left: 4px solid #0284c7;">
+              <div class="kpi-title">Total Comisiones / Otros Ingresos</div>
+              <div class="kpi-value font-mono" id="inc-kpi-total" style="color: #0369a1;">BOB 0.00</div>
+              <div class="kpi-subtitle">Plataformas y aerolíneas consolidadas</div>
+            </div>
+
+            <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+              <div class="kpi-title">Comisiones Pendientes (IMPAGAS)</div>
+              <div class="kpi-value font-mono" id="inc-kpi-impaga" style="color: #b45309;">BOB 0.00</div>
+              <div class="kpi-subtitle">Por liquidar / cobrar al proveedor</div>
+            </div>
+
+            <div class="kpi-card" style="border-left: 4px solid #10b981;">
+              <div class="kpi-title">Comisiones Liquidadas (PAGADAS)</div>
+              <div class="kpi-value font-mono" id="inc-kpi-pagado" style="color: #15803d;">BOB 0.00</div>
+              <div class="kpi-subtitle">Efectivamente cobradas por la agencia</div>
+            </div>
+
+            <div class="kpi-card" style="border-left: 4px solid #6366f1;">
+              <div class="kpi-title">Registros de Emisión</div>
+              <div class="kpi-value font-mono" id="inc-kpi-count" style="font-size: 1.3rem; color: #4338ca;">0</div>
+              <div class="kpi-subtitle">Boletos y conceptos registrados</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="trending-up"></i> Control de Otros Ingresos Operativos &amp; Comisiones de Plataforma
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="btn-open-generate-nd-modal" style="background: #0284c7; border-color: #0369a1; font-weight: 700;">
+                  <i data-lucide="file-spreadsheet"></i> Generar ND por Comisiones
+                </button>
+                <button class="btn btn-secondary" id="btn-export-other-income-csv">
+                  <i data-lucide="file-spreadsheet"></i> Exportar CSV
+                </button>
+                <button class="btn btn-primary" id="btn-new-other-income">
+                  <i data-lucide="plus-circle"></i> Nuevo Ingreso Manual
+                </button>
+              </div>
+            </div>
+
+            <!-- Filtros -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 260px;">
+                <input type="text" id="inc-search-input" class="form-control" placeholder="Buscar por Nro Boleto, Pasajero, Operador o Descripción...">
+              </div>
+              <div style="width: 220px;">
+                <select id="inc-status-filter" class="form-control">
+                  <option value="TODOS">Todos los Estados</option>
+                  <option value="IMPAGA">IMPAGA (Por cobrar)</option>
+                  <option value="PAGADO">PAGADO (Liquidado)</option>
+                </select>
+              </div>
+              <div style="width: 260px;">
+                <select id="inc-operator-filter" class="form-control">
+                  <option value="TODOS">Todos los Operadores / Plataformas</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Fecha Emisión</th>
+                    <th>Nro Boleto / Ref</th>
+                    <th>Aerolínea / Operador</th>
+                    <th>Descripción Operativa</th>
+                    <th style="text-align: right;">Comisión / Importe</th>
+                    <th style="text-align: center;">Estado</th>
+                    <th style="text-align: center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="other-income-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================================
+             VISTA 7: REPORTES Y CONTABILIDAD (REEMPLAZADA POR MÓDULO INTEGRADO Y ARQUEO DIARIO EN CAJA)
+             ====================================================================== -->
+        <section id="view-reportes" class="view-section" style="display: none;">
+          <!-- Arqueo Diario de Caja conservado y centralizado en #cash-view-arqueo dentro de Ventas & Emisiones -->
+        </section>
+
+        <!-- ======================================================================
+             VISTA 8: CONFIGURACIÓN
+             ====================================================================== -->
+        <section id="view-configuracion" class="view-section">
+          <!-- Actualizar Tipo de Cambio -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="dollar-sign"></i> Actualización del Tipo de Cambio Oficial
+              </div>
+            </div>
+            <form id="tc-update-form" onsubmit="window.settingsModule.handleSaveExchangeRate(event); return false;">
+              <div class="form-row" style="align-items: flex-end;">
+                <div>
+                  <label class="form-label">Tasa de Compra (BOB por 1 USD):</label>
+                  <input type="number" step="0.0001" id="tc-buy-rate" class="form-control font-mono" required>
+                </div>
+                <div>
+                  <label class="form-label">Tasa de Venta (BOB por 1 USD):</label>
+                  <input type="number" step="0.0001" id="tc-sell-rate" class="form-control font-mono" required>
+                </div>
+                <div>
+                  <button type="submit" class="btn btn-primary" style="height: 38px;">
+                    <i data-lucide="save"></i> Actualizar Tipo de Cambio
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            <div style="margin-top: 16px;">
+              <label class="form-label" style="font-weight: 600;">Historial Reciente de T/C:</label>
+              <div class="table-container">
+                <table class="erp-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th style="text-align: right;">T/C Compra</th>
+                      <th style="text-align: right;">T/C Venta</th>
+                      <th>Usuario</th>
+                      <th>Hora</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tc-history-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parámetros Generales de la Agencia -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="building-2"></i> Datos de la Agencia y Parámetros Fiscales
+              </div>
+            </div>
+            <form id="general-settings-form">
+              <div class="form-row">
+                <div>
+                  <label class="form-label">Nombre Comercial:</label>
+                  <input type="text" id="set-commercial-name" class="form-control" required>
+                </div>
+                <div>
+                  <label class="form-label">Nombre Legal / Razón Social:</label>
+                  <input type="text" id="set-agency-name" class="form-control" required>
+                </div>
+                <div>
+                  <label class="form-label">NIT de la Agencia:</label>
+                  <input type="text" id="set-nit" class="form-control" required>
+                </div>
+              </div>
+
+              <div class="form-row" style="margin-top: 10px;">
+                <div>
+                  <label class="form-label">Dirección Fiscal:</label>
+                  <input type="text" id="set-address" class="form-control" required>
+                </div>
+                <div>
+                  <label class="form-label">Teléfonos de Contacto:</label>
+                  <input type="text" id="set-phone" class="form-control" required>
+                </div>
+                <div>
+                  <label class="form-label">Tasa Impositiva IVA/IT (%):</label>
+                  <input type="number" step="0.01" id="set-vat-rate" class="form-control font-mono" required>
+                </div>
+                <div>
+                  <label class="form-label">Antigüedad Lectura Boletos (Días):</label>
+                  <input type="number" id="set-gds-days" class="form-control font-mono" required>
+                </div>
+              </div>
+
+              <div style="margin-top: 16px; text-align: right;">
+                <button type="submit" class="btn btn-primary">
+                  <i data-lucide="save"></i> Guardar Parámetros
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Medios de Pago -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="credit-card"></i> Medios de Pago Parametrizados
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-new-payment-method">
+                <i data-lucide="plus"></i> Nuevo Medio de Pago
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="erp-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Moneda</th>
+                    <th>Uso</th>
+                    <th>Cuenta / Banco</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="payment-methods-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Copia de Seguridad y Mantenimiento -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="database"></i> Base de Datos Local y Copias de Seguridad
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="btn btn-secondary" id="btn-export-backup">
+                <i data-lucide="download"></i> Descargar Copia de Seguridad (.JSON)
+              </button>
+
+              <label class="btn btn-secondary" style="cursor: pointer;">
+                <i data-lucide="upload"></i> Restaurar Copia (.JSON)
+                <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+              </label>
+
+              <button class="btn btn-danger" id="btn-reset-database">
+                <i data-lucide="refresh-cw"></i> Restablecer a Datos de Prueba Iniciales
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VISTA 10: GESTIÓN DE CUENTAS BANCARIAS (ADMIN SELF-SERVICE)
+             ================================================================== -->
+        <section id="view-cuentas-bancarias" class="view-section">
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">Gestión de Cuentas Bancarias Oficiales</h2>
+              <p class="view-subtitle">
+                Administre de forma autónoma las cuentas de banco habilitadas para cobros, transferencias y pie de impresión de comprobantes.
+              </p>
+            </div>
+            <button class="btn btn-primary" id="btn-new-bank-account">
+              <i data-lucide="plus-circle"></i> Nueva Cuenta Bancaria
+            </button>
+          </div>
+
+          <!-- KPIs de Cuentas Bancarias -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Total Cuentas</span>
+                <i data-lucide="building-2" class="kpi-icon icon-blue"></i>
+              </div>
+              <div class="kpi-value" id="kpi-bank-total">0</div>
+              <div class="kpi-subtitle">Registradas en el sistema</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Cuentas Activas</span>
+                <i data-lucide="check-circle-2" class="kpi-icon icon-emerald"></i>
+              </div>
+              <div class="kpi-value" id="kpi-bank-active" style="color: #10b981;">0</div>
+              <div class="kpi-subtitle">Visibles en ND y Caja</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Cuentas en BOB</span>
+                <i data-lucide="coins" class="kpi-icon icon-blue"></i>
+              </div>
+              <div class="kpi-value" id="kpi-bank-bob">0</div>
+              <div class="kpi-subtitle">Moneda Nacional (Bs.)</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Cuentas en USD</span>
+                <i data-lucide="dollar-sign" class="kpi-icon icon-emerald"></i>
+              </div>
+              <div class="kpi-value" id="kpi-bank-usd">0</div>
+              <div class="kpi-subtitle">Dólares Americanos ($us)</div>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros y Búsqueda -->
+          <div class="filter-bar">
+            <div class="filter-group" style="flex: 2;">
+              <label class="filter-label">Buscar Cuenta:</label>
+              <input type="text" id="bank-search-input" class="form-control" placeholder="Buscar por entidad bancaria, número de cuenta o titular...">
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Filtrar por Moneda:</label>
+              <select id="bank-currency-filter" class="form-control">
+                <option value="TODOS">Todas las Monedas</option>
+                <option value="BOB">BOB - Bolivianos</option>
+                <option value="USD">USD - Dólares</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">Estado:</label>
+              <select id="bank-status-filter" class="form-control">
+                <option value="TODOS">Todos los Estados</option>
+                <option value="ACTIVAS">Solo Cuentas Activas</option>
+                <option value="INACTIVAS">Solo Cuentas Inactivas</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Cuadrícula de Tarjetas de Cuentas Bancarias -->
+          <div id="bank-accounts-grid" class="bank-grid">
+            <!-- Dinámico vía bankAccountsModule -->
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODALES DEL SISTEMA
+       ========================================================================== -->
+
+  <!-- Modal: Cuenta (Cliente / Proveedor) -->
+  <div class="modal-overlay" id="modal-account">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="account-modal-title">Nueva Cuenta</h3>
+        <button class="modal-close" data-close-modal="modal-account">&times;</button>
+      </div>
+      <form id="account-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div>
+              <label class="form-label">Código Cuenta:</label>
+              <input type="text" id="acc-code" class="form-control font-mono" required>
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="form-label">Nombre Comercial / Titular:</label>
+              <input type="text" id="acc-name" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div style="grid-column: span 2;">
+              <label class="form-label">Razón Social (Facturación):</label>
+              <input type="text" id="acc-legal-name" class="form-control">
+            </div>
+            <div>
+              <label class="form-label">NIT / CI:</label>
+              <input type="text" id="acc-nit" class="form-control font-mono">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Relación:</label>
+              <select id="acc-relation-type" class="form-control">
+                <option value="CLIENTE">CLIENTE</option>
+                <option value="PROVEEDOR">PROVEEDOR</option>
+                <option value="AMBOS">AMBOS (Cliente &amp; Proveedor)</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Tipo de Cuenta:</label>
+              <select id="acc-type" class="form-control">
+                <option value="EMPRESA">EMPRESA</option>
+                <option value="PERSONA">PERSONA</option>
+                <option value="AEROLINEA">AEROLINEA</option>
+                <option value="HOTEL">HOTEL</option>
+                <option value="ONG">ONG</option>
+                <option value="INSTITUCION">INSTITUCION</option>
+                <option value="RENT_A_CAR">RENT_A_CAR</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Calificativo:</label>
+              <select id="acc-rating" class="form-control">
+                <option value="NORMAL">NORMAL</option>
+                <option value="IMPORTANTE">IMPORTANTE</option>
+                <option value="VIP">VIP</option>
+                <option value="CRITICA">CRITICA</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Departamento:</label>
+              <input type="text" id="acc-department" class="form-control" value="La Paz">
+            </div>
+            <div>
+              <label class="form-label">Ciudad:</label>
+              <input type="text" id="acc-city" class="form-control" value="La Paz">
+            </div>
+            <div>
+              <label class="form-label">Teléfono Fijo:</label>
+              <input type="text" id="acc-phone" class="form-control">
+            </div>
+            <div>
+              <label class="form-label">Celular:</label>
+              <input type="text" id="acc-cellphone" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div style="grid-column: span 2;">
+              <label class="form-label">Dirección:</label>
+              <input type="text" id="acc-address" class="form-control">
+            </div>
+            <div>
+              <label class="form-label">Email de Contacto:</label>
+              <input type="email" id="acc-email" class="form-control">
+            </div>
+            <div>
+              <label class="form-label">Página Web:</label>
+              <input type="text" id="acc-web" class="form-control">
+            </div>
+          </div>
+
+          <!-- Sección Prestadores de Servicio (Solo Proveedores) -->
+          <div id="provider-services-section" style="display: none; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label class="form-label" style="font-weight: 700; color: var(--navy); margin-bottom: 0;">
+                Prestadores de Servicios del Operador (Códigos IATA / Comisiones %):
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-provider-service">
+                <i data-lucide="plus"></i> Adicionar Servicio
+              </button>
+            </div>
+            <div id="provider-services-list">
+              <!-- Dinámico -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-account">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Auditoría de Cuenta -->
+  <div class="modal-overlay" id="modal-audit">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="audit-modal-title">Historial de Auditoría</h3>
+        <button class="modal-close" data-close-modal="modal-audit">&times;</button>
+      </div>
+      <div class="modal-content" id="audit-history-content">
+        <!-- Dinámico -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-audit">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Emisión y Registro de Boletos Aéreos -->
+  <div class="modal-overlay" id="modal-simulate-gds">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="gds-modal-title"><i data-lucide="plane"></i> Registro y Emisión de Boletos Aéreos</h3>
+        <button class="modal-close" data-close-modal="modal-simulate-gds">&times;</button>
+      </div>
+      <form id="gds-simulate-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div>
+              <label class="form-label">Nro de Boleto (13 dígitos):</label>
+              <input type="text" id="sim-ticket-number" class="form-control font-mono" placeholder="930-4581959448" required>
+            </div>
+            <div>
+              <label class="form-label">Fecha de Emisión:</label>
+              <input type="date" id="sim-issue-date" class="form-control font-mono" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Nombre del Pasajero (APELLIDO/NOMBRE):</label>
+            <input type="text" id="sim-passenger-name" class="form-control font-mono" placeholder="MENDOZA/CARLOS LIC" required>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Doc. Identidad / Pasaporte:</label>
+              <input type="text" id="sim-passenger-doc" class="form-control font-mono" placeholder="4820192 LP">
+            </div>
+            <div>
+              <label class="form-label">Ruta (Itinerario):</label>
+              <input type="text" id="sim-route" class="form-control font-mono" placeholder="LPB-VVI-LPB" required>
+            </div>
+            <div>
+              <label class="form-label">Aerolínea / Operador:</label>
+              <select id="sim-airline-select" class="form-control">
+                <!-- Dinámico -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Moneda:</label>
+              <select id="sim-currency" class="form-control" onchange="window.gdsModule.recalcSimulateTotals()">
+                <option value="BOB">BOB (Bolivianos)</option>
+                <option value="USD">USD (Dólares)</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">AIR FARE:</label>
+              <input type="number" step="0.01" id="sim-fare-amount" class="form-control font-mono" placeholder="AIR FARE (ej. 800)" oninput="window.gdsModule.recalcSimulateTotals()" required>
+            </div>
+            <div>
+              <label class="form-label">Precio de Boleto Aéreo:</label>
+              <input type="number" step="0.01" id="sim-net-amount" class="form-control font-mono" placeholder="Importe total (ej. 960)" oninput="window.gdsModule.recalcSimulateTotals()" required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">% Comisión Plataforma:</label>
+              <input type="number" step="0.01" id="sim-commission-rate" class="form-control font-mono" value="5.00" oninput="window.gdsModule.recalcSimulateTotals()">
+            </div>
+            <div>
+              <label class="form-label">Comisión Plataforma (Calculada):</label>
+              <input type="text" id="sim-commission-display" class="form-control font-mono" readonly style="background: #f1f5f9; font-weight: 700; color: #0284c7;" value="BOB 0.00">
+            </div>
+            <div>
+              <label class="form-label">Cargo por Emisión (Fee MARETRAVEL):</label>
+              <input type="number" step="0.01" id="sim-fee-amount" class="form-control font-mono" value="100.00" oninput="window.gdsModule.recalcSimulateTotals()">
+            </div>
+          </div>
+
+          <!-- Resumen de Costo y Cobro al Cliente -->
+          <div id="sim-totals-banner" style="margin-top: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; font-size: 0.83rem; align-items: center;">
+            <div>
+              <div style="color: #64748b; font-size: 0.75rem;">A pagar a la plataforma:</div>
+              <strong id="banner-provider-cost" style="color: #0f2742; font-size: 0.95rem;">BOB 0.00</strong>
+            </div>
+            <div>
+              <div style="color: #64748b; font-size: 0.75rem;">Comisión ganada (paga después):</div>
+              <strong id="banner-comm-amount" style="color: #0284c7; font-size: 0.95rem;">BOB 0.00</strong>
+            </div>
+            <div style="text-align: right;">
+              <div style="color: #64748b; font-size: 0.75rem;">A cobrar al cliente (Boleto + Fee):</div>
+              <strong id="banner-total-to-client" style="color: #047857; font-size: 1.08rem;">BOB 0.00</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-simulate-gds">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-gds"><i data-lucide="check-circle"></i> Registrar Boleto Aéreo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Nota de Débito (ND) -->
+  <div class="modal-overlay" id="modal-nd">
+    <div class="modal-box" style="max-width: 960px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Nota de Débito: <span id="nd-number-display" style="color: var(--primary);">ND #---</span></h3>
+        <button class="modal-close" data-close-modal="modal-nd">&times;</button>
+      </div>
+      <form id="nd-form">
+        <div class="modal-content">
+          <!-- Cabecera de la ND: Jerarquía Corporativa (Empresa -> Solicitante -> Pasajero) -->
+          <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1.2fr;">
+            <div>
+              <label class="form-label">Cliente / Empresa a Facturar:</label>
+              <select id="nd-client-select" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label" style="margin-bottom: 0;">Solicitante / Contacto:</label>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-quick-new-contact" style="padding: 1px 6px; font-size: 0.72rem; display: none;" title="Registrar contacto al vuelo">
+                  <i data-lucide="user-plus" style="width: 12px; height: 12px;"></i> + Nuevo
+                </button>
+              </div>
+              <select id="nd-solicitante-select" class="form-control">
+                <option value="">-- Primero seleccione una Cuenta --</option>
+              </select>
+              <div id="nd-solicitante-manual-wrap" style="display: none; margin-top: 6px;">
+                <input type="text" id="nd-solicitante-manual" class="form-control" placeholder="Nombre y cargo del solicitante...">
+              </div>
+            </div>
+            <div>
+              <label class="form-label">Pasajero(s) del Viaje:</label>
+              <input type="text" id="nd-passenger-name" class="form-control" placeholder="Ej: QUISPE/JUAN o Juan Pérez">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Fecha de Emisión:</label>
+              <input type="date" id="nd-issue-date" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">Condición de Pago:</label>
+              <select id="nd-payment-term" class="form-control">
+                <option value="AL_CONTADO">AL CONTADO</option>
+                <option value="CREDITO_7_DIAS">CRÉDITO 7 DÍAS</option>
+                <option value="CREDITO_15_DIAS">CRÉDITO 15 DÍAS</option>
+                <option value="CREDITO_30_DIAS">CRÉDITO 30 DÍAS</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Moneda Principal:</label>
+              <select id="nd-currency" class="form-control">
+                <option value="BOB">BOB (Bolivianos)</option>
+                <option value="USD">USD (Dólares)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Botones de Acción sobre Items -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 18px 0 10px;">
+            <label class="form-label" style="font-weight: 700; color: var(--navy); margin-bottom: 0;">
+              Boletos y Servicios Facturados en esta ND:
+            </label>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-gds-to-nd">
+                <i data-lucide="plane"></i> Adicionar Boletos Aéreos
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-manual-item">
+                <i data-lucide="plus"></i> Adicionar Servicio / Paquete / Visa
+              </button>
+            </div>
+          </div>
+
+          <!-- Grilla de Ítems de la ND -->
+          <div class="table-container">
+            <table class="erp-table">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Pasajero / Detalle</th>
+                  <th>Nro Boleto</th>
+                  <th>Operador</th>
+                  <th style="text-align: right;">Total Bruto</th>
+                  <th style="text-align: right;">Neto a Cobrar</th>
+                  <th style="text-align: center;">Quitar</th>
+                </tr>
+              </thead>
+              <tbody id="nd-items-table-body">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Resumen de Totales y Observaciones -->
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px;">
+            <div>
+              <label class="form-label">Observaciones Legales / Notas:</label>
+              <textarea id="nd-observations" class="form-control" rows="3" placeholder="Detalles de entrega, regulaciones tarifarias o acuerdos..."></textarea>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 14px; text-align: right;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">TOTAL FACTURADO:</div>
+              <div id="nd-total-bob-display" class="font-mono" style="font-size: 1.3rem; font-weight: 800; color: var(--navy);">BOB 0.00</div>
+              <div id="nd-total-usd-display" class="font-mono" style="font-size: 0.95rem; font-weight: 700; color: #0369a1;">USD 0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-nd">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Borrador</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Selector de Boletos GDS para ND -->
+  <div class="modal-overlay" id="modal-gds-picker">
+    <div class="modal-box" style="max-width: 820px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="plane"></i> Seleccionar Boletos Aéreos Disponibles</h3>
+        <button class="modal-close" data-close-modal="modal-gds-picker">&times;</button>
+      </div>
+      <div class="modal-content">
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">
+          Marca los boletos que deseas anexar a esta Nota de Débito:
+        </p>
+        <div class="table-container">
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">Sel.</th>
+                <th>Nro Boleto</th>
+                <th>Pasajero</th>
+                <th>Ruta (Línea)</th>
+                <th style="text-align: right;">Precio Boleto</th>
+                <th>Comisión Plataforma</th>
+                <th>Emisión</th>
+              </tr>
+            </thead>
+            <tbody id="gds-picker-table-body">
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-gds-picker">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="window.debitNotesModule.confirmAddSelectedGds()">
+          <i data-lucide="check"></i> Adicionar Boletos Seleccionados
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Adicionar Ítem Manual a ND -->
+  <div class="modal-overlay" id="modal-manual-item">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Adicionar Servicio Manual / Terrestre</h3>
+        <button class="modal-close" data-close-modal="modal-manual-item">&times;</button>
+      </div>
+      <form id="manual-item-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label" style="margin-bottom: 0;">Tipo de Servicio:</label>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openNewServiceTypeModal()" style="padding: 1px 6px; font-size: 0.72rem;" title="Añadir nuevo tipo de servicio">
+                  <i data-lucide="plus"></i> + Añadir Tipo
+                </button>
+              </div>
+              <select id="man-service-type" class="form-control">
+                <option value="HOTEL">HOTEL</option>
+                <option value="PAQUETE_TURISTICO">PAQUETE TURÍSTICO</option>
+                <option value="PAQUETE_CRUCERO">PAQUETE CRUCERO</option>
+                <option value="PAQUETE_CONCIERTO">PAQUETE CONCIERTO</option>
+                <option value="ASESORAMIENTO_VISAS">ASESORAMIENTO DE VISAS</option>
+                <option value="CERTIFICACION_FA">CERTIFICACIÓN INTERNACIONAL FA</option>
+                <option value="RENT_A_CAR">RENT A CAR</option>
+                <option value="SEGURO_VIAJE">SEGURO DE VIAJE</option>
+                <option value="OTRO">OTRO SERVICIO</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Nro de Voucher / Reserva:</label>
+              <input type="text" id="man-voucher-number" class="form-control font-mono">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Nombre del Pasajero / Titular:</label>
+              <input type="text" id="man-passenger-name" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">Doc. Identidad:</label>
+              <input type="text" id="man-passenger-doc" class="form-control font-mono">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div style="grid-column: span 2;">
+              <label class="form-label">Operador / Proveedor Responsable:</label>
+              <select id="man-provider-select" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700; color: #0284c7;">
+                  <i data-lucide="list-checks" style="width: 14px; height: 14px; vertical-align: middle;"></i> Elegir Servicio del Operador:
+                </span>
+                <span id="man-service-badge" class="badge badge-emerald" style="font-size: 0.68rem; padding: 1px 6px;">Catálogo</span>
+              </label>
+              <select id="man-provider-service-select" class="form-control" style="background-color: #f0fdf4; border-color: #86efac; font-weight: 600;">
+                <option value="">-- Seleccionar Servicio Registrado --</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Descripción del Servicio:</label>
+              <input type="text" id="man-description" class="form-control" list="man-services-datalist" placeholder="Ej: VISA AMERICANA o Hotel Los Tajibos..." required>
+              <datalist id="man-services-datalist"></datalist>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Moneda:</label>
+              <select id="man-currency" class="form-control">
+                <option value="BOB">BOB</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Importe Total:</label>
+              <input type="number" step="0.01" id="man-total-amount" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">% Comis. Proveedor:</label>
+              <input type="number" step="0.01" id="man-commission-rate" class="form-control font-mono" value="10.00">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">% Comisión Cedida a Cliente:</label>
+              <input type="number" step="0.01" id="man-client-comm-rate" class="form-control font-mono" value="0.00" title="Descuento transferido si el cliente es sub-agencia">
+            </div>
+            <div>
+              <label class="form-label">Fee de Agencia:</label>
+              <input type="number" step="0.01" id="man-fee-amount" class="form-control font-mono" value="0.00">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-manual-item">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> Agregar al Detalle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar NC Manual -->
+  <div class="modal-overlay" id="modal-nc-manual">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Registrar Nota de Crédito Manual: <span id="nc-number-display" style="color:var(--primary);">NC #---</span></h3>
+        <button class="modal-close" data-close-modal="modal-nc-manual">&times;</button>
+      </div>
+      <form id="nc-manual-form">
+        <div class="modal-content">
+          <div class="form-group">
+            <label class="form-label">Proveedor / Operador:</label>
+            <select id="nc-provider-select" class="form-control" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div>
+              <label class="form-label">Fecha:</label>
+              <input type="date" id="nc-issue-date" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">Moneda:</label>
+              <select id="nc-currency" class="form-control">
+                <option value="BOB">BOB</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Importe Total:</label>
+              <input type="number" step="0.01" id="nc-total-amount" class="form-control font-mono" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Concepto / Glosa:</label>
+            <textarea id="nc-concept" class="form-control" rows="3" placeholder="Ej: Ajuste por servicio no utilizado o alquiler..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-nc-manual">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Registrar Nota de Crédito</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar / Editar Ingreso Operativo -->
+  <div class="modal-overlay" id="modal-other-income">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="other-income-modal-title"><i data-lucide="edit-3"></i> Editar Ingreso Operativo</h3>
+        <button class="modal-close" data-close-modal="modal-other-income">&times;</button>
+      </div>
+      <form id="other-income-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div>
+              <label class="form-label">Nro de Boleto / Referencia:</label>
+              <input type="text" id="inc-form-ticket-number" class="form-control font-mono" placeholder="Ej: 930-1234567890 o ING-001" required>
+            </div>
+            <div>
+              <label class="form-label">Fecha de Emisión:</label>
+              <input type="date" id="inc-form-issue-date" class="form-control font-mono" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Aerolínea / Operador / Proveedor:</label>
+            <select id="inc-form-operator" class="form-control" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Moneda:</label>
+              <select id="inc-form-currency" class="form-control">
+                <option value="BOB">BOB</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Monto de Comisión / Ingreso:</label>
+              <input type="number" step="0.01" id="inc-form-amount" class="form-control font-mono" placeholder="0.00" required>
+            </div>
+            <div>
+              <label class="form-label">Estado:</label>
+              <select id="inc-form-status" class="form-control font-mono" onchange="window.otherIncomesModule.onStatusChangeInModal()">
+                <option value="IMPAGA">IMPAGA (Por Cobrar)</option>
+                <option value="PAGADO">PAGADO (Liquidado)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sección de Depósito de Fondos (Visible si el estado es PAGADO) -->
+          <div id="inc-form-deposit-wrap" style="margin-top: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; display: none;">
+            <div style="font-weight: 700; color: #166534; font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="landmark" style="width: 16px; height: 16px; color: #15803d;"></i> Cuenta de Depósito / Liquidación:
+              </span>
+              <span class="badge badge-emerald" style="font-size: 0.7rem;">Cobro Liquidado</span>
+            </div>
+            
+            <div class="form-row">
+              <div style="flex: 1;">
+                <label class="form-label" style="color: #166534; font-weight: 700; font-size: 0.78rem;">Fecha en que se Liquidó:</label>
+                <input type="date" id="inc-form-paid-date" class="form-control font-mono" style="background: white;">
+              </div>
+              <div style="flex: 2;">
+                <label class="form-label" style="color: #166534; font-weight: 700; font-size: 0.78rem;">Cuenta donde se depositó el dinero:</label>
+                <div style="display: flex; gap: 6px;">
+                  <select id="inc-form-deposit-account" class="form-control" style="background: white;">
+                    <!-- Opciones de banco y caja -->
+                  </select>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="window.otherIncomesModule.quickNewBankAccount()" title="Registrar nueva cuenta bancaria" style="padding: 0 10px; flex-shrink: 0;">
+                    <i data-lucide="plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px;">
+              <div style="flex: 1.2;">
+                <label class="form-label" style="color: #166534; font-weight: 700; font-size: 0.78rem;">Nro Comprobante / Ref. Transferencia:</label>
+                <input type="text" id="inc-form-deposit-ref" class="form-control font-mono" placeholder="Ej: Trf 489201 / Dep. 9021" style="background: white;">
+              </div>
+              <div style="flex: 1.8;">
+                <label class="form-label" style="color: #166534; font-weight: 700; font-size: 0.78rem;">Notas del Pago / Liquidación:</label>
+                <input type="text" id="inc-form-notes" class="form-control" placeholder="Ej: Liquidación quincenal plataforma..." style="background: white;">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Descripción Operativa:</label>
+            <textarea id="inc-form-description" class="form-control" rows="2" placeholder="Detalle del boleto, pasajero, ruta..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-other-income">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Rápido: Asignar / Cambiar Cuenta de Depósito -->
+  <div class="modal-overlay" id="modal-assign-deposit-account">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--navy); display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="landmark" style="color: #15803d;"></i> Asignar Cuenta de Depósito
+        </h3>
+        <button class="modal-close" data-close-modal="modal-assign-deposit-account">&times;</button>
+      </div>
+      <form id="assign-deposit-account-form" onsubmit="window.otherIncomesModule.handleSaveDepositAccount(event)">
+        <div class="modal-content">
+          <!-- Info de la comisión seleccionada -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span style="color: #64748b; font-weight: 600;">Boleto / Ref:</span>
+              <strong id="assign-acc-ticket" class="font-mono">930-123456</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span style="color: #64748b; font-weight: 600;">Aerolínea / Operador:</span>
+              <strong id="assign-acc-operator">BOLIVIA BOOKING</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #64748b; font-weight: 600;">Monto Comisión:</span>
+              <strong id="assign-acc-amount" class="font-mono" style="color: #0369a1; font-size: 1.1rem;">BOB 75.00</strong>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="font-weight: 700; color: var(--navy);">Cuenta donde se depositó el dinero:</label>
+            <div style="display: flex; gap: 6px;">
+              <select id="assign-acc-select" class="form-control" required style="font-weight: 600;">
+                <!-- Dinámico -->
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="window.otherIncomesModule.quickNewBankAccount()" title="Registrar nueva cuenta bancaria" style="padding: 0 10px; flex-shrink: 0;">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha de Cobro / Depósito:</label>
+              <input type="date" id="assign-acc-date" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label" style="font-weight: 700; color: var(--navy);">Nro. Comprobante / Trf:</label>
+              <input type="text" id="assign-acc-ref" class="form-control font-mono" placeholder="Ej: Trf 489201">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Notas del Depósito:</label>
+            <input type="text" id="assign-acc-notes" class="form-control" placeholder="Ej: Transferencia directa recibida en banco...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-assign-deposit-account">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="background: #15803d; border-color: #166534; font-weight: 700;">
+            <i data-lucide="save"></i> Guardar Depósito
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Generar Nota de Débito por Comisiones de Plataforma -->
+  <div class="modal-overlay" id="modal-generate-nd-commission">
+    <div class="modal-box" style="max-width: 860px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--navy); display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="file-spreadsheet" style="color: #0284c7;"></i> Generar Nota de Débito por Comisiones de Plataforma
+        </h3>
+        <button class="modal-close" data-close-modal="modal-generate-nd-commission">&times;</button>
+      </div>
+
+      <div class="modal-content">
+        <!-- Parámetros de Selección -->
+        <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+          <div class="form-row" style="align-items: flex-end;">
+            <div style="flex: 2;">
+              <label class="form-label" style="font-weight: 700; color: var(--navy);">Aerolínea / Operador a Facturar:</label>
+              <select id="gen-nd-operator-select" class="form-control font-mono" onchange="window.otherIncomesModule.recalcNdCommissionsPreview()">
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Desde:</label>
+              <input type="date" id="gen-nd-date-from" class="form-control font-mono" onchange="window.otherIncomesModule.recalcNdCommissionsPreview()">
+            </div>
+            <div>
+              <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Hasta:</label>
+              <input type="date" id="gen-nd-date-to" class="form-control font-mono" onchange="window.otherIncomesModule.recalcNdCommissionsPreview()">
+            </div>
+          </div>
+
+          <!-- Alerta informativa de regla de negocio -->
+          <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #0369a1; background: #e0f2fe; padding: 8px 12px; border-radius: 6px; border: 1px solid #bae6fd;">
+            <i data-lucide="info" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+            <span><strong>Regla de Liquidación:</strong> Solo se listan y totalizan comisiones en estado <strong>PAGADO</strong> (liquidadas por la plataforma). Las comisiones por cobrar (IMPAGAS) se excluyen automáticamente.</span>
+          </div>
+        </div>
+
+        <!-- Tabla de Boletos / Comisiones Pagadas Encontradas -->
+        <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 0.88rem; font-weight: 700; color: var(--navy);">
+            Boletos con Comisiones Pagadas Encontradas: <span id="gen-nd-item-count" class="badge badge-emerald">0 boletos</span>
+          </div>
+          <div style="font-size: 0.8rem; color: #64748b;">
+            <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="gen-nd-select-all" checked onchange="window.otherIncomesModule.toggleSelectAllNdItems(this.checked)">
+              Seleccionar todos
+            </label>
+          </div>
+        </div>
+
+        <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">Sel.</th>
+                <th>Nro Boleto</th>
+                <th>Pasajero / Ruta</th>
+                <th>Emisión</th>
+                <th>Fecha Cobro</th>
+                <th style="text-align: right;">Comisión</th>
+              </tr>
+            </thead>
+            <tbody id="gen-nd-items-table-body">
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Resumen de la ND a Crear -->
+        <div style="margin-top: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; display: grid; grid-template-columns: 2fr 1.2fr; gap: 16px; align-items: center;">
+          <div>
+            <div class="form-row">
+              <div>
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 700;">Fecha Emisión ND:</label>
+                <input type="date" id="gen-nd-issue-date" class="form-control font-mono" style="background: white;">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 700;">Condición:</label>
+                <select id="gen-nd-payment-term" class="form-control" style="background: white;">
+                  <option value="AL_CONTADO">AL CONTADO</option>
+                  <option value="CREDITO_7_DIAS">CRÉDITO 7 DÍAS</option>
+                  <option value="CREDITO_15_DIAS">CRÉDITO 15 DÍAS</option>
+                  <option value="CREDITO_30_DIAS">CRÉDITO 30 DÍAS</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 700;">Estado ND:</label>
+                <select id="gen-nd-status" class="form-control font-mono" style="background: white;">
+                  <option value="PAGADA">PAGADA (Cobrada)</option>
+                  <option value="IMPAGA">IMPAGA (Por cobrar)</option>
+                  <option value="BORRADOR">BORRADOR</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top: 8px;">
+              <input type="text" id="gen-nd-observations" class="form-control" placeholder="Observaciones de la ND (ej: Liquidación de comisiones período...)" style="background: white; font-size: 0.8rem;">
+            </div>
+            <div id="gen-nd-deposit-account-wrap" style="margin-top: 8px;">
+              <label class="form-label" style="font-size: 0.78rem; font-weight: 700; color: #166534;">Cuenta de Depósito / Cobro:</label>
+              <select id="gen-nd-deposit-account" class="form-control" style="background: white; font-size: 0.82rem;">
+                <!-- Dinámico -->
+              </select>
+            </div>
+          </div>
+
+          <div style="text-align: right; border-left: 2px solid #86efac; padding-left: 16px;">
+            <div style="font-size: 0.75rem; color: #166534; font-weight: 700; text-transform: uppercase;">Total Comisiones Pagadas a Facturar:</div>
+            <div id="gen-nd-total-display" class="font-mono" style="font-size: 1.6rem; font-weight: 900; color: #15803d;">BOB 0.00</div>
+            <div id="gen-nd-subtotal-info" style="font-size: 0.75rem; color: #166534;">0 boletos seleccionados</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-generate-nd-commission">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-generate-nd" onclick="window.otherIncomesModule.confirmGenerateNd()" style="background: #15803d; border-color: #166534; font-weight: 700;">
+          <i data-lucide="check-circle"></i> Generar Nota de Débito
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Reversión de Pago con Auditoría Obligatoria -->
+  <div class="modal-overlay" id="modal-reversal">
+    <div class="modal-box" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: #b91c1c;">
+          <i data-lucide="alert-triangle"></i> Revertir Recibo de Cobranza
+        </h3>
+        <button class="modal-close" data-close-modal="modal-reversal">&times;</button>
+      </div>
+      <form id="receipt-reversal-form">
+        <input type="hidden" id="rev-receipt-id">
+        <div class="modal-content">
+          <div id="rev-receipt-info" style="padding: 10px; background: #fee2e2; color: #991b1b; border-radius: 6px; font-weight: 600; margin-bottom: 14px;">
+            <!-- Info recibo -->
+          </div>
+
+          <p style="font-size: 0.85rem; color: #475569; margin-bottom: 12px;">
+            <strong>ATENCIÓN:</strong> La reversión anulará este comprobante de caja y <strong>restaurará automáticamente los saldos pendientes</strong> de todas las Notas de Débito afectadas.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Motivo Justificado de la Reversión (Obligatorio para Auditoría):</label>
+            <textarea id="rev-reason" class="form-control" rows="3" placeholder="Ej: Error en el medio de pago ingresado, duplicidad de comprobante..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-reversal">Cancelar</button>
+          <button type="submit" class="btn btn-danger"><i data-lucide="rotate-ccw"></i> Confirmar Reversión</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Medio de Pago -->
+  <div class="modal-overlay" id="modal-payment-method">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Medio de Pago</h3>
+        <button class="modal-close" data-close-modal="modal-payment-method">&times;</button>
+      </div>
+      <form id="payment-method-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div>
+              <label class="form-label">Código:</label>
+              <input type="text" id="pm-code" class="form-control font-mono" placeholder="Ej: BS-06" required>
+            </div>
+            <div>
+              <label class="form-label">Moneda:</label>
+              <select id="pm-currency" class="form-control">
+                <option value="BOB">BOB</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Nombre del Medio:</label>
+            <input type="text" id="pm-name" class="form-control" placeholder="Ej: Banco Bisa Moneda Nacional" required>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Uso / Tipo:</label>
+              <select id="pm-type" class="form-control">
+                <option value="COBRANZAS">COBRANZAS (Clientes)</option>
+                <option value="PAGOS">PAGOS (Proveedores)</option>
+                <option value="AMBOS">AMBOS</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Nro de Cuenta Bancaria:</label>
+              <input type="text" id="pm-bank-account" class="form-control font-mono" placeholder="Ej: 201-098234-1">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-payment-method">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Corrección Contable de Comprobantes -->
+  <div class="modal-overlay" id="modal-accounting-correct">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="accounting-correct-title">
+          <i data-lucide="edit-3"></i> Corrección Contable de Comprobante
+        </h3>
+        <button class="modal-close" data-close-modal="modal-accounting-correct">&times;</button>
+      </div>
+      <form id="accounting-correct-form">
+        <div class="modal-content">
+          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 14px;">
+            Permite al contador rectificar errores tipográficos en NIT, Razón Social, Fecha Contable o Glosa sin alterar los montos base. Se registrará la trazabilidad en la auditoría.
+          </p>
+
+          <div class="form-row">
+            <div>
+              <label class="form-label">NIT / CI del Titular:</label>
+              <input type="text" id="corr-nit" class="form-control font-mono" required>
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="form-label">Razón Social / Nombre Comercial:</label>
+              <input type="text" id="corr-name" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Fecha de Emisión Contable:</label>
+              <input type="date" id="corr-date" class="form-control font-mono" required>
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="form-label">Solicitante / Contacto:</label>
+              <input type="text" id="corr-solicitante" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Glosa / Observaciones Contables:</label>
+            <textarea id="corr-observations" class="form-control" rows="2"></textarea>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px; background: #f0f9ff; padding: 12px; border-radius: 6px; border: 1px solid #bae6fd;">
+            <label class="form-label" style="color: #0369a1; font-weight: 700;">
+              Motivo o Justificación de la Corrección (Obligatorio para Auditoría):
+            </label>
+            <textarea id="corr-reason" class="form-control" rows="2" placeholder="Ej: Rectificación de NIT por error de dedo al facturar en counter..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-accounting-correct">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Corrección</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Anulación de Comprobante con Motivo Obligatorio -->
+  <div class="modal-overlay" id="modal-accounting-void">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="accounting-void-title" style="color: #b91c1c;">
+          <i data-lucide="x-circle"></i> Anular Comprobante Contable
+        </h3>
+        <button class="modal-close" data-close-modal="modal-accounting-void">&times;</button>
+      </div>
+      <form id="accounting-void-form">
+        <div class="modal-content">
+          <div id="accounting-void-info" style="padding: 12px; background: #fee2e2; color: #991b1b; border-radius: 6px; font-size: 0.88rem; line-height: 1.4; margin-bottom: 14px;">
+            <!-- Dinámico -->
+          </div>
+
+          <p style="font-size: 0.85rem; color: #475569; margin-bottom: 12px;">
+            <strong>INFORMACIÓN TRIBUTARIA Y CONTABLE:</strong><br>
+            El número correlativo se mantendrá en el libro contable con el estado <strong>ANULADA</strong> e importe <strong>0.00</strong> para garantizar que no existan saltos en la numeración correlativa. Los boletos asociados volverán al pool disponible.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label" style="font-weight: 700; color: #b91c1c;">
+              Motivo Justificado de la Anulación (Obligatorio):
+            </label>
+            <textarea id="void-reason" class="form-control" rows="3" placeholder="Ej: Boleto no utilizado, viaje cancelado por el cliente antes de la emisión definitiva..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-accounting-void">Cancelar</button>
+          <button type="submit" class="btn btn-danger"><i data-lucide="x-circle"></i> Confirmar Anulación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Centro de Notificaciones y Alertas de Viaje -->
+  <div class="modal-overlay" id="modal-notifications-center">
+    <div class="modal-box" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="bell" style="color: #b91c1c;"></i>
+          Alertas de Vuelos y Recordatorios Próximos
+        </h3>
+        <button class="modal-close" data-close-modal="modal-notifications-center">&times;</button>
+      </div>
+      <div class="modal-content">
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">
+          Pasajeros que viajan hoy, retornan hoy o tienen vuelos en las próximas 24 horas:
+        </p>
+        <div id="notifications-list-container">
+          <!-- Dinámico -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-notifications-center">Cerrar</button>
+        <button type="button" class="btn btn-primary" onclick="window.calendarModule.openInSeparateWindow()">
+          <i data-lucide="external-link"></i> Abrir Monitor Completo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nuevo Recordatorio / Itinerario de Viaje -->
+  <div class="modal-overlay" id="modal-new-travel-reminder">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="calendar-plus"></i> Programar Nuevo Itinerario de Viaje</h3>
+        <button class="modal-close" data-close-modal="modal-new-travel-reminder">&times;</button>
+      </div>
+      <form id="travel-reminder-form">
+        <div class="modal-content">
+          <div class="form-row">
+            <div style="grid-column: span 2;">
+              <label class="form-label">Cliente / Empresa Titular:</label>
+              <select id="trv-client-select" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Celular WhatsApp Pasajero:</label>
+              <input type="text" id="trv-client-phone" class="form-control font-mono" placeholder="77298765" required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Nombre del Pasajero:</label>
+              <input type="text" id="trv-passenger-name" class="form-control font-mono" placeholder="MENDOZA/CARLOS LIC" required>
+            </div>
+            <div>
+              <label class="form-label">Doc. Identidad / Pasaporte:</label>
+              <input type="text" id="trv-passenger-doc" class="form-control font-mono" placeholder="4820192 LP">
+            </div>
+            <div>
+              <label class="form-label">Correo Electrónico:</label>
+              <input type="email" id="trv-client-email" class="form-control" placeholder="cliente@correo.com">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Ruta (Itinerario):</label>
+              <input type="text" id="trv-route" class="form-control font-mono" placeholder="LPB-VVI-LPB" required>
+            </div>
+            <div>
+              <label class="form-label">Aerolínea / Operador:</label>
+              <input type="text" id="trv-airline" class="form-control" placeholder="Boliviana de Aviación - BoA" required>
+            </div>
+            <div>
+              <label class="form-label">Nro de Vuelo:</label>
+              <input type="text" id="trv-flight-number" class="form-control font-mono" placeholder="OB-640">
+            </div>
+          </div>
+
+          <!-- Fechas de Ida -->
+          <div class="form-row" style="margin-top: 10px; background: #ecfeff; padding: 10px; border-radius: 6px; border: 1px solid #a5f3fc;">
+            <div>
+              <label class="form-label" style="color: #0891b2; font-weight: 700;">🛫 Fecha de Salida (IDA):</label>
+              <input type="date" id="trv-departure-date" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label" style="color: #0891b2; font-weight: 700;">Hora de Presentación/Vuelo:</label>
+              <input type="time" id="trv-departure-time" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">Nro de Boleto:</label>
+              <input type="text" id="trv-ticket-number" class="form-control font-mono" placeholder="930-1234567890">
+            </div>
+          </div>
+
+          <!-- Checkbox Viaje Redondo -->
+          <div style="margin-top: 10px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #92400e; cursor: pointer;">
+              <input type="checkbox" id="trv-has-return" style="width: 18px; height: 18px; cursor: pointer;" checked>
+              ¿El viaje incluye vuelo o traslado de retorno (Ida y Vuelta)?
+            </label>
+          </div>
+
+          <!-- Fechas de Vuelta -->
+          <div id="trv-return-fields-row" class="form-row" style="margin-top: 10px; background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fde68a;">
+            <div>
+              <label class="form-label" style="color: #b45309; font-weight: 700;">🛬 Fecha de Retorno (VUELTA):</label>
+              <input type="date" id="trv-return-date" class="form-control font-mono">
+            </div>
+            <div>
+              <label class="form-label" style="color: #b45309; font-weight: 700;">Hora de Vuelo Retorno:</label>
+              <input type="time" id="trv-return-time" class="form-control font-mono">
+            </div>
+            <div>
+              <label class="form-label">Hotel / Alojamiento:</label>
+              <input type="text" id="trv-hotel-name" class="form-control" placeholder="Hotel Los Tajibos">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Observaciones para el Administrador:</label>
+            <textarea id="trv-observations" class="form-control" rows="2" placeholder="Requerimientos especiales, equipaje extra, traslados..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-new-travel-reminder">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Itinerario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Detalle del Itinerario y Envío de WhatsApp -->
+  <div class="modal-overlay" id="modal-reminder-detail">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="plane"></i> Información Completa del Viaje</h3>
+        <button class="modal-close" data-close-modal="modal-reminder-detail">&times;</button>
+      </div>
+      <div class="modal-content" id="reminder-detail-modal-body">
+        <!-- Dinámico -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-reminder-detail">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Cuenta Bancaria -->
+  <div class="modal-overlay" id="modal-bank-account">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="bank-account-modal-title">Registrar Cuenta Bancaria</h3>
+        <button class="modal-close" data-close-modal="modal-bank-account">&times;</button>
+      </div>
+      <form id="bank-account-form">
+        <div class="modal-content">
+          <div class="form-group">
+            <label class="form-label">Entidad Bancaria:</label>
+            <select id="bank-name-select" class="form-control" required>
+              <option value="">-- Seleccionar Banco o Plataforma --</option>
+              <option value="Banco Ganadero S.A.">Banco Ganadero S.A.</option>
+              <option value="Binance (USDT / P2P Billetera Cripto)">Binance (USDT / P2P Billetera Cripto)</option>
+              <option value="Banco Mercantil Santa Cruz (BMSC)">Banco Mercantil Santa Cruz (BMSC)</option>
+              <option value="Banco Bisa S.A.">Banco Bisa S.A.</option>
+              <option value="Banco Nacional de Bolivia (BNB)">Banco Nacional de Bolivia (BNB)</option>
+              <option value="Banco de Crédito de Bolivia (BCP)">Banco de Crédito de Bolivia (BCP)</option>
+              <option value="Banco Unión S.A.">Banco Unión S.A.</option>
+              <option value="Banco Económico S.A.">Banco Económico S.A.</option>
+              <option value="Banco FIE S.A.">Banco FIE S.A.</option>
+              <option value="Banco Solidario S.A. (BancoSol)">Banco Solidario S.A. (BancoSol)</option>
+              <option value="Banco Fortaleza S.A.">Banco Fortaleza S.A.</option>
+            </select>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div style="grid-column: span 2;">
+              <label class="form-label">Número de Cuenta Bancaria / ID Wallet:</label>
+              <input type="text" id="bank-account-number" class="form-control font-mono" placeholder="Ej: 100-29384-2 o Pay ID Binance" required>
+            </div>
+            <div>
+              <label class="form-label">Tipo de Cuenta:</label>
+              <select id="bank-account-type" class="form-control">
+                <option value="CORRIENTE">Cuenta Corriente</option>
+                <option value="AHORROS">Caja de Ahorros</option>
+                <option value="BILLETERA_DIGITAL">Billetera Digital / P2P</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div>
+              <label class="form-label">Moneda de la Cuenta:</label>
+              <select id="bank-currency" class="form-control">
+                <option value="BOB">BOB (Bolivianos - Bs.)</option>
+                <option value="USD">USD (Dólares Americanos - $us)</option>
+              </select>
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="form-label">Titular Oficial Registrado:</label>
+              <input type="text" id="bank-titular" class="form-control" value="MARETRAVEL S.R.L." required>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 12px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
+              <input type="checkbox" id="bank-is-active" style="width: 18px; height: 18px; cursor: pointer;" checked>
+              <div>
+                <strong style="color: var(--navy);">Habilitar cuenta como ACTIVA</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                  Las cuentas activas se imprimen automáticamente en el pie de las Notas de Débito y están disponibles en Caja y Cobranzas.
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-bank-account">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Contactos Autorizados de la Empresa (Jerarquía Corporativa) -->
+  <div class="modal-overlay" id="modal-company-contacts">
+    <div class="modal-box" style="max-width: 860px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="company-contacts-modal-title"><i data-lucide="users"></i> Contactos Autorizados</h3>
+          <div id="company-contacts-modal-sub" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button class="modal-close" data-close-modal="modal-company-contacts">&times;</button>
+      </div>
+      <div class="modal-content">
+        <!-- Tabla de Contactos Existentes -->
+        <div class="table-container" style="max-height: 240px; overflow-y: auto; margin-bottom: 20px;">
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th>Nombre Completo</th>
+                <th>Cargo / Depto</th>
+                <th>Email</th>
+                <th>Teléfono / WhatsApp</th>
+                <th>Estado</th>
+                <th style="width: 90px; text-align: center;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="company-contacts-table-body">
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Formulario para Agregar / Editar Contacto -->
+        <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 14px;">
+          <h4 style="font-size: 0.88rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="user-plus"></i> Registrar / Editar Solicitante Autorizado
+          </h4>
+          <form id="company-contact-form">
+            <div class="form-row">
+              <div style="grid-column: span 2;">
+                <label class="form-label">Nombre y Apellidos:</label>
+                <input type="text" id="contact-fullname" class="form-control" placeholder="Ej: Lic. Ana María Barrenechea" required>
+              </div>
+              <div>
+                <label class="form-label">Cargo o Departamento:</label>
+                <input type="text" id="contact-department" class="form-control" placeholder="Ej: Encargada de Logística">
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px;">
+              <div>
+                <label class="form-label">Correo Electrónico:</label>
+                <input type="email" id="contact-email" class="form-control" placeholder="solicitante@empresa.com">
+              </div>
+              <div>
+                <label class="form-label">Teléfono / Celular:</label>
+                <input type="text" id="contact-phone" class="form-control font-mono" placeholder="+591 770-12345">
+              </div>
+              <div style="display: flex; align-items: flex-end; padding-bottom: 4px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0;">
+                  <input type="checkbox" id="contact-is-active" style="width: 16px; height: 16px; cursor: pointer;" checked>
+                  <span style="font-size: 0.82rem; font-weight: 600;">Contacto Activo</span>
+                </label>
+              </div>
+            </div>
+
+            <div style="margin-top: 14px; text-align: right;">
+              <button type="submit" class="btn btn-primary btn-sm" id="btn-save-contact-submit">
+                <i data-lucide="plus"></i> Agregar Solicitante
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-company-contacts">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear Solicitante al Vuelo (Quick Contact desde Emisión de ND) -->
+  <div class="modal-overlay" id="modal-quick-contact">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title"><i data-lucide="user-plus"></i> Registrar Solicitante al Vuelo</h3>
+          <div id="quick-contact-company-name" style="font-size: 0.78rem; color: var(--text-muted);">Empresa</div>
+        </div>
+        <button class="modal-close" data-close-modal="modal-quick-contact">&times;</button>
+      </div>
+      <form id="quick-contact-form">
+        <div class="modal-content">
+          <div class="form-group">
+            <label class="form-label">Nombre Completo del Solicitante:</label>
+            <input type="text" id="quick-contact-name" class="form-control" placeholder="Ej: Lic. Ana María Barrenechea" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cargo o Departamento:</label>
+            <input type="text" id="quick-contact-dept" class="form-control" placeholder="Ej: Encargada de Logística">
+          </div>
+          <div class="form-row">
+            <div>
+              <label class="form-label">Celular / Teléfono:</label>
+              <input type="text" id="quick-contact-phone" class="form-control font-mono" placeholder="77012345">
+            </div>
+            <div>
+              <label class="form-label">Email Corporativo:</label>
+              <input type="email" id="quick-contact-email" class="form-control" placeholder="contacto@empresa.com">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-quick-contact">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="check"></i> Guardar y Vincular a ND</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Historial de Emisiones de la Empresa -->
+  <div class="modal-overlay" id="modal-company-history">
+    <div class="modal-box" style="max-width: 960px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="company-history-modal-title"><i data-lucide="history"></i> Historial de Emisiones</h3>
+          <div id="company-history-modal-sub" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button class="modal-close" data-close-modal="modal-company-history">&times;</button>
+      </div>
+      <div class="modal-content">
+        <!-- Tarjetas de resumen del cliente -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+          <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 10px;">
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TOTAL FACTURADO:</div>
+            <div id="hist-company-total-facturado" class="font-mono" style="font-size: 1.15rem; font-weight: 800; color: var(--navy);">BOB 0.00</div>
+          </div>
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px;">
+            <div style="font-size: 0.72rem; color: #b91c1c; font-weight: 700;">SALDO PENDIENTE:</div>
+            <div id="hist-company-saldo-pendiente" class="font-mono" style="font-size: 1.15rem; font-weight: 800; color: #b91c1c;">BOB 0.00</div>
+          </div>
+          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px;">
+            <div style="font-size: 0.72rem; color: #0369a1; font-weight: 700;">COMPROBANTES:</div>
+            <div id="hist-company-nds-count" class="font-mono" style="font-size: 1.15rem; font-weight: 800; color: #0369a1;">0 NDs</div>
+          </div>
+        </div>
+
+        <!-- Filtros cruzados por Solicitante y Pasajero -->
+        <div class="filter-bar" style="margin-bottom: 12px;">
+          <div class="filter-group" style="flex: 1.5;">
+            <label class="filter-label">Filtrar por Solicitante:</label>
+            <select id="company-history-requester-filter" class="form-control">
+              <option value="TODOS">-- Todos los Solicitantes --</option>
+            </select>
+          </div>
+          <div class="filter-group" style="flex: 2;">
+            <label class="filter-label">Buscar por Nombre del Pasajero:</label>
+            <input type="text" id="company-history-passenger-search" class="form-control" placeholder="Escriba apellido o nombre del pasajero...">
+          </div>
+        </div>
+
+        <!-- Tabla de Emisiones -->
+        <div class="table-container" style="max-height: 360px; overflow-y: auto;">
+          <table class="erp-table">
+            <thead>
+              <tr>
+                <th>Comprobante</th>
+                <th>Fecha Emisión</th>
+                <th>Solicitado por</th>
+                <th>Pasajero(s) / Servicios</th>
+                <th>Condición</th>
+                <th style="text-align: right;">Total</th>
+                <th style="text-align: right;">Saldo</th>
+                <th>Estado</th>
+                <th style="text-align: center;">Ver / Impr.</th>
+              </tr>
+            </thead>
+            <tbody id="company-history-table-body">
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-company-history">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Vista Previa Oficial Formato Nota de Débito (Exacto a media_1789570283507.png) -->
+  <div class="modal-overlay" id="modal-nd-voucher-preview">
+    <div class="modal-box" style="max-width: 900px; padding: 0; background: #525659; overflow: hidden;">
+      <div class="modal-header" style="background: #2b3035; color: white; border-bottom: 1px solid #1a1d20; padding: 12px 20px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="file-text" style="color: #269f7a;"></i>
+          <span style="font-weight: 700; font-size: 1rem;">Vista Previa de Nota de Débito - Formato Oficial</span>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; background: #1e2225; padding: 4px 10px; border-radius: 6px; border: 1px solid #3e444a;">
+            <label for="nd-edit-emission-date" style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin: 0; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+              <i data-lucide="calendar" style="width: 14px; height: 14px; color: #269f7a;"></i> Fecha Emisión:
+            </label>
+            <input type="date" id="nd-edit-emission-date" class="form-control" title="Modificar fecha de emisión de la ND antes de imprimir" style="padding: 2px 8px; height: 28px; font-size: 0.82rem; background: #2d3339; color: white; border: 1px solid #4a5568; border-radius: 4px; width: 132px;">
+            <input type="time" id="nd-edit-emission-time" class="form-control" title="Modificar hora de emisión" style="padding: 2px 6px; height: 28px; font-size: 0.82rem; background: #2d3339; color: white; border: 1px solid #4a5568; border-radius: 4px; width: 85px;">
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-print-from-modal" style="background: #269f7a; border-color: #208e6c; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="printer"></i> Imprimir Comprobante
+          </button>
+          <button class="modal-close" data-close-modal="modal-nd-voucher-preview" style="color: white; font-size: 1.5rem;">&times;</button>
+        </div>
+      </div>
+      <div class="modal-content" style="padding: 24px 20px; max-height: calc(85vh - 75px); overflow-y: auto; display: flex; justify-content: center; background: #e2e8f0;">
+        <div id="nd-modal-preview-body" style="background: white; width: 100%; max-width: 820px; box-shadow: 0 8px 30px rgba(0,0,0,0.18); border-radius: 4px; padding: 30px 40px;">
+          <!-- Contenido inyectado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nueva Venta / Emisión Integral (Todo en Uno) -->
+  <div class="modal-overlay" id="modal-unified-operation">
+    <div class="modal-box" style="max-width: 960px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="unified-modal-title">
+          <i data-lucide="plus-circle"></i> Registrar Nueva Venta / Emisión Integral
+        </h3>
+        <button class="modal-close" data-close-modal="modal-unified-operation">&times;</button>
+      </div>
+      <form id="unified-operation-form" onsubmit="window.operationsHubModule.saveUnifiedOperation(event); return false;">
+        <div class="modal-content">
+          <!-- Fila 1: Servicio, Fecha y Voucher -->
+          <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label" style="margin-bottom: 0; font-weight: 700;">Tipo de Servicio:</label>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openNewServiceTypeModal()" style="padding: 1px 6px; font-size: 0.72rem;" title="Añadir nuevo tipo de servicio">
+                  <i data-lucide="plus"></i> + Añadir Tipo
+                </button>
+              </div>
+              <select id="uni-service-type" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Fecha de Emisión:</label>
+              <input type="date" id="uni-issue-date" class="form-control font-mono" required>
+            </div>
+            <div>
+              <label class="form-label">Nro Voucher / Reserva / Boleto:</label>
+              <input type="text" id="uni-voucher-number" class="form-control font-mono" placeholder="Ej: 930-4581959448 o RES-8841">
+            </div>
+          </div>
+
+          <!-- Fila 2: Pasajero / Titular -->
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: 2fr 1fr;">
+            <div>
+              <label class="form-label">Nombre del Pasajero / Titular:</label>
+              <input type="text" id="uni-pax-name" class="form-control font-mono" placeholder="APELLIDO / NOMBRE" required>
+            </div>
+            <div>
+              <label class="form-label">Doc. Identidad / Pasaporte:</label>
+              <input type="text" id="uni-pax-doc" class="form-control font-mono" placeholder="Ej: 4820192 LP">
+            </div>
+          </div>
+
+          <!-- Fila 3: Descripción / Ruta -->
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Descripción / Ruta / Detalle del Servicio:</label>
+            <input type="text" id="uni-description" class="form-control" placeholder="Ej: Boleto LPB-VVI-LPB / Hotel 3 noches / Paquete Cancún Todo Incluido">
+          </div>
+
+          <!-- Fila 4: Cliente Facturado y Proveedor Operador -->
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: 1fr 1fr;">
+            <div>
+              <label class="form-label">Cliente / Empresa a Facturar (Cuentas por Cobrar):</label>
+              <select id="uni-client-select" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Proveedor / Operador Responsable (Cuentas por Pagar):</label>
+              <select id="uni-provider-select" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+          </div>
+
+          <!-- Fila 5: Importes, Tarifas y Comisiones -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-top: 14px;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: #0f2742; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="calculator" style="width: 16px; height: 16px; color: #00aeef;"></i>
+              Estructura Económica y Financiera (Moneda: BOB)
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+              <div>
+                <label class="form-label">AIR FARE / Tarifa Neta:</label>
+                <input type="number" step="0.01" id="uni-fare-amount" class="form-control font-mono" placeholder="0.00" value="0.00" oninput="window.operationsHubModule.calculateUnifiedTotals()" required>
+              </div>
+              <div>
+                <label class="form-label">Fee de Emisión (Agencia):</label>
+                <input type="number" step="0.01" id="uni-fee-amount" class="form-control font-mono" placeholder="0.00" value="0.00" oninput="window.operationsHubModule.calculateUnifiedTotals()">
+              </div>
+              <div>
+                <label class="form-label">% Comis. Plataforma:</label>
+                <input type="number" step="0.01" id="uni-prov-comm-rate" class="form-control font-mono" placeholder="0.00" value="0.00" oninput="window.operationsHubModule.calculateUnifiedTotals()">
+              </div>
+              <div>
+                <label class="form-label">Costo Neto Proveedor:</label>
+                <input type="number" step="0.01" id="uni-net-cost" class="form-control font-mono" placeholder="Auto" value="0.00">
+              </div>
+            </div>
+
+            <!-- Resumen en vivo -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+              <div>
+                <span style="font-size: 0.75rem; color: #64748b;">TOTAL VENTA (A Cobrar a Cliente):</span>
+                <div class="font-mono" id="uni-total-sale-preview" style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">BOB 0.00</div>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: #64748b;">COMISIÓN GANADA (Por Cobrar Prov.):</span>
+                <div class="font-mono" id="uni-prov-comm-preview" style="font-size: 1.15rem; font-weight: 800; color: #0284c7;">BOB 0.00</div>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: #64748b;">UTILIDAD TOTAL AGENCIA:</span>
+                <div class="font-mono" id="uni-utility-preview" style="font-size: 1.15rem; font-weight: 800; color: #059669;">BOB 0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fila 6: Condición de Pago y Destino de Fondos -->
+          <div class="form-row" style="margin-top: 12px; grid-template-columns: 1fr 1.5fr;">
+            <div>
+              <label class="form-label">Condición de Pago:</label>
+              <select id="uni-payment-term" class="form-control">
+                <option value="AL_CONTADO">AL CONTADO (Cobrado en el acto)</option>
+                <option value="CREDITO_7_DIAS">CRÉDITO 7 DÍAS (Cuenta por Cobrar)</option>
+                <option value="CREDITO_15_DIAS">CRÉDITO 15 DÍAS (Cuenta por Cobrar)</option>
+                <option value="CREDITO_30_DIAS">CRÉDITO 30 DÍAS (Cuenta por Cobrar)</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Cuenta de Depósito / Ingreso (Si es Contado):</label>
+              <select id="uni-deposit-account" class="form-control font-mono">
+                <!-- Dinámico -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-unified-operation">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-lg" style="font-weight: 700;">
+            <i data-lucide="check-circle"></i> Guardar y Procesar Operación
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Gestionar Tipos de Servicio Existentes -->
+  <div class="modal-overlay" id="modal-manage-service-types">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i data-lucide="settings-2"></i> Gestión de Tipos de Servicio
+        </h3>
+        <button class="modal-close" data-close-modal="modal-manage-service-types">&times;</button>
+      </div>
+      <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 0.82rem; color: #64748b;">Servicios registrados en la base de datos:</span>
+          <button type="button" class="btn btn-primary btn-xs" onclick="window.operationsHubModule.openNewServiceTypeModal()">
+            <i data-lucide="plus"></i> + Nuevo Tipo
+          </button>
+        </div>
+        <div id="manage-service-types-list" style="max-height: 340px; overflow-y: auto;">
+          <!-- Dinámico -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-manage-service-types">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Tipo de Servicio Dinámico -->
+  <div class="modal-overlay" id="modal-new-service-type">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i data-lucide="tag"></i> Añadir Nuevo Tipo de Servicio
+        </h3>
+        <button class="modal-close" data-close-modal="modal-new-service-type">&times;</button>
+      </div>
+      <form id="form-new-service-type" onsubmit="window.operationsHubModule.saveNewServiceType(event); return false;">
+        <div class="modal-content">
+          <div class="form-group">
+            <label class="form-label">Nombre del Tipo de Servicio:</label>
+            <input type="text" id="new-service-name" class="form-control font-mono" placeholder="Ej: TOUR GASTRONÓMICO, TRASLADO PRIVADO..." required autofocus>
+          </div>
+          <div class="form-group" style="margin-top: 12px;">
+            <label class="form-label">Categoría Operativa:</label>
+            <select id="new-service-category" class="form-control">
+              <option value="PAQUETES">PAQUETES Y TOURS</option>
+              <option value="HOSPEDAJE">HOSPEDAJE / ALOJAMIENTO</option>
+              <option value="TRANSPORTE">TRANSPORTE Y TRASLADOS</option>
+              <option value="DOCUMENTOS">DOCUMENTOS Y VISAS</option>
+              <option value="VARIOS">OTROS / VARIOS</option>
+            </select>
+          </div>
+          <p style="font-size: 0.78rem; color: #64748b; margin-top: 10px;">
+            <i data-lucide="info" style="width: 14px; height: 14px; vertical-align: -2px;"></i>
+            El nuevo servicio se agregará inmediatamente a todos los desplegables de facturación y emisión del sistema.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-new-service-type">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="font-weight: 700;">
+            <i data-lucide="save"></i> Guardar Servicio
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Ajuste Rápido de Tipo de Cambio (T/C) -->
+  <div class="modal-overlay" id="modal-quick-exchange-rate">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="arrow-left-right" style="color: #00aeef;"></i> Tipo de Cambio Oficial (USD / BOB)
+        </h3>
+        <button class="modal-close" data-close-modal="modal-quick-exchange-rate">&times;</button>
+      </div>
+      <form id="quick-tc-form" onsubmit="window.app.saveQuickExchangeRate(event); return false;">
+        <div class="modal-content">
+          <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 14px;">
+            Ajuste las tasas de cambio de hoy. Se aplicarán automáticamente a todas las operaciones y conversiones del sistema.
+          </p>
+
+          <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div>
+              <label class="form-label" style="font-weight: 700; color: #15803d;">T/C Compra (BOB):</label>
+              <input type="number" step="0.0001" id="quick-tc-buy" class="form-control font-mono" style="font-size: 1.1rem; font-weight: 700; color: #15803d;" required>
+            </div>
+            <div>
+              <label class="form-label" style="font-weight: 700; color: #0284c7;">T/C Venta (BOB):</label>
+              <input type="number" step="0.0001" id="quick-tc-sell" class="form-control font-mono" style="font-size: 1.1rem; font-weight: 700; color: #0284c7;" required>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('quick-tc-buy').value='6.86'; document.getElementById('quick-tc-sell').value='6.96';">
+              Oficial (6.86 / 6.96)
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('quick-tc-buy').value='6.96'; document.getElementById('quick-tc-sell').value='6.96';">
+              Paralelo 6.96
+            </button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('quick-tc-buy').value='6.96'; document.getElementById('quick-tc-sell').value='7.00';">
+              Comercial 7.00
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-quick-exchange-rate">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="font-weight: 700;">
+            <i data-lucide="check"></i> Aplicar Tipo de Cambio
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Contenedor de Toasts -->
+  <div id="toast-container"></div>
+
+  <!-- Contenedor de Impresión Oficial MARETRAVEL (Oculto en pantalla) -->
+  <div id="print-area"></div>
+
+  <!-- Scripts del Sistema ERP -->
+  <script src="js/db.js"></script>
+  <script src="js/modules/bankAccounts.js"></script>
+  <script src="js/modules/accounts.js"></script>
+  <script src="js/modules/gds.js"></script>
+  <script src="js/modules/debitNotes.js"></script>
+  <script src="js/modules/creditNotes.js"></script>
+  <script src="js/modules/cashRegister.js"></script>
+  <script src="js/modules/otherIncomes.js"></script>
+  <script src="js/modules/reports.js"></script>
+  <script src="js/modules/calendar.js"></script>
+  <script src="js/modules/settings.js"></script>
+  <script src="js/modules/operationsHub.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
