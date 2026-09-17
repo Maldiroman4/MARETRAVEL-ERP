@@ -653,15 +653,23 @@ window.app = {
   },
 
   bindGlobalEvents() {
-    // Cerrar modales con botón [x] o [Cancelar]
-    document.querySelectorAll('[data-close-modal]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const modalId = btn.dataset.closeModal;
-        this.closeModal(modalId);
+    // 1. Evitar cierre accidental: Detener propagación de eventos click dentro del contenedor del modal
+    document.querySelectorAll('.modal-card, .modal-content, .modal-dialog, .modal-body, .modal-box').forEach(card => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
       });
     });
 
-    // Cerrar modal al hacer clic en el fondo (backdrop)
+    // 2. Cerrar modales ÚNICAMENTE con botón explícito [x], [Cancelar] o .btn-close
+    document.querySelectorAll('[data-close-modal], .btn-close, .modal-close-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const modalId = btn.dataset.closeModal || btn.closest('.modal-overlay')?.id;
+        if (modalId) this.closeModal(modalId);
+      });
+    });
+
+    // 3. Cerrar modal al hacer clic en el fondo (backdrop) EXCLUSIVAMENTE si el clic fue directo en el overlay
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
@@ -769,6 +777,13 @@ window.app = {
   openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+      // Blindaje contra cierre involuntario: Detener propagación de clics dentro de la tarjeta
+      const card = modal.querySelector('.modal-card, .modal-content, .modal-dialog, .modal-box') || modal.firstElementChild;
+      if (card && !card._hasStopPropBound) {
+        card.addEventListener('click', (e) => e.stopPropagation());
+        card._hasStopPropBound = true;
+      }
+
       // Stacking de modales dinámico para sub-modales / modales superpuestos
       const activeModals = Array.from(document.querySelectorAll('.modal-overlay.active')).filter(m => m !== modal);
       let maxZ = 1000;
@@ -825,6 +840,16 @@ window.app = {
       setTimeout(() => toast.remove(), 250);
     }, 4000);
   }
+};
+
+// Utilidad global de debounce para alto rendimiento y prevención de congelamiento
+window.debounce = function(func, wait = 300) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
 };
 
 // Arrancar cuando el DOM esté listo con verificación de sesión

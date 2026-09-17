@@ -88,9 +88,10 @@ window.financialGuard = {
     }
 
     return list.filter(acc => {
-      const isAct = (acc.isActive !== false);
+      const isAct = acc.isActive !== false && acc.status !== 'INACTIVO';
       const currMatch = !currencyFilter || currencyFilter === 'TODOS' || acc.currency === currencyFilter;
-      return isAct && currMatch;
+      const check = this.validateAccount(acc);
+      return isAct && currMatch && check.valid;
     });
   },
 

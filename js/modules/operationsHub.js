@@ -63,9 +63,12 @@ class OperationsHubModule {
 
     const searchInp = document.getElementById('hub-search-input');
     if (searchInp && typeof searchInp.addEventListener === 'function') {
-      searchInp.addEventListener('input', (e) => {
-        this.searchQuery = e.target.value;
+      const debouncedSearch = (window.debounce || (fn => fn))((val) => {
+        this.searchQuery = val;
         this.renderActiveTabContent();
+      }, 300);
+      searchInp.addEventListener('input', (e) => {
+        debouncedSearch(e.target.value);
       });
     }
 
@@ -85,10 +88,11 @@ class OperationsHubModule {
       });
     }
 
+    const debouncedCalc = (window.debounce || (fn => fn))(() => this.calculateUnifiedTotals(), 300);
     ['uni-fare-amount', 'uni-fee-amount', 'uni-prov-comm-rate'].forEach(id => {
       const el = document.getElementById(id);
       if (el && typeof el.addEventListener === 'function') {
-        el.addEventListener('input', () => this.calculateUnifiedTotals());
+        el.addEventListener('input', debouncedCalc);
       }
     });
 
@@ -284,37 +288,34 @@ class OperationsHubModule {
         else if (nd.status === 'ANULADA') badgeClass = 'badge-danger';
 
         return `
-          <tr>
-            <td class="font-mono" style="font-weight: 800; color: #0284c7;">
+          <tr id="row-nd-${nd.id}">
+            <td class="font-mono" style="font-weight: 800; color: #0284c7; white-space: nowrap;">
               ND #${nd.ndNumber}
             </td>
-            <td class="font-mono">${nd.issueDate || '-'}</td>
+            <td class="font-mono" style="white-space: nowrap;">${nd.issueDate || '-'}</td>
+            <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <strong style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${passName}">${passName}</strong>
+              <div style="font-size: 0.75rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstItem.description || '-'}">${firstItem.description || '-'}</div>
+            </td>
             <td>
               <span class="badge ${this.getServiceBadgeClass(firstItem.serviceType)}">
                 ${serviceName} ${totalItemsCount > 1 ? `(+${totalItemsCount - 1})` : ''}
               </span>
             </td>
-            <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              <strong style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${passName}">${passName}</strong>
-              <div style="font-size: 0.75rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstItem.description || '-'}">${firstItem.description || '-'}</div>
-            </td>
-            <td style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              <span style="font-weight: 600; color: #1e293b; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${nd.accountName || '-'}">${nd.accountName || '-'}</span>
-            </td>
-            <td>
-              <span style="font-size: 0.82rem; color: #475569;">${operatorName}</span>
-            </td>
-            <td class="font-mono" style="text-align: right; font-weight: 800; color: #0f172a;">
+            <td class="font-mono" style="text-align: right; font-weight: 800; color: #0f172a; white-space: nowrap;">
               BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
             </td>
-            <td class="font-mono" style="text-align: right; font-weight: 700; color: ${nd.balanceBob > 0 ? '#dc2626' : '#059669'};">
+            <td class="font-mono" style="text-align: right; font-weight: 700; color: ${nd.balanceBob > 0 ? '#dc2626' : '#059669'}; white-space: nowrap;">
               BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
             </td>
-            <td>
+            <td style="text-align: center; white-space: nowrap;">
               <span class="badge ${badgeClass}">${nd.status}</span>
             </td>
-            <td style="white-space: nowrap; width: 1%; min-width: 140px; text-align: right;">
+            <td style="white-space: nowrap; width: 1%; min-width: 150px; text-align: right;">
               <div class="table-actions-inline" style="display: inline-flex; align-items: center; gap: 4px;">
+                <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.toggleNdAccordion('${nd.id}')" title="Ver / Ocultar detalle operativo interno" style="padding: 4px 6px; font-size: 12px;">
+                  <i data-lucide="chevron-down"></i> Detalle
+                </button>
                 <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openEditOperationModal('${nd.id}')" title="Editar Operación Integral" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="edit-3"></i> Editar
                 </button>
@@ -332,6 +333,18 @@ class OperationsHubModule {
               </div>
             </td>
           </tr>
+          <tr id="accordion-nd-${nd.id}" style="display: none; background: #f8fafc;">
+            <td colspan="8" style="padding: 10px 16px; border-bottom: 1px solid #e2e8f0; font-size: 0.8rem;">
+              <div style="display: flex; gap: 24px; flex-wrap: wrap; color: #475569; align-items: center;">
+                <div><span style="color: #64748b; font-weight: 600;">Cliente Facturado:</span> <strong style="color: #0f172a;">${nd.accountName || '-'}</strong> ${nd.accountNit ? `(NIT: ${nd.accountNit})` : ''}</div>
+                <div><span style="color: #64748b; font-weight: 600;">Operador / Proveedor:</span> <strong style="color: #0f172a;">${operatorName}</strong></div>
+                <div><span style="color: #64748b; font-weight: 600;">T/C Congelado:</span> <span class="font-mono" style="color: #0284c7; font-weight: 700;">${Number(nd.frozenExchangeRate || 6.96).toFixed(2)}</span></div>
+                <div><span style="color: #64748b; font-weight: 600;">Término de Pago:</span> <span class="badge badge-slate">${nd.paymentTerm || 'CONTADO'}</span></div>
+                ${nd.depositAccountId ? `<div><span style="color: #64748b; font-weight: 600;">Cuenta Financiera:</span> <span class="font-mono">${nd.depositAccountId}</span></div>` : ''}
+                ${nd.observations ? `<div><span style="color: #64748b; font-weight: 600;">Observaciones:</span> ${nd.observations}</div>` : ''}
+              </div>
+            </td>
+          </tr>
         `;
       }).join('');
     }
@@ -341,16 +354,14 @@ class OperationsHubModule {
         <table class="erp-table">
           <thead>
             <tr>
-              <th>Nro ND / Ref</th>
-              <th>Fecha</th>
-              <th>Tipo Servicio</th>
+              <th style="width: 95px;">Nro ND</th>
+              <th style="width: 95px;">Fecha</th>
               <th style="max-width: 180px;">Pasajero / Detalle</th>
-              <th style="max-width: 160px;">Cliente Facturado</th>
-              <th>Operador / Prov.</th>
-              <th style="text-align: right;">Total Venta</th>
-              <th style="text-align: right;">Saldo Pendiente</th>
-              <th>Estado</th>
-              <th style="white-space: nowrap; width: 1%; min-width: 140px; text-align: right;">Acciones Operativas</th>
+              <th>Servicios Incluidos</th>
+              <th style="text-align: right; width: 120px;">Total Venta</th>
+              <th style="text-align: right; width: 120px;">Saldo Pendiente</th>
+              <th style="width: 90px; text-align: center;">Estado</th>
+              <th style="white-space: nowrap; width: 1%; min-width: 150px; text-align: right;">Acciones Operativas</th>
             </tr>
           </thead>
           <tbody>
@@ -359,6 +370,14 @@ class OperationsHubModule {
         </table>
       </div>
     `;
+  }
+
+  toggleNdAccordion(id) {
+    const acc = document.getElementById(`accordion-nd-${id}`);
+    if (acc) {
+      acc.style.display = (acc.style.display === 'none' || !acc.style.display) ? 'table-row' : 'none';
+      if (window.lucide) window.lucide.createIcons();
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -955,7 +974,10 @@ class OperationsHubModule {
     if (!this.activeNdItems[index]) return;
     this.activeNdItems[index][field] = value;
     if (field === 'fareAmount' || field === 'feeAmount' || field === 'providerCommissionRate') {
-      this.calculateConsolidatedTotals();
+      if (!this._debouncedCalcTotals) {
+        this._debouncedCalcTotals = (window.debounce || (fn => fn))(() => this.calculateConsolidatedTotals(), 300);
+      }
+      this._debouncedCalcTotals();
     }
   }
 
@@ -1895,8 +1917,16 @@ class OperationsHubModule {
   saveUnifiedOperation(e) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const data = window.db.get();
-    const clientId = document.getElementById('uni-client-select')?.value;
+    const submitBtn = e?.submitter || document.getElementById('btn-save-unified-operation') || document.querySelector('#modal-unified-operation button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.dataset.origText = submitBtn.innerHTML;
+      submitBtn.innerHTML = '<span style="display:inline-block;animation:spin 0.6s linear infinite;">⏳</span> Procesando...';
+    }
+
+    try {
+      const data = window.db.get();
+      const clientId = document.getElementById('uni-client-select')?.value;
     const issueDate = document.getElementById('uni-issue-date')?.value || new Date().toISOString().split('T')[0];
     const paymentTerm = document.getElementById('uni-payment-term')?.value || 'AL_CONTADO';
     const isPaid = (paymentTerm === 'AL_CONTADO');
@@ -2225,6 +2255,15 @@ class OperationsHubModule {
 
     const providerCount = Object.keys(providerGroups).length;
     window.app.showToast(`¡ND #${nextNdNumber} consolidada con éxito (${mappedItems.length} servicios)! Se bifurcaron ${providerCount} Cuentas por Pagar (NCs) a proveedores.`, 'success');
+    } catch (err) {
+      console.error('Error al procesar y guardar la operación:', err);
+      window.app.showToast('Error al guardar la operación: ' + (err.message || err), 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = submitBtn.dataset.origText || 'Guardar Operación';
+      }
+    }
   }
 
   openEditOperationModal(id) {
@@ -2296,30 +2335,49 @@ class OperationsHubModule {
     const nd = (data.debitNotes || []).find(n => n.id === id);
     if (!nd) return;
 
-    if (!confirm(`¿Está seguro de BORRAR DEFINITIVAMENTE la operación ND #${nd.ndNumber}?\n\nEsta acción eliminará el registro de la base de datos y revertirá saldos contables.`)) {
+    if (!confirm(`¿Está seguro de BORRAR DEFINITIVAMENTE la operación ND #${nd.ndNumber}?\n\nEsta acción eliminará el registro y limpiará en cascada sus cuentas por pagar y comprobantes vinculados.`)) {
       return;
     }
 
-    data.creditNotes = (data.creditNotes || []).filter(nc => nc.originDebitNoteId !== id && nc.originDebitNoteNumber !== nd.ndNumber);
+    try {
+      // 1. Borrado en cascada de NCs vinculadas
+      data.creditNotes = (data.creditNotes || []).filter(nc => nc.originDebitNoteId !== id && nc.originDebitNoteNumber !== nd.ndNumber);
 
-    (nd.items || []).forEach(it => {
-      if (it.gdsTicketId) {
-        data.gdsTickets = (data.gdsTickets || []).filter(t => t.id !== it.gdsTicketId);
-      }
-    });
+      // 2. Borrado en cascada de Boletos GDS vinculados
+      (nd.items || []).forEach(it => {
+        if (it.gdsTicketId) {
+          data.gdsTickets = (data.gdsTickets || []).filter(t => t.id !== it.gdsTicketId);
+        }
+      });
 
-    data.cashReceipts = (data.cashReceipts || []).filter(r => r.debitNoteId !== id && r.debitNoteNumber !== nd.ndNumber);
+      // 3. Borrado en cascada de Recibos de Caja (RCP)
+      data.cashReceipts = (data.cashReceipts || []).filter(r => r.debitNoteId !== id && r.debitNoteNumber !== nd.ndNumber);
 
-    data.otherIncomes = (data.otherIncomes || []).filter(inc => {
-      return !nd.items.some(it => it.ticketNumber && inc.ticketNumber === it.ticketNumber);
-    });
+      // 4. Borrado en cascada de Otros Ingresos (Comisiones)
+      data.otherIncomes = (data.otherIncomes || []).filter(inc => {
+        return !nd.items.some(it => it.ticketNumber && inc.ticketNumber === it.ticketNumber);
+      });
 
-    data.debitNotes = (data.debitNotes || []).filter(n => n.id !== id);
+      // 5. Borrado de la Nota de Débito
+      data.debitNotes = (data.debitNotes || []).filter(n => n.id !== id);
 
-    window.db.save(data);
-    this.render();
-    window.app.updateDashboardKpis();
-    window.app.showToast(`Operación ND #${nd.ndNumber} borrada definitivamente del sistema`, 'success');
+      // 6. Persistencia síncrona/asíncrona en base de datos
+      window.db.save(data);
+
+      // 7. Borrado reactivo del nodo DOM para evitar re-renderizado masivo y lag
+      const rowNode = document.getElementById(`row-nd-${id}`);
+      if (rowNode) rowNode.remove();
+      const accordionNode = document.getElementById(`accordion-nd-${id}`);
+      if (accordionNode) accordionNode.remove();
+
+      this.updateHubKpis();
+      window.app.updateDashboardKpis();
+      if (window.creditNotesModule) window.creditNotesModule.render();
+      window.app.showToast(`Operación ND #${nd.ndNumber} eliminada en cascada correctamente`, 'success');
+    } catch (err) {
+      console.error('Error en eliminación en cascada:', err);
+      window.app.showToast('Error al eliminar operación: ' + (err.message || err), 'error');
+    }
   }
 
   deleteTicket(id) {
