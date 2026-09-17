@@ -285,13 +285,16 @@ window.reportsModule = {
           </td>
           <td><span class="badge ${statusBadge}">${nd.status}</span></td>
           <td style="text-align: center; text-decoration: none;">
-            <div style="display: flex; gap: 4px; justify-content: center;">
+            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printVoucher('${nd.id}', 'ND')" title="Imprimir ND Oficial">
+                <i data-lucide="printer"></i>
+              </button>
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('ND', '${nd.id}')" title="Corregir datos contables (NIT, Razón Social, Fecha, Glosa)">
-                <i data-lucide="edit-3"></i> Corregir
+                <i data-lucide="edit-3"></i>
               </button>
               ${!isVoid ? `
                 <button class="btn btn-danger btn-sm" onclick="window.reportsModule.openVoidModal('ND', '${nd.id}')" title="Anular comprobante contable">
-                  <i data-lucide="x-circle"></i> Anular
+                  <i data-lucide="x-circle"></i>
                 </button>
               ` : `
                 <span class="badge badge-rose" style="font-size:0.68rem;">ANULADO</span>
@@ -382,7 +385,10 @@ window.reportsModule = {
             ${nc.currency} ${Number(nc.balance).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
           </td>
           <td style="text-align: center; text-decoration: none;">
-            <div style="display: flex; gap: 4px; justify-content: center;">
+            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printVoucher('${nc.id}', 'NC')" title="Imprimir NC Oficial">
+                <i data-lucide="printer"></i>
+              </button>
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('NC', '${nc.id}')" title="Corregir datos contables">
                 <i data-lucide="edit-3"></i>
               </button>

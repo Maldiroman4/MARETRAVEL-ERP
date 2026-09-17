@@ -92,7 +92,7 @@ window.creditNotesModule = {
           </td>
           <td><span class="badge ${statusBadge}">${nc.status}</span></td>
           <td style="text-align: center;">
-            <div style="display: flex; gap: 4px; justify-content: center;">
+            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('NC', '${nc.id}')" title="Corrección Contable">
                 <i data-lucide="edit-3"></i>
               </button>
@@ -101,6 +101,12 @@ window.creditNotesModule = {
                   <i data-lucide="x-circle"></i>
                 </button>
               ` : ''}
+              <button class="btn btn-secondary btn-sm" onclick="window.creditNotesModule.directPrint('${nc.id}')" title="Impresión Directa (Oficial)">
+                <i data-lucide="printer"></i>
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="window.creditNotesModule.printPreview('${nc.id}')" title="Vista Previa y Emisión Oficial">
+                <i data-lucide="file-text"></i>
+              </button>
             </div>
           </td>
         </tr>
@@ -174,5 +180,30 @@ window.creditNotesModule = {
     this.render();
     if (window.operationsHubModule) window.operationsHubModule.render();
     if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
+  },
+
+  /**
+   * Vista previa y emisión oficial para NC
+   */
+  printPreview(ncId) {
+    if (window.debitNotesModule && typeof window.debitNotesModule.printPreview === 'function') {
+      window.debitNotesModule.printPreview(ncId, 'long', 'NC');
+    }
+  },
+
+  /**
+   * Alias de impresión de voucher NC
+   */
+  printVoucher(ncId) {
+    this.printPreview(ncId);
+  },
+
+  /**
+   * Impresión directa sin modal de NC
+   */
+  directPrint(ncId) {
+    if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
+      window.debitNotesModule.directPrint(ncId, 'NC');
+    }
   }
 };

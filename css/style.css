@@ -1530,7 +1530,7 @@ body {
 
   /* =========================================================================
      FORMATO OFICIAL NOTA DE DÉBITO MARETRAVEL (EXACTO A REQUERIMIENTO)
-     Color institucional verde: #269f7a
+     Color institucional verde: #00a884
      ========================================================================= */
   .nd-official-container {
     width: 100%;
@@ -1631,7 +1631,7 @@ body {
   }
 
   .nd-green-badge {
-    background-color: #269f7a;
+    background-color: #00a884;
     color: #ffffff;
     display: inline-block;
     padding: 4px 18px;
@@ -1645,7 +1645,7 @@ body {
 
   .nd-green-line {
     height: 3.5px;
-    background-color: #269f7a;
+    background-color: #00a884;
     width: 100%;
     margin: 0 0 12px 0;
     -webkit-print-color-adjust: exact !important;
@@ -1660,11 +1660,11 @@ body {
   }
 
   .nd-col-left {
-    width: 40%;
+    width: 38%;
   }
 
   .nd-col-center {
-    width: 30%;
+    width: 32%;
   }
 
   .nd-col-right {
@@ -1716,7 +1716,7 @@ body {
   }
 
   .nd-th-currency {
-    background-color: #269f7a;
+    background-color: #00a884;
     color: #ffffff;
     font-weight: 800;
     font-size: 0.75rem;
@@ -1752,7 +1752,7 @@ body {
   }
 
   .nd-obs-badge {
-    background-color: #269f7a;
+    background-color: #00a884;
     color: #ffffff;
     font-weight: 800;
     font-size: 0.72rem;
@@ -1883,7 +1883,7 @@ body {
   margin-top: 6px;
 }
 .nd-green-badge {
-  background-color: #269f7a;
+  background-color: #00a884;
   color: #ffffff;
   display: inline-block;
   padding: 4px 18px;
@@ -1894,7 +1894,7 @@ body {
 }
 .nd-green-line {
   height: 3.5px;
-  background-color: #269f7a;
+  background-color: #00a884;
   width: 100%;
   margin: 0 0 12px 0;
 }
@@ -1905,10 +1905,10 @@ body {
   padding: 2px 0;
 }
 .nd-col-left {
-  width: 40%;
+  width: 38%;
 }
 .nd-col-center {
-  width: 30%;
+  width: 32%;
 }
 .nd-col-right {
   width: 30%;
@@ -1948,7 +1948,7 @@ body {
   border-collapse: collapse;
 }
 .nd-th-currency {
-  background-color: #269f7a;
+  background-color: #00a884;
   color: #ffffff;
   font-weight: 800;
   font-size: 0.75rem;
@@ -1978,7 +1978,7 @@ body {
   margin-top: 4px;
 }
 .nd-obs-badge {
-  background-color: #269f7a;
+  background-color: #00a884;
   color: #ffffff;
   font-weight: 800;
   font-size: 0.72rem;
