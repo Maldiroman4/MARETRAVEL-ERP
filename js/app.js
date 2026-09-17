@@ -8,8 +8,17 @@ window.app = {
   AUTH_KEY: 'MARETRAVEL_AUTH_SESSION_V1',
   initialized: false,
 
-  start() {
+  async start() {
     this.bindAuthEvents();
+    // 1. Carga inicial directa y obligatoria desde el almacenamiento permanente en disco
+    if (window.db && typeof window.db.syncWithServerFile === 'function') {
+      try {
+        await window.db.syncWithServerFile();
+      } catch (e) {
+        console.warn('Error sincronizando con el servidor en arranque:', e);
+      }
+    }
+
     if (this.isAuthenticated()) {
       this.showApp();
       if (!this.initialized) {
@@ -108,15 +117,27 @@ window.app = {
 
       if (passEl) passEl.value = '';
 
-      this.showApp();
-      if (!this.initialized) {
-        try {
-          this.init();
-        } catch (initErr) {
-          console.error('Error during init:', initErr);
+      const completeLogin = () => {
+        this.showApp();
+        if (!this.initialized) {
+          try {
+            this.init();
+          } catch (initErr) {
+            console.error('Error during init:', initErr);
+          }
+        } else {
+          this.updateDashboardKpis();
+          this.updateExchangeRateWidget();
+          if (window.operationsHubModule) window.operationsHubModule.render();
         }
+        this.showToast('¡Bienvenido al sistema MARETRAVEL ERP, Luis!', 'success');
+      };
+
+      if (window.db && typeof window.db.syncWithServerFile === 'function') {
+        window.db.syncWithServerFile().then(completeLogin).catch(completeLogin);
+      } else {
+        completeLogin();
       }
-      this.showToast('¡Bienvenido al sistema MARETRAVEL ERP, Luis!', 'success');
       return false;
     } else {
       if (errorAlert) {

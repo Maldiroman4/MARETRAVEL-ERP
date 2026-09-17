@@ -1,7 +1,7 @@
 /**
- * MARETRAVEL ERP - Servidor Local de Sincronización y Persistencia en Carpeta
- * Ejecuta la aplicación web y guarda automáticamente cualquier cambio
- * directamente en el archivo físico: data/database.json
+ * MARETRAVEL ERP - Servidor de Persistencia Transaccional en Disco y Endpoints REST
+ * Garantiza guardado atómico y sincrónico en data/database.json.
+ * Prohibido responder 200 OK si no se confirma la escritura física en almacenamiento persistente.
  */
 
 const http = require('http');
@@ -11,11 +11,13 @@ const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
-const DB_PATH = path.join(ROOT_DIR, 'data', 'database.json');
-const BACKUP_DIR = path.join(ROOT_DIR, 'data', 'backups');
+const DATA_DIR = path.join(ROOT_DIR, 'data');
+const DB_PATH = path.join(DATA_DIR, 'database.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
-if (!fs.existsSync(path.join(ROOT_DIR, 'data'))) {
-  fs.mkdirSync(path.join(ROOT_DIR, 'data'), { recursive: true });
+// Asegurar directorios de persistencia física
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -33,6 +35,149 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon'
 };
+
+const INITIAL_SEED_DATABASE = {
+  systemSettings: {
+    agencyName: 'MARETRAVEL',
+    agencyCommercialName: 'MARETRAVEL - Agencia de Viajes y Turismo',
+    agencyNit: '1028374021',
+    agencyAddress: 'Av. 16 de Julio #1440, Edif. San Pablo Piso 4, Of. 402, La Paz - Bolivia',
+    agencyPhone: '+591 (2) 244-1234 / Cel: 772-98765',
+    agencyEmail: 'administracion@maretravel.bo',
+    vatRate: 14.94,
+    gdsLookbackDays: 30,
+    activeExchangeBuy: 6.86,
+    activeExchangeSell: 6.96
+  },
+  currentUser: {
+    id: 'USR-001',
+    name: 'Luis',
+    username: 'luis',
+    role: 'ADMIN',
+    email: 'luis@maretravel.bo'
+  },
+  exchangeRates: [
+    {
+      id: 'TC-001',
+      date: new Date().toISOString().split('T')[0],
+      buyRate: 6.86,
+      sellRate: 6.96,
+      createdById: 'USR-001',
+      createdByName: 'Luis',
+      createdAt: new Date().toLocaleString()
+    }
+  ],
+  paymentMethods: [
+    { id: 'PM-01', code: 'BS-01', name: 'Efectivo Moneda Nacional (BOB)', currency: 'BOB', type: 'COBRANZAS', bankAccount: '-', status: 'ACTIVO' },
+    { id: 'PM-02', code: 'US-01', name: 'Efectivo Dólares Americanos (USD)', currency: 'USD', type: 'COBRANZAS', bankAccount: '-', status: 'ACTIVO' },
+    { id: 'PM-03', code: 'BS-02', name: 'Banco Nacional de Bolivia BNB BOB', currency: 'BOB', type: 'AMBOS', bankAccount: 'Cta. Cte. 100-29384-2', status: 'ACTIVO' },
+    { id: 'PM-04', code: 'BS-03', name: 'Banco Mercantil Santa Cruz BMSC BOB', currency: 'BOB', type: 'AMBOS', bankAccount: 'Cta. Cte. 401-09823-1', status: 'ACTIVO' },
+    { id: 'PM-05', code: 'US-02', name: 'Banco Bisa USD', currency: 'USD', type: 'AMBOS', bankAccount: 'Cta. Dólares 029-91823-7', status: 'ACTIVO' },
+    { id: 'PM-06', code: 'BS-04', name: 'Cobro Simple QR BNB BOB', currency: 'BOB', type: 'COBRANZAS', bankAccount: 'Cta. Cte. 100-29384-2', status: 'ACTIVO' },
+    { id: 'PM-07', code: 'BS-05', name: 'Cheque de Gerencia BOB', currency: 'BOB', type: 'COBRANZAS', bankAccount: '-', status: 'ACTIVO' },
+    { id: 'PM-08', code: 'BS-06', name: 'Banco Ganadero S.A. BOB', currency: 'BOB', type: 'AMBOS', bankAccount: 'Cta. Cte. 1051-20948-3', status: 'ACTIVO' },
+    { id: 'PM-09', code: 'US-03', name: 'Binance P2P (USDT / Cripto)', currency: 'USD', type: 'AMBOS', bankAccount: 'Wallet ID: 89410293 (Pay)', status: 'ACTIVO' }
+  ],
+  financialAccounts: [
+    { id: 'ACC-BNK-BMSC-01', type: 'BANCO', bankName: 'Banco Mercantil Santa Cruz BMSC', accountNumber: '401-09823-1', accountType: 'CORRIENTE', titularName: 'MARETRAVEL S.R.L.', currency: 'BOB', isActive: true, currentBalance: 45200.00, createdAt: '16/9/2026, 10:00:00' },
+    { id: 'ACC-BNK-GANADERO-02', type: 'BANCO', bankName: 'Banco Ganadero S.A.', accountNumber: '1051-20948-3', accountType: 'CORRIENTE', titularName: 'MARETRAVEL S.R.L.', currency: 'BOB', isActive: true, currentBalance: 32850.50, createdAt: '16/9/2026, 10:00:00' },
+    { id: 'ACC-BNK-BISA-USD-03', type: 'BANCO', bankName: 'Banco Bisa S.A.', accountNumber: '029-91823-7', accountType: 'CORRIENTE', titularName: 'MARETRAVEL S.R.L.', currency: 'USD', isActive: true, currentBalance: 12400.00, createdAt: '16/9/2026, 10:00:00' },
+    { id: 'ACC-DIG-BINANCE-04', type: 'BINANCE', bankName: 'Binance Pay / P2P', accountNumber: '89410293', binanceId: '89410293', walletAddress: '0x89410293MareTravelPayWallet', titularName: 'MARETRAVEL CRYPTO SRL', currency: 'USDT', isActive: true, currentBalance: 8500.00, createdAt: '16/9/2026, 10:00:00' },
+    { id: 'ACC-CSH-CENTRAL-BOB-05', type: 'EFECTIVO', bankName: 'Caja Central Oficina General', cashDeskName: 'Caja General Oficina Central BOB', accountNumber: 'CAJA-BOB-01', custodianName: 'Luis (Cajero Principal)', titularName: 'MARETRAVEL S.R.L. (Custodio: Luis)', currency: 'BOB', isActive: true, currentBalance: 5000.00, createdAt: '16/9/2026, 10:00:00' },
+    { id: 'ACC-CSH-CENTRAL-USD-06', type: 'EFECTIVO', bankName: 'Caja Central Oficina Dólares', cashDeskName: 'Caja General Oficina Central USD', accountNumber: 'CAJA-USD-01', custodianName: 'Luis (Cajero Principal)', titularName: 'MARETRAVEL S.R.L. (Custodio: Luis)', currency: 'USD', isActive: true, currentBalance: 2100.00, createdAt: '16/9/2026, 10:00:00' }
+  ],
+  bankAccounts: [
+    { id: 'ACC-BNK-GANADERO-02', bankName: 'Banco Ganadero S.A.', accountNumber: '1051-20948-3', accountType: 'CORRIENTE', currency: 'BOB', titularName: 'MARETRAVEL S.R.L.', isActive: true, createdAt: '16/9/2026, 12:00:00', updatedAt: '16/9/2026, 12:00:00' },
+    { id: 'ACC-BNK-BMSC-01', bankName: 'Banco Mercantil Santa Cruz BMSC', accountNumber: '401-09823-1', accountType: 'CORRIENTE', currency: 'BOB', titularName: 'MARETRAVEL S.R.L.', isActive: true, createdAt: '16/9/2026, 12:00:00', updatedAt: '16/9/2026, 12:00:00' },
+    { id: 'ACC-BNK-BISA-USD-03', bankName: 'Banco Bisa S.A.', accountNumber: '029-91823-7', accountType: 'CORRIENTE', currency: 'USD', titularName: 'MARETRAVEL S.R.L.', isActive: true, createdAt: '16/9/2026, 12:00:00', updatedAt: '16/9/2026, 12:00:00' }
+  ],
+  accounts: [],
+  accountHistory: [],
+  companyContacts: [],
+  gdsTickets: [],
+  debitNotes: [],
+  creditNotes: [],
+  cashReceipts: [],
+  cashTransactions: [],
+  expenses: [],
+  travelReminders: [],
+  auditLog: [],
+  accountingModifications: [],
+  otherIncomes: [],
+  providerPayments: [],
+  serviceTypes: [
+    { id: 'SRV-BOLETO', code: 'BOLETO_AEREO', name: 'BOLETO AÉREO / GDS', category: 'AÉREO' },
+    { id: 'SRV-HOTEL', code: 'HOTEL', name: 'HOTEL / HOSPEDAJE', category: 'HOSPEDAJE' },
+    { id: 'SRV-PAQ-TUR', code: 'PAQUETE_TURISTICO', name: 'PAQUETE TURÍSTICO', category: 'PAQUETES' },
+    { id: 'SRV-PAQ-CRU', code: 'PAQUETE_CRUCERO', name: 'PAQUETE CRUCERO', category: 'PAQUETES' },
+    { id: 'SRV-PAQ-CON', code: 'PAQUETE_CONCIERTO', name: 'PAQUETE CONCIERTO', category: 'PAQUETES' },
+    { id: 'SRV-VISA', code: 'ASESORAMIENTO_VISAS', name: 'ASESORAMIENTO DE VISAS', category: 'VISAS' },
+    { id: 'SRV-FA', code: 'CERTIFICACION_FA', name: 'CERTIFICACIÓN INTERNACIONAL FA', category: 'CERTIFICACIONES' },
+    { id: 'SRV-AUTO', code: 'RENT_A_CAR', name: 'RENT A CAR', category: 'VEHÍCULOS' },
+    { id: 'SRV-SEG', code: 'SEGURO_VIAJE', name: 'SEGURO DE VIAJE', category: 'SEGUROS' },
+    { id: 'SRV-OTRO', code: 'OTRO', name: 'OTRO SERVICIO', category: 'VARIOS' }
+  ]
+};
+
+// ============================================================================
+// GESTOR DE PERSISTENCIA TRANSACCIONAL EN DISCO
+// ============================================================================
+
+/**
+ * Lee la base de datos física desde disco. Si no existe, inicializa con la plantilla persistente.
+ */
+function readDbSync() {
+  if (!fs.existsSync(DB_PATH)) {
+    saveDbSync(INITIAL_SEED_DATABASE);
+    return JSON.parse(JSON.stringify(INITIAL_SEED_DATABASE));
+  }
+  const raw = fs.readFileSync(DB_PATH, 'utf-8');
+  return JSON.parse(raw);
+}
+
+/**
+ * Guarda sincrónica y atómicamente la base de datos en data/database.json.
+ * Escribe primero en archivo .tmp y renombra atómicamente para prevenir corrupción.
+ */
+function saveDbSync(data) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Datos inválidos para persistencia en disco.');
+  }
+  const tempPath = DB_PATH + '.tmp';
+  const jsonContent = JSON.stringify(data, null, 2);
+  fs.writeFileSync(tempPath, jsonContent, 'utf-8');
+  fs.renameSync(tempPath, DB_PATH);
+  return true;
+}
+
+/**
+ * Crea una copia de respaldo fechada en data/backups/
+ */
+function createBackupCopy(prefix = 'backup') {
+  if (!fs.existsSync(DB_PATH)) return null;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFilename = `${prefix}_${ts}.json`;
+  const targetPath = path.join(BACKUP_DIR, backupFilename);
+  fs.copyFileSync(DB_PATH, targetPath);
+  return targetPath;
+}
+
+// Carga y validación inicial de persistencia al levantar el servidor
+try {
+  if (!fs.existsSync(DB_PATH)) {
+    console.log('[INICIO] No se encontró data/database.json. Creando archivo persistente inicial...');
+    saveDbSync(INITIAL_SEED_DATABASE);
+  } else {
+    const stat = fs.statSync(DB_PATH);
+    console.log(`[INICIO] Base de datos física verificada: ${DB_PATH} (${stat.size} bytes).`);
+  }
+} catch (err) {
+  console.error('[ERROR CRÍTICO] Error al inicializar almacenamiento en disco:', err);
+}
+
+// ============================================================================
+// REGLAS Y VALIDACIONES DE SEGURIDAD (GUARDRAILS)
+// ============================================================================
 
 function validateFinancialAccount(account) {
   if (!account || typeof account !== 'object') {
@@ -79,8 +224,6 @@ function validateFinancialAccount(account) {
     if (!['BOB', 'USD'].includes(account.currency)) {
       errors.push('La moneda de la caja física debe ser BOB o USD.');
     }
-  } else {
-    errors.push(`Tipo de cuenta financiera desconocido: ${type}`);
   }
 
   return {
@@ -89,11 +232,36 @@ function validateFinancialAccount(account) {
   };
 }
 
-const server = http.createServer((req, res) => {
-  // CORS para máxima compatibilidad
+// Helper para parsear cuerpo de petición HTTP (Promesa)
+function parseRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      if (!body || !body.trim()) {
+        resolve({});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(body);
+        resolve(parsed);
+      } catch (err) {
+        reject(new Error('JSON malformado en el cuerpo de la petición: ' + err.message));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+// ============================================================================
+// SERVIDOR HTTP CON ENDPOINTS REST TRANSACCIONALES
+// ============================================================================
+
+const server = http.createServer(async (req, res) => {
+  // CORS universal
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -101,26 +269,127 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const requestUrl = new URL(req.url, 'http://' + (req.headers.host || 'localhost:3000'));
-  const pathname = requestUrl.pathname;
+  const parsedUrl = new URL(req.url, 'http://' + (req.headers.host || 'localhost:3000'));
+  const pathname = parsedUrl.pathname;
 
-  // Helper para leer base de datos sincrónicamente
-  const readDb = () => {
-    if (!fs.existsSync(DB_PATH)) return null;
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-  };
+  // --------------------------------------------------------------------------
+  // 1. ENDPOINT PRINCIPAL DE BASE DE DATOS: /api/db (GET / POST)
+  // --------------------------------------------------------------------------
 
-  // 1. API: Leer base de datos desde la carpeta
+  // GET /api/db: Retorna el contenido real y actualizado desde disco
   if (pathname === '/api/db' && req.method === 'GET') {
     try {
-      if (fs.existsSync(DB_PATH)) {
-        const content = fs.readFileSync(DB_PATH, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(content);
-      } else {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'data/database.json no encontrado' }));
+      const dbData = readDbSync();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(dbData));
+    } catch (err) {
+      console.error('[ERROR] Fallo al leer data/database.json:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Error al leer base de datos en disco: ' + err.message }));
+    }
+    return;
+  }
+
+  // POST /api/db: Guarda atómicamente el estado completo en disco
+  if (pathname === '/api/db' && req.method === 'POST') {
+    try {
+      const parsed = await parseRequestBody(req);
+
+      // Guardrail financiero
+      const financialAccounts = parsed.financialAccounts || [];
+      const bankAccounts = parsed.bankAccounts || [];
+      const allAccounts = [...financialAccounts, ...bankAccounts];
+
+      if (Array.isArray(parsed.cashReceipts)) {
+        for (const rcp of parsed.cashReceipts) {
+          if (rcp.status === 'VALIDO' && rcp.totalPaidBob > 0) {
+            const accId = rcp.bankAccountId || rcp.depositAccountId || rcp.financialAccountId;
+            if (accId && accId !== 'CAJA_EFECTIVO') {
+              const targetAcc = allAccounts.find(a => a.id === accId);
+              if (targetAcc) {
+                const check = validateFinancialAccount(targetAcc);
+                if (!check.valid) {
+                  res.writeHead(400, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({
+                    error: 'Bloqueo de Seguridad Guardrail: La cuenta financiera destino no es válida o está incompleta.',
+                    details: check.errors
+                  }));
+                  return;
+                }
+              }
+            }
+          }
+        }
       }
+
+      // PERSISTENCIA FÍSICA OBLIGATORIA EN DISCO
+      saveDbSync(parsed);
+
+      console.log(`[${new Date().toLocaleTimeString()}] Base de datos confirmada en disco: data/database.json`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        persisted: true,
+        timestamp: new Date().toISOString(),
+        summary: {
+          debitNotes: (parsed.debitNotes || []).length,
+          creditNotes: (parsed.creditNotes || []).length,
+          tickets: (parsed.gdsTickets || []).length,
+          accounts: (parsed.accounts || []).length,
+          receipts: (parsed.cashReceipts || []).length
+        }
+      }));
+    } catch (err) {
+      console.error('[ERROR] Error crítico al persistir en disco:', err);
+      // PROHIBIDO RESPONDER 200 SI FALLÓ LA ESCRITURA EN DISCO
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Fallo al guardar en disco: ' + err.message }));
+    }
+    return;
+  }
+
+  // --------------------------------------------------------------------------
+  // 2. ENDPOINTS REST GRANULARES (Persistencia Directa en Disco)
+  // --------------------------------------------------------------------------
+
+  // OPERACIONES / NOTAS DE DÉBITO: /api/operaciones
+  if (pathname === '/api/operaciones') {
+    const db = readDbSync();
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(db.debitNotes || []));
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const item = await parseRequestBody(req);
+        db.debitNotes = db.debitNotes || [];
+        const existingIdx = db.debitNotes.findIndex(n => n.id === item.id);
+        if (existingIdx !== -1) {
+          db.debitNotes[existingIdx] = { ...db.debitNotes[existingIdx], ...item, updatedAt: new Date().toLocaleString() };
+        } else {
+          db.debitNotes.unshift({ ...item, createdAt: new Date().toLocaleString() });
+        }
+        saveDbSync(db);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, item }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+  }
+
+  if (pathname.startsWith('/api/operaciones/') && req.method === 'DELETE') {
+    const id = pathname.replace('/api/operaciones/', '').trim();
+    try {
+      const db = readDbSync();
+      db.debitNotes = (db.debitNotes || []).filter(n => n.id !== id);
+      db.creditNotes = (db.creditNotes || []).filter(nc => nc.originDebitNoteId !== id);
+      saveDbSync(db);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, deletedId: id }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
@@ -128,74 +397,107 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2. API: Guardar base de datos persistentemente con Guardrails Financieros
-  if (pathname === '/api/db' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+  // BOLETOS GDS: /api/boletos
+  if (pathname === '/api/boletos') {
+    const db = readDbSync();
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(db.gdsTickets || []));
+      return;
+    }
+    if (req.method === 'POST') {
       try {
-        if (!body || !body.trim()) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Cuerpo vacío' }));
-          return;
+        const tkt = await parseRequestBody(req);
+        db.gdsTickets = db.gdsTickets || [];
+        const idx = db.gdsTickets.findIndex(t => t.id === tkt.id);
+        if (idx !== -1) {
+          db.gdsTickets[idx] = { ...db.gdsTickets[idx], ...tkt, updatedAt: new Date().toLocaleString() };
+        } else {
+          db.gdsTickets.unshift({ ...tkt, createdAt: new Date().toLocaleString() });
         }
-        const parsed = JSON.parse(body);
-
-        // Guardrail: Validación estricta de Cuentas Financieras en movimientos de fondos
-        const financialAccounts = parsed.financialAccounts || [];
-        const bankAccounts = parsed.bankAccounts || [];
-        const allAccounts = [...financialAccounts, ...bankAccounts];
-
-        // Validar que no existan recibos de caja sin cuenta financiera válida
-        if (Array.isArray(parsed.cashReceipts)) {
-          for (const rcp of parsed.cashReceipts) {
-            if (rcp.status === 'VALIDO' && rcp.totalPaidBob > 0) {
-              const accId = rcp.bankAccountId || rcp.depositAccountId || rcp.financialAccountId;
-              if (accId && accId !== 'CAJA_EFECTIVO') {
-                const targetAcc = allAccounts.find(a => a.id === accId);
-                if (targetAcc) {
-                  const check = validateFinancialAccount(targetAcc);
-                  if (!check.valid) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({
-                      error: 'Bloqueo de Seguridad Guardrail: La cuenta financiera destino no es válida o está incompleta.',
-                      details: check.errors
-                    }));
-                    return;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        const tempPath = DB_PATH + '.tmp';
-        const formattedJson = JSON.stringify(parsed, null, 2);
-        
-        fs.writeFileSync(tempPath, formattedJson, 'utf-8');
-        fs.renameSync(tempPath, DB_PATH);
-
-        console.log(`[${new Date().toLocaleTimeString()}] Base de datos guardada con integridad financiera en data/database.json`);
+        saveDbSync(db);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, timestamp: new Date().toISOString() }));
+        res.end(JSON.stringify({ success: true, ticket: tkt }));
       } catch (err) {
-        console.error('Error guardando en archivo:', err);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
-    });
+      return;
+    }
+  }
+
+  if (pathname.startsWith('/api/boletos/') && req.method === 'DELETE') {
+    const id = pathname.replace('/api/boletos/', '').trim();
+    try {
+      const db = readDbSync();
+      db.gdsTickets = (db.gdsTickets || []).filter(t => t.id !== id);
+      db.otherIncomes = (db.otherIncomes || []).filter(i => i.ticketId !== id);
+      saveDbSync(db);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, deletedId: id }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
-  // 3. API: Consultar Tipo de Cambio Oficial Centralizado
-  if (pathname === '/api/exchange-rate' && req.method === 'GET') {
-    try {
-      const db = readDb();
-      if (!db) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Base de datos no encontrada' }));
-        return;
+  // CUENTAS (CLIENTES Y PROVEEDORES): /api/cuentas
+  if (pathname === '/api/cuentas') {
+    const db = readDbSync();
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(db.accounts || []));
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const acc = await parseRequestBody(req);
+        db.accounts = db.accounts || [];
+        const idx = db.accounts.findIndex(a => a.id === acc.id);
+        if (idx !== -1) {
+          db.accounts[idx] = { ...db.accounts[idx], ...acc, updatedAt: new Date().toLocaleString() };
+        } else {
+          db.accounts.unshift({ ...acc, createdAt: new Date().toLocaleString() });
+        }
+        saveDbSync(db);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, account: acc }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
       }
+      return;
+    }
+  }
+
+  // CONFIGURACIÓN GENERAL: /api/config
+  if (pathname === '/api/config') {
+    const db = readDbSync();
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(db.systemSettings || {}));
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const config = await parseRequestBody(req);
+        db.systemSettings = { ...db.systemSettings, ...config };
+        saveDbSync(db);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, systemSettings: db.systemSettings }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+  }
+
+  // TIPO DE CAMBIO GLOBAL: /api/exchange-rate
+  if (pathname === '/api/exchange-rate') {
+    const db = readDbSync();
+    if (req.method === 'GET') {
       const settings = db.systemSettings || {};
       const rates = db.exchangeRates || [];
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -206,34 +508,18 @@ const server = http.createServer((req, res) => {
         updatedBy: rates[0] ? rates[0].createdByName : 'Sistema',
         history: rates.slice(0, 15)
       }));
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      return;
     }
-    return;
-  }
-
-  // 4. API: Actualizar Tipo de Cambio Oficial (Único Punto de Verdad)
-  if (pathname === '/api/exchange-rate' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+    if (req.method === 'POST') {
       try {
-        const payload = JSON.parse(body || '{}');
+        const payload = await parseRequestBody(req);
         const buy = parseFloat(payload.buyRate);
         const sell = parseFloat(payload.sellRate);
         const updatedBy = payload.updatedBy || 'Luis (Admin)';
 
         if (isNaN(buy) || buy <= 0 || isNaN(sell) || sell <= 0) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Los valores de compra y venta del Tipo de Cambio deben ser números positivos válidos.' }));
-          return;
-        }
-
-        const db = readDb();
-        if (!db) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'No se pudo leer la base de datos' }));
+          res.end(JSON.stringify({ error: 'Los valores de compra y venta deben ser números positivos válidos.' }));
           return;
         }
 
@@ -254,8 +540,8 @@ const server = http.createServer((req, res) => {
         if (!db.exchangeRates) db.exchangeRates = [];
         db.exchangeRates.unshift(newEntry);
 
-        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
-        console.log(`[T/C ACTUALIZADO] Compra: ${buy} | Venta: ${sell} por ${updatedBy}`);
+        saveDbSync(db);
+        console.log(`[T/C PERSISTIDO] Compra: ${buy} | Venta: ${sell} por ${updatedBy}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, activeExchangeBuy: buy, activeExchangeSell: sell, entry: newEntry }));
@@ -263,16 +549,107 @@ const server = http.createServer((req, res) => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
-    });
+      return;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. RESPALDO, RESTAURACIÓN Y REINICIO A VALORES INICIALES
+  // --------------------------------------------------------------------------
+
+  // DESCARGAR COPIA DE SEGURIDAD (.JSON): /api/backup/download o /api/db/export
+  if ((pathname === '/api/backup/download' || pathname === '/api/db/export') && req.method === 'GET') {
+    try {
+      if (!fs.existsSync(DB_PATH)) {
+        saveDbSync(INITIAL_SEED_DATABASE);
+      }
+      const fileData = fs.readFileSync(DB_PATH, 'utf-8');
+      const dateStr = new Date().toISOString().split('T')[0];
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="maretravel_backup_${dateStr}.json"`,
+        'Cache-Control': 'no-store'
+      });
+      res.end(fileData);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Fallo al exportar copia de seguridad: ' + err.message }));
+    }
     return;
   }
 
-  // 5. API: Consultar Cuentas Financieras Válidas
+  // RESTAURAR COPIA DE SEGURIDAD (.JSON): /api/backup/restore o /api/db/import
+  if ((pathname === '/api/backup/restore' || pathname === '/api/db/import') && req.method === 'POST') {
+    try {
+      const backupData = await parseRequestBody(req);
+
+      if (!backupData || !backupData.systemSettings || !Array.isArray(backupData.accounts)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'El archivo no tiene la estructura válida de MARETRAVEL ERP (falta systemSettings o accounts).' }));
+        return;
+      }
+
+      // Guardar respaldo de seguridad previo antes de sobreescribir
+      createBackupCopy('pre_restore');
+
+      // Sobreescribir archivo permanente en disco
+      saveDbSync(backupData);
+
+      console.log(`[RESTORE] Base de datos restaurada exitosamente desde archivo JSON.`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        message: 'Base de datos restaurada y guardada en disco exitosamente.',
+        timestamp: new Date().toISOString()
+      }));
+    } catch (err) {
+      console.error('[RESTORE ERROR]:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Error al restaurar copia en disco: ' + err.message }));
+    }
+    return;
+  }
+
+  // RESTABLECER A DATOS INICIALES (RESET CONTROLADO): /api/db/reset
+  if (pathname === '/api/db/reset' && req.method === 'POST') {
+    try {
+      const payload = await parseRequestBody(req);
+      if (!payload.confirm) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Se requiere confirmación explícita (confirm: true) para restablecer la base de datos a 0.' }));
+        return;
+      }
+
+      // Crear copia de seguridad antes del reseteo
+      createBackupCopy('pre_reset');
+
+      // Restablecer archivo físico con la plantilla limpia
+      saveDbSync(INITIAL_SEED_DATABASE);
+
+      console.log(`[RESET] Base de datos restablecida a valores iniciales limpios en data/database.json`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        message: 'Base de datos restablecida en disco a sus valores iniciales limpios.',
+        data: INITIAL_SEED_DATABASE
+      }));
+    } catch (err) {
+      console.error('[RESET ERROR]:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Error al restablecer base de datos en disco: ' + err.message }));
+    }
+    return;
+  }
+
+  // --------------------------------------------------------------------------
+  // 4. CONSULTA Y VALIDACIÓN DE CUENTAS FINANCIERAS
+  // --------------------------------------------------------------------------
+
   if (pathname === '/api/financial-accounts' && req.method === 'GET') {
     try {
-      const db = readDb();
+      const db = readDbSync();
       const accounts = (db ? db.financialAccounts || db.bankAccounts : []) || [];
-      const onlyActive = requestUrl.searchParams.get('active') === 'true';
+      const onlyActive = parsedUrl.searchParams.get('active') === 'true';
       const filtered = onlyActive ? accounts.filter(a => a.isActive) : accounts;
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -290,45 +667,58 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 6. API: Validar Cuenta Financiera (Guardrail Endpoint)
   if (pathname === '/api/financial-accounts/validate' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const payload = JSON.parse(body || '{}');
-        const db = readDb();
-        let targetAccount = payload.account;
-        if (!targetAccount && payload.accountId) {
-          const list = (db ? db.financialAccounts || db.bankAccounts : []) || [];
-          targetAccount = list.find(a => a.id === payload.accountId);
-        }
-
-        const result = validateFinancialAccount(targetAccount);
-        res.writeHead(result.valid ? 200 : 400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
+    try {
+      const payload = await parseRequestBody(req);
+      const db = readDbSync();
+      let targetAccount = payload.account;
+      if (!targetAccount && payload.accountId) {
+        const list = (db ? db.financialAccounts || db.bankAccounts : []) || [];
+        targetAccount = list.find(a => a.id === payload.accountId);
       }
-    });
+
+      const result = validateFinancialAccount(targetAccount);
+      res.writeHead(result.valid ? 200 : 400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
-  // 7. API: Status del servidor
+  // STATUS DE PERSISTENCIA Y SERVIDOR: /api/status
   if (pathname === '/api/status') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'ONLINE',
-      system: 'MARETRAVEL ERP',
-      folder: ROOT_DIR,
-      dbFile: 'data/database.json',
-      guardrails: 'STRICT_ACTIVE'
-    }));
+    try {
+      const stat = fs.existsSync(DB_PATH) ? fs.statSync(DB_PATH) : null;
+      const db = stat ? readDbSync() : null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'ONLINE',
+        system: 'MARETRAVEL ERP',
+        folder: ROOT_DIR,
+        dbFile: 'data/database.json',
+        fileSizeBytes: stat ? stat.size : 0,
+        lastModified: stat ? stat.mtime : null,
+        counts: db ? {
+          debitNotes: (db.debitNotes || []).length,
+          creditNotes: (db.creditNotes || []).length,
+          gdsTickets: (db.gdsTickets || []).length,
+          accounts: (db.accounts || []).length,
+          cashReceipts: (db.cashReceipts || []).length
+        } : null,
+        persistenceType: 'ATOMIC_FILE_SYNC'
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
-  // 4. Servir archivos estáticos del ERP
+  // --------------------------------------------------------------------------
+  // 5. SERVIR ARCHIVOS ESTÁTICOS DE LA APLICACIÓN WEB
+  // --------------------------------------------------------------------------
   let safePath = path.normalize(pathname).replace(/^(\.+|[\\/])+/, '');
   if (safePath === '' || safePath === '.') safePath = 'index.html';
 
@@ -337,7 +727,7 @@ const server = http.createServer((req, res) => {
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Archivo no encontrado');
+      res.end('Recurso no encontrado: ' + pathname);
       return;
     }
 
@@ -352,7 +742,7 @@ const server = http.createServer((req, res) => {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.warn(`[AVISO] El puerto ${PORT} está en uso. Intentando en ${Number(PORT) + 1}...`);
+    console.warn(`[AVISO] Puerto ${PORT} ocupado. Reintentando en ${Number(PORT) + 1}...`);
     setTimeout(() => {
       server.listen(Number(PORT) + 1, '0.0.0.0');
     }, 500);
@@ -364,10 +754,11 @@ server.on('error', (err) => {
 server.listen(PORT, '0.0.0.0', () => {
   const activePort = server.address().port;
   console.log('================================================================');
-  console.log('       MARETRAVEL ERP - SERVIDOR LOCAL CON PERSISTENCIA');
+  console.log('       MARETRAVEL ERP - SERVIDOR DE PERSISTENCIA EN DISCO');
   console.log('================================================================');
-  console.log(`  Servidor corriendo en:    http://0.0.0.0:${activePort}`);
-  console.log(`  Base de datos vinculada: ${DB_PATH}`);
-  console.log('  Cualquier cambio se guarda automáticamente en la carpeta.');
+  console.log(`  Servidor corriendo en:    http://localhost:${activePort}`);
+  console.log(`  Archivo de Base de Datos: ${DB_PATH}`);
+  console.log(`  Directorio de Respaldos:  ${BACKUP_DIR}`);
+  console.log('  Persistencia en disco:    TRANSACCIONAL ATÓMICA');
   console.log('================================================================');
 });

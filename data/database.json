@@ -20,6 +20,24 @@
   },
   "exchangeRates": [
     {
+      "id": "TC-1789673590214",
+      "date": "2026-09-17",
+      "buyRate": 6.86,
+      "sellRate": 6.96,
+      "createdById": "USR-001",
+      "createdByName": "Luis",
+      "createdAt": "17/9/2026, 15:33:10"
+    },
+    {
+      "id": "TC-1789673590206",
+      "date": "2026-09-17",
+      "buyRate": 6.9,
+      "sellRate": 6.98,
+      "createdById": "USR-001",
+      "createdByName": "Luis Test",
+      "createdAt": "17/9/2026, 15:33:10"
+    },
+    {
       "id": "TC-1789670562502",
       "date": "2026-09-17",
       "buyRate": 6.86,

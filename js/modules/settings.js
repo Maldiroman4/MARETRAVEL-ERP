@@ -224,23 +224,27 @@ window.settingsModule = {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const success = window.db.importBackup(event.target.result);
+    reader.onload = async (event) => {
+      const success = await window.db.importBackup(event.target.result);
       if (success) {
-        window.app.showToast('Copia de seguridad restaurada correctamente', 'success');
+        window.app.showToast('Copia de seguridad restaurada y guardada en disco exitosamente', 'success');
         setTimeout(() => location.reload(), 800);
       } else {
-        window.app.showToast('Archivo de copia de seguridad inválido', 'error');
+        window.app.showToast('Archivo de copia de seguridad inválido o error al guardar en disco', 'error');
       }
     };
     reader.readAsText(file);
   },
 
-  handleResetDatabase() {
-    if (confirm('¿ATENCIÓN: Está seguro de limpiar y reiniciar toda la base de datos a 0?\n\nSe vaciarán todas las cuentas, boletos, notas de débito y movimientos, dejando el sistema completamente limpio para registrar todo desde cero.')) {
-      window.db.reset();
-      window.app.showToast('Sistema reiniciado a 0 exitosamente', 'info');
-      setTimeout(() => location.reload(), 600);
+  async handleResetDatabase() {
+    if (confirm('¿ATENCIÓN: Está seguro de limpiar y reiniciar toda la base de datos a 0 en el servidor y disco?\n\nSe vaciarán todas las cuentas, boletos, notas de débito y movimientos, dejando el sistema completamente limpio para registrar todo desde cero.')) {
+      const ok = await window.db.reset();
+      if (ok) {
+        window.app.showToast('Base de datos restablecida en disco a sus valores limpios iniciales', 'info');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        window.app.showToast('Error al restablecer la base de datos en disco', 'error');
+      }
     }
   }
 };

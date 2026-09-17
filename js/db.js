@@ -90,11 +90,12 @@ const initialDatabase = {
 class LocalDatabase {
   constructor() {
     this.serverOnline = false;
-    this.init();
+    this.cachedData = null;
+    this.initPromise = this.init();
   }
 
   async init() {
-    // 1. Limpiar versiones anteriores con datos de prueba
+    // 1. Limpiar versiones obsoletas
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('MARETRAVEL_ERP_DB_V1');
@@ -102,22 +103,31 @@ class LocalDatabase {
       }
     } catch(e) {}
 
-    // 2. Intentar sincronizar con el archivo data/database.json en la carpeta
-    await this.syncWithServerFile();
+    // 2. Cargar inmediatamente desde el servidor permanente en disco (data/database.json)
+    const serverData = await this.syncWithServerFile();
+    if (serverData) {
+      this.cachedData = serverData;
+      return serverData;
+    }
 
-    // 3. Si no existe en localStorage, inicializar limpio
+    // 3. Fallback solo si el servidor no está en línea y no hay datos en localStorage
     try {
       if (typeof localStorage !== 'undefined') {
-        const data = localStorage.getItem(DB_KEY);
-        if (!data) {
-          this.save(initialDatabase);
+        const local = localStorage.getItem(DB_KEY);
+        if (local) {
+          this.cachedData = JSON.parse(local);
+        } else {
+          this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
+          localStorage.setItem(DB_KEY, JSON.stringify(this.cachedData));
         }
       }
-    } catch(e) {}
+    } catch(e) {
+      this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
+    }
+    return this.cachedData;
   }
 
   async syncWithServerFile() {
-    // Verificar si el servidor local de persistencia está respondiendo
     const endpoints = ['/api/db', 'http://localhost:3000/api/db', 'http://localhost:3001/api/db'];
     for (const endpoint of endpoints) {
       try {
@@ -126,6 +136,7 @@ class LocalDatabase {
           const fileData = await res.json();
           if (fileData && fileData.systemSettings) {
             this.serverOnline = true;
+            this.cachedData = fileData;
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(DB_KEY, JSON.stringify(fileData));
             }
@@ -143,60 +154,36 @@ class LocalDatabase {
 
   get() {
     try {
-      if (typeof localStorage === 'undefined') {
-        return JSON.parse(JSON.stringify(initialDatabase));
+      if (this.cachedData) {
+        return this.cachedData;
       }
 
-      const data = localStorage.getItem(DB_KEY);
-      if (!data) return JSON.parse(JSON.stringify(initialDatabase));
-
-      const parsed = JSON.parse(data);
-      let modified = false;
-
-      // Garantizar que existan todas las estructuras base como arreglos vacíos si faltan
-      const arrayKeys = [
-        'accounts', 'accountHistory', 'companyContacts', 'gdsTickets',
-        'debitNotes', 'creditNotes', 'cashReceipts', 'cashTransactions',
-        'expenses', 'travelReminders', 'auditLog', 'accountingModifications',
-        'bankAccounts', 'financialAccounts', 'paymentMethods', 'otherIncomes', 'exchangeRates', 'serviceTypes'
-      ];
-
-      arrayKeys.forEach(k => {
-        if (!parsed[k]) {
-          parsed[k] = JSON.parse(JSON.stringify(initialDatabase[k] || []));
-          modified = true;
+      if (typeof localStorage !== 'undefined') {
+        const data = localStorage.getItem(DB_KEY);
+        if (data) {
+          this.cachedData = JSON.parse(data);
+          return this.cachedData;
         }
-      });
-
-      if (!parsed.systemSettings) {
-        parsed.systemSettings = JSON.parse(JSON.stringify(initialDatabase.systemSettings));
-        modified = true;
       }
 
-      if (!parsed.currentUser || parsed.currentUser.username !== 'luis') {
-        parsed.currentUser = JSON.parse(JSON.stringify(initialDatabase.currentUser));
-        modified = true;
-      }
-
-      if (modified) {
-        this.save(parsed);
-      }
-
-      return parsed;
+      this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
+      return this.cachedData;
     } catch (e) {
-      console.error('Error leyendo base de datos local:', e);
+      console.error('Error leyendo base de datos:', e);
       return JSON.parse(JSON.stringify(initialDatabase));
     }
   }
 
   save(data) {
     try {
+      this.cachedData = data;
+
       // 1. Persistencia síncrona en el navegador (localStorage)
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(DB_KEY, JSON.stringify(data));
       }
 
-      // 2. Persistencia asíncrona en el archivo físico de la carpeta (data/database.json)
+      // 2. Persistencia real obligatoria en el archivo físico en disco (data/database.json)
       this.persistToFileServer(data);
 
       // 3. Disparar evento de actualización reactiva en toda la app
@@ -204,7 +191,7 @@ class LocalDatabase {
         window.dispatchEvent(new Event('maretravel_db_updated'));
       }
     } catch (e) {
-      console.error('Error guardando en base de datos local:', e);
+      console.error('Error guardando en base de datos:', e);
     }
   }
 
@@ -221,6 +208,9 @@ class LocalDatabase {
           this.serverOnline = true;
           this.updateStoragePill(true);
           return true;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.error('Servidor rechazó guardado en disco:', errData);
         }
       } catch (err) {
         // Continuar al siguiente endpoint
@@ -236,12 +226,12 @@ class LocalDatabase {
     if (pill) {
       if (isServerConnected) {
         pill.className = 'badge badge-emerald';
-        pill.innerHTML = '<i data-lucide="hard-drive" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i> Guardado en Carpeta: Activo';
-        pill.title = 'Base de datos sincronizada en tiempo real con data/database.json';
+        pill.innerHTML = '<i data-lucide="hard-drive" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i> Guardado en Disco: Activo';
+        pill.title = 'Base de datos sincronizada y confirmada en disco en data/database.json';
       } else {
         pill.className = 'badge badge-blue';
-        pill.innerHTML = '<i data-lucide="database" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i> Guardado Local: Activo';
-        pill.title = 'Guardado en navegador. Inicia INICIAR_SISTEMA.bat para sincronizar en tiempo real con la carpeta.';
+        pill.innerHTML = '<i data-lucide="database" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i> Guardado Local (Offline)';
+        pill.title = 'Guardado en navegador. Inicia el servidor para sincronizar en disco.';
       }
       if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
@@ -249,30 +239,54 @@ class LocalDatabase {
     }
   }
 
-  reset() {
-    this.save(initialDatabase);
+  async reset() {
+    try {
+      const res = await fetch('/api/db/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      if (res.ok) {
+        const fresh = await res.json();
+        this.cachedData = fresh.data || null;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(DB_KEY);
+        }
+        await this.syncWithServerFile();
+        return true;
+      }
+    } catch (e) {
+      console.error('Error reseteando DB en servidor:', e);
+    }
+    return false;
   }
 
   exportBackup() {
-    const data = this.get();
-    const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `database_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Descarga directa del volcado real y actual guardado en disco
+    window.location.href = '/api/backup/download';
   }
 
-  importBackup(jsonString) {
+  async importBackup(jsonString) {
     try {
       const parsed = JSON.parse(jsonString);
-      if (parsed.systemSettings && parsed.accounts) {
-        this.save(parsed);
-        return true;
+      if (!parsed.systemSettings || !Array.isArray(parsed.accounts)) {
+        throw new Error('Estructura de base de datos inválida.');
       }
-      return false;
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonString
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error del servidor' }));
+        throw new Error(err.error || 'Fallo al restaurar en disco');
+      }
+      this.cachedData = parsed;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DB_KEY, JSON.stringify(parsed));
+      }
+      this.save(parsed);
+      return true;
     } catch (e) {
       console.error('Error importando backup:', e);
       return false;
