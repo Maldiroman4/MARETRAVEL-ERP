@@ -426,14 +426,11 @@
 
             <!-- BARRA DE BÚSQUEDA Y FILTROS (visible solo en pestaña Servicio) -->
             <div id="hub-filters-row" style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
-              <div style="flex: 2; min-width: 260px;">
+              <div style="flex: 1; min-width: 260px;">
                 <input type="text" id="hub-search-input" class="form-control" placeholder="Buscar por Nro ND, Pasajero, Documento, Cliente o Proveedor...">
               </div>
-              <div style="flex: 1; min-width: 180px;">
-                <select id="hub-filter-service" class="form-control">
-                  <option value="ALL">Todos los Servicios</option>
-                </select>
-              </div>
+              <!-- hub-filter-service se mantiene oculto para compatibilidad con el JS -->
+              <select id="hub-filter-service" style="display:none;"></select>
               <div style="width: 180px;">
                 <select id="hub-filter-status" class="form-control">
                   <option value="ALL">Todos los Estados</option>
