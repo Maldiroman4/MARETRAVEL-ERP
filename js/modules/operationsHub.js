@@ -2068,6 +2068,10 @@ class OperationsHubModule {
           window.app.closeModal('modal-unified-operation');
           this.render();
           window.app.updateDashboardKpis();
+          if (window.creditNotesModule) window.creditNotesModule.render();
+          if (window.gdsModule) window.gdsModule.render();
+          if (window.debitNotesModule) window.debitNotesModule.render();
+          if (window.otherIncomesModule) window.otherIncomesModule.render();
           window.app.showToast(`¡Operación ND #${existingNd.ndNumber} actualizada con éxito!`, 'success');
           return;
         }
@@ -2257,6 +2261,9 @@ class OperationsHubModule {
       this.render();
       window.app.updateDashboardKpis();
       if (window.creditNotesModule) window.creditNotesModule.render();
+      if (window.gdsModule) window.gdsModule.render();
+      if (window.debitNotesModule) window.debitNotesModule.render();
+      if (window.otherIncomesModule) window.otherIncomesModule.render();
 
       const providerCount = Object.keys(providerGroups).length;
       window.app.showToast(`¡ND #${nextNdNumber} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');
@@ -2391,8 +2398,11 @@ class OperationsHubModule {
     if (!confirm('¿Desea eliminar definitivamente este boleto aéreo?')) return;
     const data = window.db.get();
     data.gdsTickets = (data.gdsTickets || []).filter(t => t.id !== id);
+    data.otherIncomes = (data.otherIncomes || []).filter(i => i.ticketId !== id);
     window.db.save(data);
     this.render();
+    if (window.gdsModule) window.gdsModule.render();
+    if (window.otherIncomesModule) window.otherIncomesModule.render();
     window.app.updateDashboardKpis();
     window.app.showToast('Boleto eliminado del sistema', 'success');
   }

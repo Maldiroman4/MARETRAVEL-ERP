@@ -738,6 +738,8 @@ window.cashRegisterModule = {
     // Recargar vista y abrir impresión del Recibo Oficial
     this.loadClientPendingNds(clientId);
     if (window.debitNotesModule) window.debitNotesModule.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
     this.printReceipt(newReceipt.id);
   },
 
@@ -1060,6 +1062,8 @@ window.cashRegisterModule = {
     window.app.showToast(`Comprobante de Pago a Proveedor ${receiptCode} emitido exitosamente`, 'success');
     this.loadProviderPendingNcs(provId);
     if (window.creditNotesModule) window.creditNotesModule.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
   },
 
   // ==========================================
@@ -1178,6 +1182,8 @@ window.cashRegisterModule = {
 
     this.renderReceiptsHistory();
     if (window.debitNotesModule) window.debitNotesModule.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
   },
 
   /**

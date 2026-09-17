@@ -344,8 +344,11 @@ window.accountsModule = {
     window.db.save(data);
     window.app.closeModal('modal-account');
     this.render();
-    if (window.operationsHubModule && window.operationsHubModule.currentTab === 'accounts') {
-      window.operationsHubModule.renderActiveTabContent();
+    if (window.operationsHubModule) {
+      window.operationsHubModule.render();
+    }
+    if (window.app && window.app.updateDashboardKpis) {
+      window.app.updateDashboardKpis();
     }
   },
 

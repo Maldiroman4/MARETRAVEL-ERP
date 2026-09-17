@@ -858,6 +858,8 @@ window.debitNotesModule = {
     window.db.save(data);
     window.app.closeModal('modal-nd');
     this.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
   },
 
   /**
@@ -939,6 +941,8 @@ window.debitNotesModule = {
     window.db.save(data);
     this.render();
     if (window.creditNotesModule) window.creditNotesModule.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
 
     window.app.showToast(`ND #${nd.ndNumber} CERRADA. Se generaron ${ncGeneratedCount} Nota(s) de Crédito a proveedores`, 'success');
   },
@@ -973,6 +977,8 @@ window.debitNotesModule = {
     window.db.save(data);
     this.render();
     if (window.creditNotesModule) window.creditNotesModule.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
     window.app.showToast(`ND #${nd.ndNumber} reabierta exitosamente en estado BORRADOR`, 'info');
   },
 

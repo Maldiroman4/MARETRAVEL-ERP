@@ -172,5 +172,7 @@ window.creditNotesModule = {
     window.app.closeModal('modal-nc-manual');
     window.app.showToast(`Nota de Crédito NC #${newNc.ncNumber} registrada correctamente`, 'success');
     this.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
   }
 };

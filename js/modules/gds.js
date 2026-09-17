@@ -374,7 +374,13 @@ window.gdsModule = {
 
     window.app.closeModal('modal-simulate-gds');
     this.render();
+    if (window.operationsHubModule) window.operationsHubModule.render();
     if (window.otherIncomesModule) window.otherIncomesModule.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
+  },
+
+  openEditModal(ticketId) {
+    return this.openSimulateModal(ticketId);
   },
 
   deleteTicket(ticketId) {
@@ -393,7 +399,9 @@ window.gdsModule = {
       window.db.save(data);
       window.app.showToast(`Boleto ${tkt.ticketNumber} eliminado correctamente`, 'success');
       this.render();
+      if (window.operationsHubModule) window.operationsHubModule.render();
       if (window.otherIncomesModule) window.otherIncomesModule.render();
+      if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
     }
   },
 
