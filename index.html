@@ -74,23 +74,66 @@
       </div>
 
       <ul class="sidebar-menu">
-        <li class="menu-category">Operaciones &amp; Ventas</li>
-        <li>
-          <a class="nav-item active" data-view="dashboard">
-            <i data-lucide="layout-dashboard"></i>
-            <span>Dashboard</span>
-          </a>
+        <!-- Menú Padre Colapsable: SERVICIOS -->
+        <li class="sidebar-dropdown-group open" id="sidebar-group-servicios">
+          <button type="button" class="nav-dropdown-toggle" id="btn-toggle-servicios" aria-expanded="true">
+            <div class="nav-toggle-content">
+              <i data-lucide="briefcase"></i>
+              <span>Servicios</span>
+            </div>
+            <i data-lucide="chevron-down" class="dropdown-arrow"></i>
+          </button>
+          <ul class="sidebar-submenu" id="submenu-servicios">
+            <li>
+              <a class="nav-sub-item active" data-service="BOLETO_AEREO">
+                <i data-lucide="plane"></i>
+                <span>Boletos Aéreo</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="SEGURO_VIAJE">
+                <i data-lucide="shield-check"></i>
+                <span>Seguro de Viaje</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="CERTIFICACION_FA">
+                <i data-lucide="award"></i>
+                <span>Certificado IFA</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="ASESORAMIENTO_VISAS">
+                <i data-lucide="file-check"></i>
+                <span>EA Visa</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="PAQUETES">
+                <i data-lucide="compass"></i>
+                <span>Paquetes</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="HOTEL">
+                <i data-lucide="building-2"></i>
+                <span>Hospedaje</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-sub-item" data-service="RENT_A_CAR">
+                <i data-lucide="car"></i>
+                <span>Traslado</span>
+              </a>
+            </li>
+          </ul>
         </li>
+
+        <!-- Ítem Independiente de Nivel Superior: DIRECTORIO DE CUENTAS -->
         <li>
-          <a class="nav-item" data-view="operaciones">
-            <i data-lucide="layers"></i>
-            <span>Ventas &amp; Emisiones (Todo en Uno)</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-item" data-view="calendario">
-            <i data-lucide="calendar-clock"></i>
-            <span>Calendario de Viajes</span>
+          <a class="nav-item" data-view="cuentas" id="nav-item-cuentas">
+            <i data-lucide="users"></i>
+            <span>Directorio de cuentas (Clientes - Proveedores)</span>
           </a>
         </li>
 
@@ -140,7 +183,7 @@
       <!-- Topbar Header -->
       <header class="topbar">
         <div class="topbar-left">
-          <h2 class="page-title" id="current-page-title">Panel de Control Ejecutivo</h2>
+          <h2 class="page-title" id="current-page-title">Centro de Operaciones &amp; Servicios</h2>
         </div>
 
         <div class="topbar-right">
@@ -186,7 +229,7 @@
         <!-- ======================================================================
              VISTA 1: DASHBOARD
              ====================================================================== -->
-        <section id="view-dashboard" class="view-section active">
+        <section id="view-dashboard" class="view-section">
           <!-- SECCIÓN 1: PANTALLA COMPLETA DE 4 KPI CARDS GIGANTES -->
           <div class="kpi-hero-container">
             <div class="kpi-grid-fullscreen">
@@ -353,7 +396,7 @@
              VISTA CENTRALIZADA: VENTAS & EMISIONES (TODO EN UNO)
              Unifica: Boletos Aéreos, Notas de Débito, Notas de Crédito, Cuentas y Caja
              ====================================================================== -->
-        <section id="view-operaciones" class="view-section">
+        <section id="view-operaciones" class="view-section active">
           <!-- BARRA DE KPIS OPERATIVOS -->
           <div class="hub-stats-bar">
             <div class="hub-kpi-card">

@@ -211,6 +211,44 @@ class OperationsHubModule {
     if (window.lucide) window.lucide.createIcons();
   }
 
+  filterByService(serviceCode) {
+    this.currentTab = 'all';
+    this.filterService = serviceCode || 'ALL';
+
+    // Sincronizar select en la barra de herramientas si existe
+    const filterSelect = document.getElementById('hub-filter-service');
+    if (filterSelect) {
+      let optExists = Array.from(filterSelect.options).some(o => o.value === serviceCode);
+      if (!optExists && serviceCode !== 'ALL') {
+        const opt = document.createElement('option');
+        opt.value = serviceCode;
+        opt.textContent = this.formatServiceName(serviceCode);
+        filterSelect.appendChild(opt);
+      }
+      filterSelect.value = serviceCode;
+    }
+
+    // Activar pestaña maestra 'all'
+    document.querySelectorAll('.hub-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.hubTab === 'all');
+    });
+
+    const filterRow = document.getElementById('hub-filters-row');
+    if (filterRow) filterRow.style.display = 'flex';
+
+    document.querySelectorAll('.hub-tab-panel').forEach(p => p.style.display = 'none');
+    const panelAll = document.getElementById('hub-panel-all');
+    if (panelAll) panelAll.style.display = 'block';
+
+    const titleEl = document.getElementById('current-page-title');
+    if (titleEl && serviceCode && serviceCode !== 'ALL') {
+      titleEl.textContent = `Servicios: ${this.formatServiceName(serviceCode)}`;
+    }
+
+    this.renderActiveTabContent();
+    if (window.lucide) window.lucide.createIcons();
+  }
+
   renderActiveTabContent() {
     if (this.currentTab === 'all') {
       const container = document.getElementById('hub-panel-all');
@@ -259,7 +297,32 @@ class OperationsHubModule {
     }
 
     if (this.filterService !== 'ALL') {
-      nds = nds.filter(n => n.items && n.items.some(it => it.serviceType === this.filterService));
+      const fs = (this.filterService || '').toUpperCase();
+      nds = nds.filter(n => n.items && n.items.some(it => {
+        const itType = (it.serviceType || '').toUpperCase();
+        if (fs === 'BOLETO_AEREO') {
+          return itType.includes('BOLETO') || itType.includes('AEREO') || itType.includes('GDS');
+        }
+        if (fs === 'SEGURO_VIAJE') {
+          return itType.includes('SEGURO');
+        }
+        if (fs === 'CERTIFICACION_FA') {
+          return itType.includes('FA') || itType.includes('CERTIFIC');
+        }
+        if (fs === 'ASESORAMIENTO_VISAS') {
+          return itType.includes('VISA');
+        }
+        if (fs === 'PAQUETES' || fs === 'PAQUETE_TURISTICO') {
+          return itType.includes('PAQUETE') || itType.includes('CRUCERO') || itType.includes('CONCIERTO');
+        }
+        if (fs === 'HOTEL' || fs === 'HOSPEDAJE') {
+          return itType.includes('HOTEL') || itType.includes('HOSPEDAJE');
+        }
+        if (fs === 'RENT_A_CAR' || fs === 'TRASLADO') {
+          return itType.includes('AUTO') || itType.includes('RENT') || itType.includes('CAR') || itType.includes('TRASLADO') || itType.includes('VEHIC');
+        }
+        return itType === fs;
+      }));
     }
 
     let rowsHtml = '';
@@ -2591,27 +2654,33 @@ class OperationsHubModule {
 
   formatServiceName(code) {
     if (!code) return 'SERVICIO';
+    const map = {
+      'BOLETO_AEREO': 'Boletos Aéreo',
+      'BOLETO_GDS': 'Boletos Aéreo',
+      'HOTEL': 'Hospedaje',
+      'HOTEL_HOSPEDAJE': 'Hospedaje',
+      'PAQUETE': 'Paquetes',
+      'PAQUETES': 'Paquetes',
+      'PAQUETE_TURISTICO': 'Paquetes',
+      'PAQUETE_CRUCERO': 'Paquetes (Crucero)',
+      'PAQUETE_CONCIERTO': 'Paquetes (Concierto)',
+      'ASESORAMIENTO_VISAS': 'EA Visa',
+      'VISA': 'EA Visa',
+      'CERTIFICACION_FA': 'Certificado IFA',
+      'RENT_A_CAR': 'Traslado',
+      'TRASLADO': 'Traslado',
+      'SEGURO': 'Seguro de Viaje',
+      'SEGURO_VIAJE': 'Seguro de Viaje',
+      'COMISION_PLATAFORMA': 'Comisión Plataforma',
+      'OTRO': 'Otro Servicio'
+    };
+    if (map[code]) return map[code];
+
     const services = this.getServiceTypes();
     const found = services.find(s => s.code === code || s.id === code);
     if (found) return found.name;
 
-    const map = {
-      'BOLETO_AEREO': 'BOLETO AÉREO',
-      'BOLETO_GDS': 'BOLETO AÉREO GDS',
-      'HOTEL': 'HOTEL',
-      'PAQUETE': 'PAQUETE TURÍSTICO',
-      'PAQUETE_TURISTICO': 'PAQUETE TURÍSTICO',
-      'PAQUETE_CRUCERO': 'PAQUETE CRUCERO',
-      'PAQUETE_CONCIERTO': 'PAQUETE CONCIERTO',
-      'ASESORAMIENTO_VISAS': 'ASESORAMIENTO VISAS',
-      'CERTIFICACION_FA': 'CERTIFICACIÓN FA',
-      'RENT_A_CAR': 'RENT A CAR',
-      'SEGURO': 'SEGURO DE VIAJE',
-      'SEGURO_VIAJE': 'SEGURO DE VIAJE',
-      'COMISION_PLATAFORMA': 'COMISIÓN PLATAFORMA',
-      'OTRO': 'OTRO SERVICIO'
-    };
-    return map[code] || code.replace(/_/g, ' ');
+    return code.replace(/_/g, ' ');
   }
 
   getServiceBadgeClass(code) {

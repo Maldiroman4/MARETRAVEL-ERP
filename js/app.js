@@ -4,7 +4,7 @@
  */
 
 window.app = {
-  currentView: 'dashboard',
+  currentView: 'operaciones',
   AUTH_KEY: 'MARETRAVEL_AUTH_SESSION_V1',
   initialized: false,
 
@@ -202,6 +202,14 @@ window.app = {
     if (window.calendarModule) window.calendarModule.init();
     if (window.settingsModule) window.settingsModule.init();
 
+    // Inicializar módulo inicial de Operaciones si corresponde
+    if (this.currentView === 'operaciones' && window.operationsHubModule) {
+      window.operationsHubModule.render();
+      const activeSub = document.querySelector('.nav-sub-item.active');
+      const srvCode = activeSub ? activeSub.dataset.service : 'BOLETO_AEREO';
+      window.operationsHubModule.filterByService(srvCode);
+    }
+
     // Re-renderizar iconos Lucide
     if (window.lucide) window.lucide.createIcons();
 
@@ -214,14 +222,71 @@ window.app = {
   },
 
   bindNavigation() {
+    // 1. Enlaces principales de nivel superior (Directorio de cuentas, Otros Ingresos, Cuentas Bancarias, etc.)
     const navLinks = document.querySelectorAll('.nav-item');
     navLinks.forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const view = link.dataset.view;
-        if (view) this.navigateTo(view);
+        if (view) {
+          // Desactivar cualquier sub-ítem si se va a otra sección principal
+          document.querySelectorAll('.nav-sub-item').forEach(sub => sub.classList.remove('active'));
+          this.navigateTo(view);
+        }
       });
     });
+
+    // 2. Acordeón Desplegable para "Servicios" (Toggle expandir/colapsar)
+    const toggleBtn = document.getElementById('btn-toggle-servicios');
+    const group = document.getElementById('sidebar-group-servicios');
+    if (toggleBtn && group) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        group.classList.toggle('open');
+        const isOpen = group.classList.contains('open');
+        toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+    }
+
+    // 3. Sub-ítems de "Servicios" (Navegación Dinámica y Filtro Reactivo)
+    const subItems = document.querySelectorAll('.nav-sub-item');
+    subItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const serviceCode = item.dataset.service;
+        this.selectServiceSubItem(serviceCode, item);
+      });
+    });
+  },
+
+  selectServiceSubItem(serviceCode, targetItem) {
+    // A. Quitar estado activo de enlaces principales
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+    // B. Resaltar sub-ítem seleccionado con color corporativo (#00a884)
+    document.querySelectorAll('.nav-sub-item').forEach(el => el.classList.remove('active'));
+    if (targetItem) {
+      targetItem.classList.add('active');
+    } else if (serviceCode) {
+      const el = document.querySelector(`.nav-sub-item[data-service="${serviceCode}"]`);
+      if (el) el.classList.add('active');
+    }
+
+    // C. Asegurar que el acordeón esté expandido
+    const group = document.getElementById('sidebar-group-servicios');
+    if (group && !group.classList.contains('open')) {
+      group.classList.add('open');
+      const toggleBtn = document.getElementById('btn-toggle-servicios');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    // D. Conmutar a la vista central de operaciones sin recargar página
+    this.navigateTo('operaciones');
+
+    // E. Filtrar dinámicamente la tabla central a esa categoría
+    if (window.operationsHubModule && typeof window.operationsHubModule.filterByService === 'function') {
+      window.operationsHubModule.filterByService(serviceCode);
+    }
   },
 
   navigateTo(viewName) {
@@ -254,6 +319,11 @@ window.app = {
       }
     });
 
+    // Si se navega fuera de operaciones, remover activo de los sub-servicios
+    if (viewName !== 'operaciones') {
+      document.querySelectorAll('.nav-sub-item').forEach(sub => sub.classList.remove('active'));
+    }
+
     // Cambiar vistas visibles
     document.querySelectorAll('.view-section').forEach(section => {
       section.classList.remove('active');
@@ -267,8 +337,8 @@ window.app = {
     // Actualizar título de la barra superior
     const titleMap = {
       'dashboard': 'Panel de Control Ejecutivo',
-      'operaciones': 'Ventas & Emisiones (Todo en Uno)',
-      'cuentas': 'Gestión de Cuentas (Clientes y Proveedores)',
+      'operaciones': 'Centro de Operaciones & Servicios',
+      'cuentas': 'Directorio de Cuentas (Clientes y Proveedores)',
       'gds': 'Control y Emisión de Boletos Aéreos',
       'notas-debito': 'Notas de Débito (Facturación y Ventas)',
       'notas-credito': 'Notas de Crédito a Proveedores (Cuentas por Pagar)',
