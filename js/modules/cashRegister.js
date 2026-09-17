@@ -93,6 +93,13 @@ window.cashRegisterModule = {
 
   setupCobranzasTab() {
     const data = window.db.get();
+    
+    // Renderizar Badge de T/C Centralizado
+    const tcBadge = document.getElementById('cash-tc-badge-cobranzas');
+    if (tcBadge && window.financialGuard) {
+      tcBadge.innerHTML = window.financialGuard.renderTcBadgeHtml();
+    }
+
     const clients = data.accounts.filter(a => a.relationType === 'CLIENTE' || a.relationType === 'AMBOS');
     const select = document.getElementById('cash-client-select');
     if (select) {
@@ -267,51 +274,89 @@ window.cashRegisterModule = {
     const container = document.getElementById('payment-methods-breakdown-list');
     if (!container) return;
 
-    const data = window.db.get();
-    const methods = data.paymentMethods.filter(m => m.type === 'COBRANZAS' || m.type === 'AMBOS');
     const rowId = 'pm_row_' + Math.random().toString(36).substr(2, 9);
 
     const div = document.createElement('div');
     div.className = 'payment-row form-row';
     div.id = rowId;
-    div.style.marginBottom = '8px';
-    div.style.alignItems = 'center';
+    div.style.marginBottom = '12px';
+    div.style.alignItems = 'flex-start';
     div.innerHTML = `
       <div style="grid-column: span 2;">
         <select class="form-control pm-select" onchange="window.cashRegisterModule.onPaymentAmountChange()">
-          ${methods.map(m => `<option value="${m.id}" data-curr="${m.currency}">[${m.code}] ${m.name} (${m.currency})</option>`).join('')}
+          <!-- Opciones pobladas por financialGuard -->
         </select>
+        <div class="pm-account-guard-pill" style="margin-top: 4px; font-size: 0.76rem;"></div>
       </div>
       <div>
         <input type="number" step="0.01" class="form-control pm-amount" placeholder="Importe" value="0.00" oninput="window.cashRegisterModule.onPaymentAmountChange()" style="text-align: right; font-weight: 700;">
       </div>
       <div>
-        <input type="text" class="form-control pm-ref" placeholder="Nro Cheque / Ref / QR">
+        <input type="text" class="form-control pm-ref" placeholder="Nro Transf / Cheque / QR">
       </div>
-      <div style="flex-shrink: 0; width: 40px;">
+      <div style="flex-shrink: 0; width: 40px; padding-top: 4px;">
         <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('${rowId}').remove(); window.cashRegisterModule.onPaymentAmountChange();">
           <i data-lucide="trash-2"></i>
         </button>
       </div>
     `;
     container.appendChild(div);
+
+    const selectEl = div.querySelector('.pm-select');
+    if (window.financialGuard && selectEl) {
+      window.financialGuard.populateSelect(selectEl, null, { placeholder: '-- Seleccionar Cuenta Financiera Activa --' });
+    } else if (selectEl) {
+      const data = window.db.get();
+      const methods = data.paymentMethods || [];
+      selectEl.innerHTML = '<option value="">-- Seleccionar Cuenta --</option>' + methods.map(m => `<option value="${m.id}" data-curr="${m.currency}">[${m.code}] ${m.name} (${m.currency})</option>`).join('');
+    }
+
     if (window.lucide) window.lucide.createIcons();
-    this.updateCobranzaSummary();
+    this.onPaymentAmountChange();
   },
 
   onPaymentAmountChange() {
     const data = window.db.get();
-    const sellRate = data.systemSettings.activeExchangeSell || 6.96;
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
 
-    // Calcular total ingresado en medios de pago
+    let allAccountsValid = true;
     let totalEnteredBob = 0;
     const paymentRows = document.querySelectorAll('#payment-methods-breakdown-list .payment-row');
+
     paymentRows.forEach(row => {
       const select = row.querySelector('.pm-select');
-      const opt = select?.options[select.selectedIndex];
-      const curr = opt?.dataset.curr || 'BOB';
+      const pill = row.querySelector('.pm-account-guard-pill');
+      const accId = select ? select.value : '';
       const amount = parseFloat(row.querySelector('.pm-amount')?.value) || 0;
-      totalEnteredBob += curr === 'BOB' ? amount : (amount * sellRate);
+
+      let account = null;
+      if (window.financialGuard) {
+        account = window.financialGuard.getAccountById(accId);
+      }
+      if (!account && data.paymentMethods) {
+        account = data.paymentMethods.find(m => m.id === accId);
+      }
+
+      if (accId && account) {
+        const val = window.financialGuard ? window.financialGuard.validateAccount(account) : { valid: true, summary: '' };
+        if (val.valid) {
+          if (pill) pill.innerHTML = `<span style="color: #15803d; font-weight: 600;">✓ Cuenta Activa y Validada (${account.currency})</span>`;
+          const curr = account.currency || 'BOB';
+          if (curr === 'BOB') {
+            totalEnteredBob += amount;
+          } else {
+            // USD o USDT
+            totalEnteredBob += (amount * sellRate);
+          }
+        } else {
+          allAccountsValid = false;
+          if (pill) pill.innerHTML = `<span style="color: #dc2626; font-weight: 600;">⚠ ${val.summary}</span>`;
+        }
+      } else {
+        allAccountsValid = false;
+        if (pill) pill.innerHTML = `<span style="color: #94a3b8; font-style: italic;">Selecciona una cuenta financiera activa</span>`;
+      }
     });
 
     // Auto-ajustar importes en la tabla de NDs según el pago ingresado
@@ -342,6 +387,21 @@ window.cashRegisterModule = {
     }
 
     this.updateCobranzaSummary();
+
+    // Guardrail UI: Bloquear/Desbloquear botón Procesar Cobro
+    const btnProcess = document.getElementById('btn-process-collection');
+    if (btnProcess) {
+      const hasSelectedNds = checks.length > 0;
+      if (!allAccountsValid || totalEnteredBob <= 0 || !hasSelectedNds) {
+        btnProcess.disabled = true;
+        btnProcess.style.opacity = '0.55';
+        btnProcess.style.cursor = 'not-allowed';
+      } else {
+        btnProcess.disabled = false;
+        btnProcess.style.opacity = '1';
+        btnProcess.style.cursor = 'pointer';
+      }
+    }
   },
 
   onNdAmountChange(input) {
@@ -370,9 +430,11 @@ window.cashRegisterModule = {
 
       const firstPmInput = paymentRows[0].querySelector('.pm-amount');
       const select = paymentRows[0].querySelector('.pm-select');
-      const opt = select?.options[select.selectedIndex];
-      const curr = opt?.dataset.curr || 'BOB';
-      const sellRate = window.db.get().systemSettings.activeExchangeSell || 6.96;
+      const accId = select ? select.value : '';
+      let account = window.financialGuard ? window.financialGuard.getAccountById(accId) : null;
+      const curr = account ? account.currency : 'BOB';
+      const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+      const sellRate = rates.sellRate || 6.96;
 
       if (firstPmInput) {
         firstPmInput.value = curr === 'BOB' ? totalToPay.toFixed(2) : (totalToPay / sellRate).toFixed(2);
@@ -384,7 +446,8 @@ window.cashRegisterModule = {
 
   updateCobranzaSummary() {
     const data = window.db.get();
-    const sellRate = data.systemSettings.activeExchangeSell || 6.96;
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
 
     // 1. Total saldo de las NDs seleccionadas
     let totalSelectedBalanceBob = 0;
@@ -403,8 +466,11 @@ window.cashRegisterModule = {
     const paymentRows = document.querySelectorAll('#payment-methods-breakdown-list .payment-row');
     paymentRows.forEach(row => {
       const select = row.querySelector('.pm-select');
-      const opt = select?.options[select.selectedIndex];
-      const curr = opt?.dataset.curr || 'BOB';
+      const accId = select ? select.value : '';
+      let account = window.financialGuard ? window.financialGuard.getAccountById(accId) : null;
+      if (!account && data.paymentMethods) account = data.paymentMethods.find(m => m.id === accId);
+
+      const curr = account ? account.currency : 'BOB';
       const amount = parseFloat(row.querySelector('.pm-amount')?.value) || 0;
 
       if (curr === 'BOB') {
@@ -460,36 +526,63 @@ window.cashRegisterModule = {
       return;
     }
 
-    const sellRate = data.systemSettings.activeExchangeSell || 6.96;
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
 
-    // Recopilar formas de pago
+    // Recopilar y validar estrictamente las formas de pago
     const payments = [];
     let totalEnteredBob = 0;
     const paymentRows = document.querySelectorAll('#payment-methods-breakdown-list .payment-row');
 
-    paymentRows.forEach(row => {
-      const pmId = row.querySelector('.pm-select').value;
-      const pm = data.paymentMethods.find(m => m.id === pmId);
-      const amount = parseFloat(row.querySelector('.pm-amount').value) || 0;
-      const ref = row.querySelector('.pm-ref').value.trim();
+    for (let row of paymentRows) {
+      const select = row.querySelector('.pm-select');
+      const accId = select ? select.value : '';
+      const amount = parseFloat(row.querySelector('.pm-amount')?.value) || 0;
+      const ref = (row.querySelector('.pm-ref')?.value || '').trim();
 
-      if (amount > 0 && pm) {
-        const inBob = pm.currency === 'BOB' ? amount : (amount * sellRate);
-        totalEnteredBob += inBob;
-        payments.push({
-          paymentMethodId: pm.id,
-          paymentMethodCode: pm.code,
-          paymentMethodName: pm.name,
-          currency: pm.currency,
-          amount: amount,
-          exchangeRateUsed: sellRate,
-          reference: ref || '-'
-        });
+      if (amount <= 0) continue;
+
+      let account = null;
+      if (window.financialGuard) {
+        account = window.financialGuard.getAccountById(accId);
       }
-    });
+      if (!account && data.paymentMethods) {
+        account = data.paymentMethods.find(m => m.id === accId);
+      }
+
+      const val = window.financialGuard ? window.financialGuard.validateAccount(account) : { valid: !!account, summary: '' };
+      if (!account || !val.valid) {
+        window.app.showToast(`Bloqueo de Cobranza: La cuenta seleccionada no es válida o está inactiva (${val.summary})`, 'error');
+        return;
+      }
+
+      const curr = account.currency || 'BOB';
+      const inBob = (curr === 'BOB') ? amount : (amount * sellRate);
+      totalEnteredBob += inBob;
+
+      const accDisplayName = account.type === 'BANCO' ? `${account.bankName} - Cta. ${account.accountNumber} (${account.titularName})` :
+                             account.type === 'BINANCE' ? `Binance Pay (ID: ${account.binanceId || account.walletAddress})` :
+                             account.type === 'EFECTIVO' ? `${account.cashDeskName || 'Caja Central'} (Custodio: ${account.custodianName})` :
+                             (account.name || 'Cuenta');
+
+      payments.push({
+        financialAccountId: account.id,
+        accountType: account.type || 'BANCO',
+        paymentMethodId: account.id,
+        paymentMethodCode: account.bankName || account.code || 'FIN-ACC',
+        paymentMethodName: accDisplayName,
+        titularName: account.titularName || account.custodianName || '-',
+        currency: curr,
+        amount: amount,
+        amountBob: parseFloat(inBob.toFixed(2)),
+        exchangeRateUsed: sellRate,
+        frozenExchangeRate: sellRate,
+        reference: ref || '-'
+      });
+    }
 
     if (payments.length === 0 || totalEnteredBob <= 0) {
-      window.app.showToast('Ingresa al menos una forma de pago válida con monto mayor a cero', 'warning');
+      window.app.showToast('Ingresa al menos una forma de pago válida en una cuenta financiera activa con monto mayor a cero', 'warning');
       return;
     }
 
@@ -497,7 +590,7 @@ window.cashRegisterModule = {
     let totalSelectedBalanceBob = 0;
     checks.forEach(cb => {
       const nd = data.debitNotes.find(n => n.id === cb.value);
-      if (nd) totalSelectedBalanceBob += nd.balanceBob;
+      if (nd) totalSelectedBalanceBob += (nd.balanceBob || 0);
     });
 
     if (totalEnteredBob > totalSelectedBalanceBob + 0.10) {
@@ -514,7 +607,7 @@ window.cashRegisterModule = {
       const nd = data.debitNotes.find(n => n.id === ndId);
       const amountInput = document.querySelector(`.nd-amount-to-pay[data-nd-id="${ndId}"]`);
       const amt = parseFloat(amountInput?.value) || 0;
-      if (amt > nd.balanceBob + 0.05) {
+      if (amt > (nd.balanceBob || 0) + 0.05) {
         customAmountsValid = false;
         break;
       }
@@ -526,7 +619,6 @@ window.cashRegisterModule = {
     let totalAmortizedBob = 0;
 
     if (customAmountsValid && Math.abs(customSum - totalEnteredBob) <= 0.10 && customSum > 0) {
-      // El usuario especificó montos manuales por ND
       userAmounts.forEach(({ nd, amt }) => {
         if (amt > 0) {
           totalAmortizedBob += amt;
@@ -538,13 +630,12 @@ window.cashRegisterModule = {
         }
       });
     } else {
-      // Distribución automática del pago (sea parcial o total) sobre las NDs seleccionadas
       let remaining = totalEnteredBob;
       for (let cb of checks) {
         if (remaining <= 0.001) break;
         const ndId = cb.value;
         const nd = data.debitNotes.find(n => n.id === ndId);
-        if (!nd || nd.balanceBob <= 0) continue;
+        if (!nd || (nd.balanceBob || 0) <= 0) continue;
 
         const toPay = Math.min(nd.balanceBob, remaining);
         const toPayBob = parseFloat(toPay.toFixed(2));
@@ -560,26 +651,40 @@ window.cashRegisterModule = {
     }
 
     // Crear Recibo de Caja Oficial
-    const nextReceipt = (data.cashReceipts.length > 0) ? Math.max(...data.cashReceipts.map(r => r.receiptNumber)) + 1 : 2001;
+    const nextReceipt = (data.cashReceipts && data.cashReceipts.length > 0) ? Math.max(...data.cashReceipts.map(r => r.receiptNumber || 0)) + 1 : 2001;
+    const receiptCode = 'RCP-' + String(nextReceipt).padStart(5, '0');
     const receiptDetails = [];
 
     // Aplicar amortizaciones a cada ND
     amortizations.forEach(item => {
-      const prevBalBob = item.nd.balanceBob;
-      const prevBalUsd = item.nd.balanceUsd;
+      const prevBalBob = Number(item.nd.balanceBob || 0);
+      const prevBalUsd = Number(item.nd.balanceUsd || 0);
       const newBalBob = Math.max(0, prevBalBob - item.amountPaidBob);
       const newBalUsd = Math.max(0, prevBalUsd - item.amountPaidUsd);
 
-      item.nd.paidAmountBob = parseFloat((item.nd.paidAmountBob + item.amountPaidBob).toFixed(2));
-      item.nd.paidAmountUsd = parseFloat((item.nd.paidAmountUsd + item.amountPaidUsd).toFixed(2));
+      item.nd.paidAmountBob = parseFloat(((item.nd.paidAmountBob || 0) + item.amountPaidBob).toFixed(2));
+      item.nd.paidAmountUsd = parseFloat(((item.nd.paidAmountUsd || 0) + item.amountPaidUsd).toFixed(2));
       item.nd.balanceBob = parseFloat(newBalBob.toFixed(2));
       item.nd.balanceUsd = parseFloat(newBalUsd.toFixed(2));
 
+      // Actualización Dinámica del Estado: Si saldo <= 0.05 -> PAGADA / LIQUIDADA
       if (item.nd.balanceBob <= 0.05) {
         item.nd.status = 'PAGADA';
+        item.nd.balanceBob = 0;
+        item.nd.balanceUsd = 0;
       } else {
         item.nd.status = 'PARCIAL';
       }
+
+      if (!item.nd.paymentHistory) item.nd.paymentHistory = [];
+      item.nd.paymentHistory.push({
+        receiptNumber: nextReceipt,
+        receiptCode: receiptCode,
+        amountPaidBob: item.amountPaidBob,
+        amountPaidUsd: item.amountPaidUsd,
+        date: new Date().toLocaleString(),
+        exchangeRateUsed: sellRate
+      });
 
       receiptDetails.push({
         debitNoteId: item.nd.id,
@@ -599,6 +704,7 @@ window.cashRegisterModule = {
     const newReceipt = {
       id: 'CR-' + Date.now(),
       receiptNumber: nextReceipt,
+      receiptCode: receiptCode,
       accountId: client.id,
       accountName: client.name,
       solicitante: amortizations[0]?.nd?.solicitante || 'Oficina Central',
@@ -608,23 +714,25 @@ window.cashRegisterModule = {
       totalPaidUsd: parseFloat((totalAmortizedBob / sellRate).toFixed(2)),
       remainingBalanceBob: parseFloat(remainingTotalBalance.toFixed(2)),
       exchangeRateUsed: sellRate,
+      frozenExchangeRate: sellRate,
       status: 'VALIDO',
       reversalReason: null,
       reversedAt: null,
       reversedBy: null,
-      createdById: data.currentUser.id,
-      createdByName: data.currentUser.name,
+      createdById: data.currentUser ? data.currentUser.id : 'usr-1',
+      createdByName: data.currentUser ? data.currentUser.name : 'Administrador',
       details: receiptDetails,
       payments: payments
     };
 
+    if (!data.cashReceipts) data.cashReceipts = [];
     data.cashReceipts.unshift(newReceipt);
     window.db.save(data);
 
     if (isPartial) {
-      window.app.showToast(`Recibo #${nextReceipt} emitido con éxito. ¡Pago Parcial registrado! Saldo restante: BOB ${remainingTotalBalance.toFixed(2)}`, 'success');
+      window.app.showToast(`Recibo ${receiptCode} emitido con éxito. ¡Abono Parcial registrado! Saldo restante: BOB ${remainingTotalBalance.toFixed(2)}`, 'success');
     } else {
-      window.app.showToast(`Recibo #${nextReceipt} emitido con éxito. Liquidación total al 100%`, 'success');
+      window.app.showToast(`Recibo ${receiptCode} emitido con éxito. ¡Liquidación total al 100%!`, 'success');
     }
 
     // Recargar vista y abrir impresión del Recibo Oficial
@@ -639,6 +747,13 @@ window.cashRegisterModule = {
 
   setupPagosTab() {
     const data = window.db.get();
+
+    // Renderizar Badge de T/C Centralizado
+    const tcBadge = document.getElementById('cash-tc-badge-pagos');
+    if (tcBadge && window.financialGuard) {
+      tcBadge.innerHTML = window.financialGuard.renderTcBadgeHtml();
+    }
+
     const providers = data.accounts.filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS');
     const select = document.getElementById('cash-prov-select');
     if (select) {
@@ -646,11 +761,58 @@ window.cashRegisterModule = {
         providers.map(p => `<option value="${p.id}">${p.name} (${p.code})</option>`).join('');
     }
 
-    const payMethods = data.paymentMethods.filter(m => m.type === 'PAGOS' || m.type === 'AMBOS');
     const selectMethod = document.getElementById('prov-payment-method-select');
     if (selectMethod) {
-      selectMethod.innerHTML = payMethods.map(m => `<option value="${m.id}">[${m.code}] ${m.name} (${m.currency})</option>`).join('');
+      if (window.financialGuard) {
+        window.financialGuard.populateSelect(selectMethod, null, { placeholder: '-- Seleccionar Cuenta Financiera Origen --' });
+      } else {
+        const payMethods = data.paymentMethods.filter(m => m.type === 'PAGOS' || m.type === 'AMBOS');
+        selectMethod.innerHTML = payMethods.map(m => `<option value="${m.id}">[${m.code}] ${m.name} (${m.currency})</option>`).join('');
+      }
     }
+
+    this.onProvAccountChange();
+
+    // Cargar historial de NCs integrado
+    this.renderNcHistory();
+  },
+
+  onProvAccountChange() {
+    const selectMethod = document.getElementById('prov-payment-method-select');
+    const pill = document.getElementById('prov-account-guard-pill');
+    const btn = document.getElementById('btn-process-prov-payment');
+    if (!selectMethod) return;
+
+    const accId = selectMethod.value;
+    const account = window.financialGuard ? window.financialGuard.getAccountById(accId) : null;
+
+    if (!accId || !account) {
+      if (pill) pill.innerHTML = `<span style="color: #94a3b8; font-style: italic;">Seleccione la cuenta financiera desde donde saldrán los fondos.</span>`;
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.55';
+        btn.style.cursor = 'not-allowed';
+      }
+      return;
+    }
+
+    const val = window.financialGuard ? window.financialGuard.validateAccount(account) : { valid: true };
+    if (val.valid) {
+      if (pill) pill.innerHTML = `<span style="color: #15803d; font-weight: 600;">✓ Cuenta Activa y Verificada (${account.currency}) | Titular/Custodio: ${account.titularName || account.custodianName || '-'}</span>`;
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+    } else {
+      if (pill) pill.innerHTML = `<span style="color: #dc2626; font-weight: 600;">⚠ ${val.summary}</span>`;
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.55';
+        btn.style.cursor = 'not-allowed';
+      }
+    }
+  },
 
     // Cargar historial de NCs integrado
     this.renderNcHistory();
@@ -814,9 +976,18 @@ window.cashRegisterModule = {
       return;
     }
 
-    const pmId = document.getElementById('prov-payment-method-select').value;
-    const pm = data.paymentMethods.find(m => m.id === pmId);
+    const accId = document.getElementById('prov-payment-method-select').value;
+    const account = window.financialGuard ? window.financialGuard.getAccountById(accId) : null;
+    const val = window.financialGuard ? window.financialGuard.validateAccount(account) : { valid: !!account, summary: '' };
+
+    if (!account || !val.valid) {
+      window.app.showToast('Bloqueo Financiero: Cuenta de origen inválida o inactiva (' + val.summary + ')', 'error');
+      return;
+    }
+
     const ref = document.getElementById('prov-pay-ref').value.trim();
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
 
     let totalPaid = 0;
     const details = [];
@@ -825,18 +996,25 @@ window.cashRegisterModule = {
       const ncId = cb.value;
       const nc = data.creditNotes.find(c => c.id === ncId);
       const amountInput = document.querySelector(`.nc-pay-amount[data-nc-id="${ncId}"]`);
-      const amount = parseFloat(amountInput.value) || 0;
+      const amount = parseFloat(amountInput?.value) || 0;
 
       if (amount <= 0) continue;
-      if (amount > (nc.balance + 0.01)) {
+      if (amount > ((nc.balance || 0) + 0.01)) {
         window.app.showToast(`El monto a pagar en NC #${nc.ncNumber} excede su saldo`, 'warning');
         return;
       }
 
-      const prevBal = nc.balance;
-      nc.paidAmount = parseFloat((nc.paidAmount + amount).toFixed(2));
+      const prevBal = Number(nc.balance || 0);
+      nc.paidAmount = parseFloat(((nc.paidAmount || 0) + amount).toFixed(2));
       nc.balance = parseFloat(Math.max(0, prevBal - amount).toFixed(2));
-      nc.status = nc.balance <= 0.01 ? 'PAGADA' : 'PARCIAL';
+
+      // Actualización Dinámica del Estado: Si saldo <= 0.01 -> PAGADA / LIQUIDADA
+      if (nc.balance <= 0.01) {
+        nc.status = 'PAGADA';
+        nc.balance = 0;
+      } else {
+        nc.status = 'PARCIAL';
+      }
 
       totalPaid += amount;
       details.push({
@@ -848,31 +1026,42 @@ window.cashRegisterModule = {
       });
     }
 
-    const nextRec = (data.providerPayments && data.providerPayments.length > 0) ? Math.max(...data.providerPayments.map(p => p.receiptNumber)) + 1 : 8001;
+    if (totalPaid <= 0) {
+      window.app.showToast('Ingresa un monto mayor a cero para liquidar', 'warning');
+      return;
+    }
+
+    const nextRec = (data.providerPayments && data.providerPayments.length > 0) ? Math.max(...data.providerPayments.map(p => p.receiptNumber || 0)) + 1 : 8001;
+    const receiptCode = 'OP-' + String(nextRec).padStart(5, '0');
 
     const receipt = {
       id: 'PPR-' + Date.now(),
       receiptNumber: nextRec,
+      receiptCode: receiptCode,
       providerId: provider.id,
       providerName: provider.name,
       paymentDate: new Date().toLocaleString(),
       totalPaid: parseFloat(totalPaid.toFixed(2)),
-      currency: pm.currency,
-      paymentMethodId: pm.id,
-      paymentMethodName: pm.name,
+      currency: account.currency || 'BOB',
+      financialAccountId: account.id,
+      accountType: account.type || 'BANCO',
+      financialAccountName: account.type === 'BANCO' ? `${account.bankName} - Cta. ${account.accountNumber}` : (account.type === 'BINANCE' ? `Binance Pay (${account.binanceId})` : account.name),
+      titularName: account.titularName || account.custodianName || '-',
+      exchangeRateUsed: sellRate,
+      frozenExchangeRate: sellRate,
       reference: ref || '-',
       status: 'VALIDO',
       reversalReason: null,
       details: details,
-      createdById: data.currentUser.id,
-      createdByName: data.currentUser.name
+      createdById: data.currentUser ? data.currentUser.id : 'usr-1',
+      createdByName: data.currentUser ? data.currentUser.name : 'Administrador'
     };
 
     if (!data.providerPayments) data.providerPayments = [];
     data.providerPayments.unshift(receipt);
     window.db.save(data);
 
-    window.app.showToast(`Comprobante de Pago a Proveedor #${receipt.receiptNumber} emitido exitosamente`, 'success');
+    window.app.showToast(`Comprobante de Pago a Proveedor ${receiptCode} emitido exitosamente`, 'success');
     this.loadProviderPendingNcs(provId);
     if (window.creditNotesModule) window.creditNotesModule.render();
   },
@@ -1022,7 +1211,7 @@ window.cashRegisterModule = {
 
         <div class="print-doc-title">
           <h2>RECIBO OFICIAL DE CAJA</h2>
-          <div class="print-doc-number">N° ${String(r.receiptNumber).padStart(6, '0')}</div>
+          <div class="print-doc-number">${r.receiptCode || ('RCP-' + String(r.receiptNumber).padStart(5, '0'))}</div>
           ${r.status === 'REVERTIDO' ? '<div style="color:red; font-weight:800; font-size:12pt; margin-top:4px;">*** ANULADO / REVERTIDO ***</div>' : ''}
         </div>
 
@@ -1063,12 +1252,13 @@ window.cashRegisterModule = {
 
         <!-- Formas de Pago Aplicadas -->
         <div style="font-size: 8.5pt; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #0f2742;">
-          Desglose de Formas de Pago:
+          Desglose de Formas de Pago (Cuentas Financieras):
         </div>
         <table class="print-table">
           <thead>
             <tr>
-              <th>Método / Cuenta</th>
+              <th>Cuenta Financiera / Destino</th>
+              <th>Titular / Custodio</th>
               <th>Referencia</th>
               <th style="text-align: right;">Importe Pagado</th>
             </tr>
@@ -1076,7 +1266,8 @@ window.cashRegisterModule = {
           <tbody>
             ${r.payments.map(p => `
               <tr>
-                <td>${p.paymentMethodName}</td>
+                <td><strong>${p.paymentMethodName || p.financialAccountName || 'Cuenta'}</strong></td>
+                <td>${p.titularName || '-'}</td>
                 <td class="font-mono">${p.reference || '-'}</td>
                 <td class="font-mono" style="text-align: right; font-weight: 700;">
                   ${p.currency} ${Number(p.amount).toFixed(2)}

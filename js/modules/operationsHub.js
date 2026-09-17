@@ -13,6 +13,7 @@ class OperationsHubModule {
     this.searchQuery = '';
     this.filterService = 'ALL';
     this.filterStatus = 'ALL';
+    this.activeNdItems = [];
     this.init();
   }
 
@@ -488,12 +489,14 @@ class OperationsHubModule {
   }
 
   // --------------------------------------------------------------------------
-  // MODAL UNIFICADO: NUEVA VENTA / EMISIÓN INTEGRAL
+  // MODAL UNIFICADO: NUEVA VENTA / EMISIÓN INTEGRAL MULTI-SERVICIO
   // --------------------------------------------------------------------------
   openNewUnifiedModal() {
     this.editingOperationId = null;
     const modalTitle = document.getElementById('unified-modal-title');
-    if (modalTitle) modalTitle.innerHTML = `<i data-lucide="plus-circle"></i> Registrar Nueva Venta / Emisión Integral`;
+    if (modalTitle) {
+      modalTitle.innerHTML = `<i data-lucide="layers"></i> Emisión de Nota de Débito Multi-Servicio & Venta Integral`;
+    }
 
     const form = document.getElementById('unified-operation-form');
     if (form) form.reset();
@@ -501,63 +504,84 @@ class OperationsHubModule {
     const dateInput = document.getElementById('uni-issue-date');
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
 
-    this.populateServiceTypeSelects();
     this.populateAccountsSelects();
 
-    const initialSrv = document.getElementById('uni-service-type')?.value || 'BOLETO_AEREO';
-    this.renderDynamicServiceFields(initialSrv, {});
+    // Renderizar Badge T/C Oficial Centralizado Bloqueado
+    const tcBadge = document.getElementById('uni-tc-badge-display');
+    if (tcBadge && window.financialGuard) {
+      tcBadge.innerHTML = window.financialGuard.renderTcBadgeHtml();
+    }
 
-    this.calculateUnifiedTotals();
+    // Inicializar con 1 ítem por defecto
+    this.activeNdItems = [ this.createDefaultItem() ];
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+    this.onPaymentTermChange();
 
     window.app.openModal('modal-unified-operation');
     if (window.lucide) window.lucide.createIcons();
   }
 
+  createDefaultItem(custom = {}) {
+    const data = window.db ? window.db.get() : null;
+    const providers = (data?.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR');
+    const defaultProv = providers[0] || { id: '', name: 'Proveedor', settlementModel: 'DEDUCCION_DIRECTA' };
+
+    return {
+      id: 'NDI-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      serviceType: custom.serviceType || 'BOLETO_AEREO',
+      providerId: custom.providerId || defaultProv.id,
+      providerName: custom.providerName || defaultProv.name,
+      settlementModel: custom.settlementModel || defaultProv.settlementModel || 'DEDUCCION_DIRECTA',
+      passengerName: custom.passengerName || '',
+      passengerDoc: custom.passengerDoc || '',
+      voucherNumber: custom.voucherNumber || '',
+      description: custom.description || '',
+      fareAmount: parseFloat(custom.fareAmount) || 0,
+      feeAmount: parseFloat(custom.feeAmount) || 0,
+      providerCommissionRate: parseFloat(custom.providerCommissionRate) || (custom.serviceType === 'BOLETO_AEREO' ? 0 : 10),
+      serviceDetails: custom.serviceDetails || {}
+    };
+  }
+
+  addNewItemToNd(custom = {}) {
+    const item = this.createDefaultItem(custom);
+    this.activeNdItems.push(item);
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
+  removeItemFromNd(index) {
+    if (this.activeNdItems.length <= 1) {
+      window.app.showToast('La Nota de Débito debe contener al menos un servicio.', 'warning');
+      return;
+    }
+    this.activeNdItems.splice(index, 1);
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
   populateAccountsSelects() {
     const data = window.db.get();
-    const clients = (data.accounts || []).filter(a => a.type === 'CLIENTE' || a.type === 'AGENCIA' || a.type === 'CORPORATIVO');
-    const providers = (data.accounts || []).filter(a => a.type === 'PROVEEDOR' || a.type === 'AEROLINEA' || a.type === 'HOTEL' || a.type === 'OPERADOR');
+    const clients = (data.accounts || []).filter(a => a.relationType === 'CLIENTE' || a.relationType === 'AMBOS' || a.type === 'CLIENTE' || a.type === 'AGENCIA' || a.type === 'CORPORATIVO');
 
     const clientSelect = document.getElementById('uni-client-select');
     if (clientSelect) {
-      clientSelect.innerHTML = `<option value="">-- Seleccionar Cliente --</option>` +
+      clientSelect.innerHTML = `<option value="">-- Seleccionar Cliente a Facturar --</option>` +
         clients.map(c => `<option value="${c.id}">${c.name} (${c.docNumber || c.code})</option>`).join('') +
         `<option value="__NEW_CLIENT__">➕ + Registrar Nuevo Cliente...</option>`;
     }
 
-    const provSelect = document.getElementById('uni-provider-select');
-    if (provSelect) {
-      provSelect.innerHTML = `<option value="">-- Seleccionar Proveedor / Operador --</option>` +
-        providers.map(p => `<option value="${p.id}">${p.name} (${p.docNumber || p.code})</option>`).join('') +
-        `<option value="__NEW_PROV__">➕ + Registrar Nuevo Proveedor...</option>`;
-    }
-
     const depositSelect = document.getElementById('uni-deposit-account');
-    if (depositSelect) {
-      const bankAccounts = (data.bankAccounts || []).filter(b => b.isActive);
-      depositSelect.innerHTML = `
-        <option value="CAJA_EFECTIVO">Caja Central Efectivo (BOB / USD)</option>
-        ${bankAccounts.map(b => `<option value="${b.id}">Banco: ${b.bankName} (${b.accountNumber})</option>`).join('')}
-      `;
+    if (depositSelect && window.financialGuard) {
+      window.financialGuard.populateSelect(depositSelect, null, { placeholder: '-- Seleccionar Cuenta Financiera Destino --' });
     }
   }
 
   populateServiceTypeSelects() {
     const services = this.getServiceTypes();
     
-    // 1. Selector en modal unificado
-    const uniSelect = document.getElementById('uni-service-type');
-    if (uniSelect) {
-      const currentVal = uniSelect.value;
-      uniSelect.innerHTML = services.map(s => `
-        <option value="${s.code || s.id}">${s.name}</option>
-      `).join('') + `<option value="__NEW_SERVICE__">➕ + Añadir Nuevo Tipo de Servicio...</option>`;
-      if (currentVal && services.some(s => (s.code || s.id) === currentVal)) {
-        uniSelect.value = currentVal;
-      }
-    }
-
-    // 2. Selector en modal manual de ND (modal-manual-item)
+    // Selector en modal manual de ND (modal-manual-item)
     const manSelect = document.getElementById('man-service-type');
     if (manSelect) {
       const currentVal = manSelect.value;
@@ -569,7 +593,7 @@ class OperationsHubModule {
       }
     }
 
-    // 3. Filtro en la barra de herramientas
+    // Filtro en la barra de herramientas
     const filterSelect = document.getElementById('hub-filter-service');
     if (filterSelect) {
       const currentVal = filterSelect.value;
@@ -579,23 +603,467 @@ class OperationsHubModule {
     }
   }
 
-  calculateUnifiedTotals() {
-    const fare = parseFloat(document.getElementById('uni-fare-amount')?.value) || 0;
-    const fee = parseFloat(document.getElementById('uni-fee-amount')?.value) || 0;
-    const provCommRate = parseFloat(document.getElementById('uni-prov-comm-rate')?.value) || 0;
+  renderItemsRepeater() {
+    const container = document.getElementById('uni-items-repeater-list');
+    if (!container) return;
 
-    const totalVenta = fare + fee;
-    const provCommAmount = fare * (provCommRate / 100);
+    const data = window.db.get();
+    const serviceTypes = this.getServiceTypes();
+    const providers = (data.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR' || a.type === 'AEROLINEA' || a.type === 'HOTEL');
 
-    const totalVentaEl = document.getElementById('uni-total-sale-preview');
-    const provCommEl = document.getElementById('uni-prov-comm-preview');
-    const utilPreviewEl = document.getElementById('uni-utility-preview');
+    const countBadge = document.getElementById('uni-items-count-badge');
+    if (countBadge) {
+      countBadge.textContent = `${this.activeNdItems.length} Servicio${this.activeNdItems.length > 1 ? 's' : ''}`;
+    }
 
-    if (totalVentaEl) totalVentaEl.textContent = `BOB ${totalVenta.toFixed(2)}`;
-    if (provCommEl) provCommEl.textContent = `BOB ${provCommAmount.toFixed(2)}`;
-    
-    const utilidad = fee + provCommAmount;
-    if (utilPreviewEl) utilPreviewEl.textContent = `BOB ${utilidad.toFixed(2)}`;
+    container.innerHTML = this.activeNdItems.map((item, idx) => {
+      const srvObj = serviceTypes.find(s => (s.code || s.id) === item.serviceType) || { name: item.serviceType, category: 'GENERAL' };
+      const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
+      const provCommAmt = (item.fareAmount || 0) * ((item.providerCommissionRate || 0) / 100);
+      const netCost = isGross ? item.fareAmount : Math.max(0, item.fareAmount - provCommAmt);
+      const lineTotal = item.fareAmount + item.feeAmount;
+
+      return `
+        <div class="item-card" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <!-- Cabecera de Ítem -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span class="badge badge-blue font-bold" style="font-size: 0.8rem;">Servicio #${idx + 1}</span>
+              <strong style="color: #0f2742; font-size: 0.95rem;">${srvObj.name}</strong>
+              <span class="badge badge-slate" style="font-size: 0.72rem;">${srvObj.category || 'SERVICIO'}</span>
+              <span class="badge ${isGross ? 'badge-amber' : 'badge-emerald'}" style="font-size: 0.72rem;">
+                ${isGross ? 'Consolidador Bruto (Comisión Diferida)' : 'Deducción Directa (Neto a Pagar)'}
+              </span>
+            </div>
+            ${this.activeNdItems.length > 1 ? `
+              <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.removeItemFromNd(${idx})" title="Quitar este servicio de la ND" style="display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Quitar Servicio
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Fila 1: Selector de Servicio, Proveedor y Modelo de Liquidación -->
+          <div class="form-row" style="grid-template-columns: 1.2fr 1.2fr 1.6fr; gap: 10px;">
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Tipo de Servicio:</label>
+              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemServiceTypeChange(${idx}, this.value)">
+                ${serviceTypes.map(s => `<option value="${s.code || s.id}" ${(s.code || s.id) === item.serviceType ? 'selected' : ''}>${s.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador Responsable:</label>
+              <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
+                ${providers.map(p => `<option value="${p.id}" ${p.id === item.providerId ? 'selected' : ''}>${p.name} (${p.docNumber || p.code})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación Proveedor:</label>
+              <select class="form-control" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
+                <option value="DEDUCCION_DIRECTA" ${item.settlementModel === 'DEDUCCION_DIRECTA' ? 'selected' : ''}>Deducción Directa (Neto a pagar / Retención inmediata)</option>
+                <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto (Pago tarifa completa + Comisión por cobrar)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Fila 2: Pasajero, Doc y Nro Voucher -->
+          <div class="form-row" style="grid-template-columns: 1.8fr 1fr 1.2fr; gap: 10px; margin-top: 10px;">
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
+              <input type="text" class="form-control font-mono font-bold" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.75rem;">Doc. Identidad / Pasaporte:</label>
+              <input type="text" class="form-control font-mono" placeholder="Ej: 4820192 LP" value="${item.passengerDoc || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerDoc', this.value.toUpperCase())">
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.75rem;">Nro Voucher / Boleto / Reserva:</label>
+              <input type="text" class="form-control font-mono" placeholder="Ej: 930-4581959448 o RES-8841" value="${item.voucherNumber || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'voucherNumber', this.value)">
+            </div>
+          </div>
+
+          <!-- Fila 3: Campos Específicos Personalizados -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 10px;">
+            ${this.renderItemSpecificFieldsHtml(idx, item)}
+          </div>
+
+          <!-- Fila 4: Estructura Financiera e Importes -->
+          <div style="background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 10px;">
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Tarifa Base (BOB):</label>
+                <input type="number" step="0.01" class="form-control font-mono font-bold" value="${item.fareAmount || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right;" required>
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">Fee Agencia (BOB):</label>
+                <input type="number" step="0.01" class="form-control font-mono" value="${item.feeAmount || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'feeAmount', parseFloat(this.value) || 0)" style="text-align: right;">
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.75rem;">% Comis. Prov:</label>
+                <input type="number" step="0.01" class="form-control font-mono" value="${item.providerCommissionRate || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'providerCommissionRate', parseFloat(this.value) || 0)" style="text-align: right;">
+              </div>
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">
+                  Costo Prov. (${isGross ? 'Bruto' : 'Neto'}):
+                </label>
+                <div class="font-mono font-bold" style="padding: 7px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 0.88rem; color: #b91c1c;">
+                  BOB ${netCost.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #0369a1;">Total Ítem (A Cobrar):</label>
+                <div class="font-mono font-bold" style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
+                  BOB ${lineTotal.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  renderItemSpecificFieldsHtml(idx, item) {
+    const srv = (item.serviceType || 'BOLETO_AEREO').toUpperCase();
+    const d = item.serviceDetails || {};
+
+    if (srv === 'BOLETO_AEREO' || srv === 'BOLETO_GDS') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Ruta Aérea (Origen - Destino):</label>
+            <input type="text" class="form-control font-mono font-bold" placeholder="Ej: LPB-VVI-LPB" value="${d.flightRoute || d.route || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRoute', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Código PNR / Localizador:</label>
+            <input type="text" class="form-control font-mono font-bold" placeholder="Ej: AZ44SK" value="${d.pnrCode || d.pnr || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'pnrCode', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha de Salida:</label>
+            <input type="date" class="form-control font-mono" value="${d.flightDepDate || d.departureDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightDepDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha de Retorno:</label>
+            <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'HOTEL') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Hotel / Ciudad:</label>
+            <input type="text" class="form-control" placeholder="Ej: Hotel Ritz / Santa Cruz" value="${d.hotelName || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'hotelName', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Check-in (Entrada):</label>
+            <input type="date" class="form-control font-mono" value="${d.checkIn || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'checkIn', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Check-out (Salida):</label>
+            <input type="date" class="form-control font-mono" value="${d.checkOut || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'checkOut', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Habitación / Régimen:</label>
+            <input type="text" class="form-control" placeholder="Doble Standard c/ Desayuno" value="${d.roomType || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'roomType', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'SEGURO_VIAJE') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Compañía / Plan:</label>
+            <input type="text" class="form-control" placeholder="Ej: Assist Card AC-60 Mundial" value="${d.insurancePlan || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'insurancePlan', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino Cobertura:</label>
+            <input type="text" class="form-control" placeholder="Europa Schengen / Internacional" value="${d.insuranceDestination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'insuranceDestination', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Cobertura Inicio:</label>
+            <input type="date" class="form-control font-mono" value="${d.coverageStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageStartDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Cobertura Fin:</label>
+            <input type="date" class="form-control font-mono" value="${d.coverageEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageEndDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'PAQUETE_TURISTICO' || srv === 'PAQUETE_CRUCERO' || srv === 'PAQUETE_CONCIERTO') {
+      return `
+        <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino / Itinerario / Evento:</label>
+            <input type="text" class="form-control" placeholder="Ej: Cancún Todo Incluido 5D/4N o Crucero Caribe" value="${d.tourDestination || d.destination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourDestination', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Inicio:</label>
+            <input type="date" class="form-control font-mono" value="${d.tourStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourStartDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Fin:</label>
+            <input type="date" class="form-control font-mono" value="${d.tourEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourEndDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'ASESORAMIENTO_VISAS') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">País Solicitado:</label>
+            <input type="text" class="form-control" placeholder="Estados Unidos / España / Canadá" value="${d.visaCountry || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'visaCountry', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Tipo de Visa:</label>
+            <input type="text" class="form-control" placeholder="Turismo B1/B2 o Negocios" value="${d.visaType || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'visaType', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Cita Embajada:</label>
+            <input type="date" class="form-control font-mono" value="${d.appointmentDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'appointmentDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'RENT_A_CAR') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Rentadora / Categoría:</label>
+            <input type="text" class="form-control" placeholder="Hertz / SUV Automática" value="${d.carCategory || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'carCategory', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Retiro:</label>
+            <input type="date" class="form-control font-mono" value="${d.pickUpDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'pickUpDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Devolución:</label>
+            <input type="date" class="form-control font-mono" value="${d.dropOffDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'dropOffDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Concepto Detallado del Servicio:</label>
+            <input type="text" class="form-control" placeholder="Detalle específico del servicio brindado" value="${d.customDetails || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'customDetails', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fechas / Lugar:</label>
+            <input type="text" class="form-control" placeholder="Ciudad, fecha o período" value="${d.customDates || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'customDates', this.value)">
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  onItemFieldChange(index, field, value) {
+    if (!this.activeNdItems[index]) return;
+    this.activeNdItems[index][field] = value;
+    if (field === 'fareAmount' || field === 'feeAmount' || field === 'providerCommissionRate') {
+      this.calculateConsolidatedTotals();
+    }
+  }
+
+  onItemDetailChange(index, key, value) {
+    if (!this.activeNdItems[index]) return;
+    if (!this.activeNdItems[index].serviceDetails) {
+      this.activeNdItems[index].serviceDetails = {};
+    }
+    this.activeNdItems[index].serviceDetails[key] = value;
+  }
+
+  onItemServiceTypeChange(index, newType) {
+    if (!this.activeNdItems[index]) return;
+    this.activeNdItems[index].serviceType = newType;
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
+  onItemProviderChange(index, newProvId) {
+    if (!this.activeNdItems[index]) return;
+    const data = window.db.get();
+    const prov = (data.accounts || []).find(a => a.id === newProvId);
+    this.activeNdItems[index].providerId = newProvId;
+    if (prov) {
+      this.activeNdItems[index].providerName = prov.name;
+      if (prov.settlementModel) {
+        this.activeNdItems[index].settlementModel = prov.settlementModel;
+      }
+    }
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
+  onItemSettlementModelChange(index, newModel) {
+    if (!this.activeNdItems[index]) return;
+    this.activeNdItems[index].settlementModel = newModel;
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
+  calculateConsolidatedTotals() {
+    const data = window.db ? window.db.get() : null;
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
+
+    let totalVentaBob = 0;
+    let totalCostoBob = 0;
+    let totalComisBob = 0;
+
+    const providerMap = {};
+
+    this.activeNdItems.forEach(item => {
+      const fare = parseFloat(item.fareAmount) || 0;
+      const fee = parseFloat(item.feeAmount) || 0;
+      const rate = parseFloat(item.providerCommissionRate) || 0;
+      const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
+
+      const commAmount = fare * (rate / 100);
+      const netCost = isGross ? fare : Math.max(0, fare - commAmount);
+      const lineTotal = fare + fee;
+
+      totalVentaBob += lineTotal;
+      totalCostoBob += netCost;
+      totalComisBob += commAmount;
+
+      const pId = item.providerId || 'PROV_DEFAULT';
+      if (!providerMap[pId]) {
+        const provAcc = (data?.accounts || []).find(a => a.id === pId) || { name: item.providerName || 'Proveedor' };
+        providerMap[pId] = {
+          providerId: pId,
+          providerName: provAcc.name,
+          services: [],
+          totalGross: 0,
+          totalNet: 0,
+          totalComm: 0,
+          settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
+        };
+      }
+      providerMap[pId].services.push(item.serviceType);
+      providerMap[pId].totalGross += fare;
+      providerMap[pId].totalNet += (fare - commAmount);
+      providerMap[pId].totalComm += commAmount;
+      if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
+        providerMap[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
+      }
+    });
+
+    const utilidadBob = totalVentaBob - totalCostoBob;
+    const totalVentaUsd = totalVentaBob / sellRate;
+    const utilidadUsd = utilidadBob / sellRate;
+
+    const elSaleBob = document.getElementById('uni-total-sale-preview');
+    const elSaleUsd = document.getElementById('uni-total-sale-usd-preview');
+    const elCostBob = document.getElementById('uni-total-cost-preview');
+    const elUtilBob = document.getElementById('uni-utility-preview');
+    const elUtilUsd = document.getElementById('uni-utility-usd-preview');
+    const elSummaryTc = document.getElementById('uni-summary-tc');
+
+    if (elSaleBob) elSaleBob.textContent = `BOB ${totalVentaBob.toFixed(2)}`;
+    if (elSaleUsd) elSaleUsd.textContent = `USD ${totalVentaUsd.toFixed(2)}`;
+    if (elCostBob) elCostBob.textContent = `BOB ${totalCostoBob.toFixed(2)}`;
+    if (elUtilBob) elUtilBob.textContent = `BOB ${utilidadBob.toFixed(2)}`;
+    if (elUtilUsd) elUtilUsd.textContent = `USD ${utilidadUsd.toFixed(2)}`;
+    if (elSummaryTc) elSummaryTc.textContent = `${sellRate.toFixed(2)} BOB`;
+
+    // Renderizar Previsualización de Bifurcación de NCs por Proveedor
+    const bifContainer = document.getElementById('uni-bifurcation-preview');
+    if (bifContainer) {
+      const pEntries = Object.values(providerMap);
+      if (pEntries.length === 0) {
+        bifContainer.innerHTML = `<span style="font-size:0.75rem; color:#64748b;">Agregue servicios para ver la bifurcación automática.</span>`;
+      } else {
+        bifContainer.innerHTML = pEntries.map(p => {
+          const isG = (p.settlementModel === 'CONSOLIDADOR_BRUTO');
+          return `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; border: 1px solid #334155;">
+              <span style="color: #e2e8f0;">
+                <strong style="color: #38bdf8;">✓ NC Proveedor: ${p.providerName}</strong>
+                <span style="color: #94a3b8; font-size: 0.72rem; margin-left: 6px;">[${p.services.join(', ')}]</span>
+              </span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="badge ${isG ? 'badge-amber' : 'badge-blue'}" style="font-size: 0.72rem;">
+                  ${isG ? 'Bruto a Pagar: BOB ' + p.totalGross.toFixed(2) : 'Neto a Pagar: BOB ' + p.totalNet.toFixed(2)}
+                </span>
+                ${isG ? `<span class="badge badge-emerald" style="font-size: 0.72rem;">Comisión por Cobrar: BOB ${p.totalComm.toFixed(2)}</span>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  onPaymentTermChange() {
+    const term = document.getElementById('uni-payment-term')?.value || 'AL_CONTADO';
+    const isPaid = (term === 'AL_CONTADO');
+    const wrap = document.getElementById('uni-deposit-account-wrap');
+    const depositSelect = document.getElementById('uni-deposit-account');
+
+    if (wrap) {
+      wrap.style.display = isPaid ? 'block' : 'none';
+    }
+
+    if (isPaid) {
+      if (depositSelect && !depositSelect.value && depositSelect.options.length > 1) {
+        depositSelect.selectedIndex = 1;
+      }
+      this.onDepositAccountChange();
+    } else {
+      // Crédito: No requiere cuenta de cobro inmediata
+      const pill = document.getElementById('uni-account-guard-pill');
+      if (pill) {
+        pill.style.background = '#f1f5f9';
+        pill.style.color = '#475569';
+        pill.innerHTML = `<span>Condición Crédito: Se registrará en Cuentas por Cobrar del cliente.</span>`;
+      }
+      const saveBtn = document.getElementById('btn-save-unified-operation');
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
+  onDepositAccountChange() {
+    const term = document.getElementById('uni-payment-term')?.value;
+    if (term !== 'AL_CONTADO') return;
+
+    const select = document.getElementById('uni-deposit-account');
+    const pill = document.getElementById('uni-account-guard-pill');
+    const saveBtn = document.getElementById('btn-save-unified-operation');
+    const accountId = select?.value;
+
+    if (!accountId) {
+      if (pill) {
+        pill.style.background = '#fef2f2';
+        pill.style.color = '#dc2626';
+        pill.innerHTML = `<span style="display:flex; align-items:center; gap:4px;"><i data-lucide="alert-triangle" style="width:14px;height:14px;"></i> Bloqueo: Seleccione una cuenta financiera activa.</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (saveBtn) saveBtn.disabled = true;
+      return;
+    }
+
+    const account = window.financialGuard ? window.financialGuard.getAccountById(accountId) : null;
+    const check = window.financialGuard ? window.financialGuard.validateAccount(account) : { valid: true };
+
+    if (!check.valid) {
+      if (pill) {
+        pill.style.background = '#fef2f2';
+        pill.style.color = '#dc2626';
+        pill.innerHTML = `<span style="display:flex; align-items:center; gap:4px;"><i data-lucide="alert-octagon" style="width:14px;height:14px;"></i> Bloqueo: ${check.errors[0]}</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (saveBtn) saveBtn.disabled = true;
+    } else {
+      if (pill) {
+        pill.style.background = '#f0fdf4';
+        pill.style.color = '#15803d';
+        pill.innerHTML = `<span style="display:flex; align-items:center; gap:4px;"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> ✓ Cuenta Verificada: ${check.summary}</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (saveBtn) saveBtn.disabled = false;
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -1335,48 +1803,64 @@ class OperationsHubModule {
     if (e && e.preventDefault) e.preventDefault();
 
     const data = window.db.get();
-    const serviceType = document.getElementById('uni-service-type').value;
-    const issueDate = document.getElementById('uni-issue-date').value || new Date().toISOString().split('T')[0];
-    const passengerName = (document.getElementById('uni-pax-name').value || '').trim().toUpperCase();
-    const passengerDoc = (document.getElementById('uni-pax-doc').value || '').trim().toUpperCase();
-    const serviceDetails = this.getServiceSpecificValues(serviceType);
-    let description = (document.getElementById('uni-description').value || '').trim();
-    if (!description) {
-      description = this.getCompiledDescription(serviceType, serviceDetails);
-    }
-    const voucherNumber = (document.getElementById('uni-voucher-number').value || '').trim() || ('EM-' + Date.now().toString().slice(-6));
-    
-    const clientId = document.getElementById('uni-client-select').value;
-    const providerId = document.getElementById('uni-provider-select').value;
+    const clientId = document.getElementById('uni-client-select')?.value;
+    const issueDate = document.getElementById('uni-issue-date')?.value || new Date().toISOString().split('T')[0];
+    const paymentTerm = document.getElementById('uni-payment-term')?.value || 'AL_CONTADO';
+    const isPaid = (paymentTerm === 'AL_CONTADO');
+    const depositAccountId = document.getElementById('uni-deposit-account')?.value;
+    const observations = (document.getElementById('uni-observations')?.value || '').trim();
 
-    if (!passengerName) {
-      window.app.showToast('Debe ingresar el nombre del pasajero o titular', 'warning');
-      return;
-    }
+    // 1. Validar Cliente
     if (!clientId || clientId === '__NEW_CLIENT__') {
-      window.app.showToast('Debe seleccionar un cliente para facturar', 'warning');
+      window.app.showToast('Debe seleccionar un cliente a facturar para registrar la ND', 'warning');
       return;
     }
-    if (!providerId || providerId === '__NEW_PROV__') {
-      window.app.showToast('Debe seleccionar un proveedor u operador responsable', 'warning');
-      return;
-    }
-
-    const fare = parseFloat(document.getElementById('uni-fare-amount').value) || 0;
-    const fee = parseFloat(document.getElementById('uni-fee-amount').value) || 0;
-    const provCommRate = parseFloat(document.getElementById('uni-prov-comm-rate').value) || 0;
-    const provCommAmount = fare * (provCommRate / 100);
-    const netCost = parseFloat(document.getElementById('uni-net-cost').value) || (fare - provCommAmount);
-    const totalVenta = fare + fee;
-    const paymentTerm = document.getElementById('uni-payment-term').value;
-    const depositAccount = document.getElementById('uni-deposit-account').value;
-
     const client = (data.accounts || []).find(a => a.id === clientId) || { name: 'Cliente' };
-    const provider = (data.accounts || []).find(a => a.id === providerId) || { name: 'Proveedor' };
 
-    // Fechas normalizadas para elevación
-    const depDate = serviceDetails.flightDepDate || serviceDetails.checkIn || serviceDetails.tourStartDate || serviceDetails.embarkDate || serviceDetails.concertDate || serviceDetails.appointmentDate || serviceDetails.certDate || serviceDetails.pickUpDate || serviceDetails.coverageStartDate || serviceDetails.customDates || issueDate;
-    const retDate = serviceDetails.flightRetDate || serviceDetails.checkOut || serviceDetails.tourEndDate || serviceDetails.disembarkDate || serviceDetails.dropOffDate || serviceDetails.coverageEndDate || depDate;
+    // 2. Validar que haya al menos 1 ítem
+    if (!this.activeNdItems || this.activeNdItems.length === 0) {
+      window.app.showToast('La Nota de Débito debe incluir al menos un servicio', 'warning');
+      return;
+    }
+
+    // 3. Validar Pasajero y Proveedor en cada ítem
+    for (let i = 0; i < this.activeNdItems.length; i++) {
+      const it = this.activeNdItems[i];
+      if (!it.passengerName || !it.passengerName.trim()) {
+        window.app.showToast(`Servicio #${i + 1}: Ingrese el nombre del pasajero o titular`, 'warning');
+        return;
+      }
+      if (!it.providerId) {
+        window.app.showToast(`Servicio #${i + 1}: Seleccione el proveedor u operador responsable`, 'warning');
+        return;
+      }
+    }
+
+    // 4. Guardrail Estricto de Cuenta Financiera en Contado
+    let validatedFinancialAccount = null;
+    if (isPaid) {
+      if (!depositAccountId) {
+        window.app.showToast('Bloqueo de Seguridad Guardrail: Debe seleccionar una Cuenta Financiera para cobrar al contado.', 'error');
+        return;
+      }
+      validatedFinancialAccount = window.financialGuard ? window.financialGuard.getAccountById(depositAccountId) : null;
+      const check = window.financialGuard ? window.financialGuard.validateAccount(validatedFinancialAccount) : { valid: true };
+      if (!check.valid) {
+        window.app.showToast('Bloqueo de Seguridad: ' + check.summary, 'error');
+        return;
+      }
+    }
+
+    // 5. Tipo de Cambio Oficial Único Congelado (Single Source of Truth)
+    const { sellRate } = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+
+    // 6. Totales Consolidados
+    let totalConsolidadoBob = 0;
+    this.activeNdItems.forEach(it => {
+      totalConsolidadoBob += (parseFloat(it.fareAmount) || 0) + (parseFloat(it.feeAmount) || 0);
+    });
+    totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
+    const totalConsolidadoUsd = parseFloat((totalConsolidadoBob / sellRate).toFixed(2));
 
     // EDICIÓN DE OPERACIÓN EXISTENTE
     if (this.editingOperationId) {
@@ -1387,46 +1871,43 @@ class OperationsHubModule {
         existingNd.accountName = client.name;
         existingNd.accountNit = client.docNumber || '';
         existingNd.paymentTerm = paymentTerm;
-        existingNd.totalAmountBob = totalVenta;
-        existingNd.balanceBob = paymentTerm === 'AL_CONTADO' ? 0 : totalVenta;
-        existingNd.status = paymentTerm === 'AL_CONTADO' ? 'PAGADA' : 'IMPAGA';
-        
-        if (!existingNd.items || existingNd.items.length === 0) existingNd.items = [{}];
-        existingNd.items[0] = {
-          ...existingNd.items[0],
-          serviceType: serviceType,
-          ticketNumber: voucherNumber,
-          passengerName: passengerName,
-          passengerDocId: passengerDoc,
-          operatorId: providerId,
-          operatorName: provider.name,
-          description: description,
-          serviceDetails: serviceDetails,
-          route: serviceDetails.flightRoute || serviceDetails.destination || serviceDetails.cruiseItinerary || '',
-          pnr: serviceDetails.pnrCode || '',
-          departureDate: depDate,
-          returnDate: retDate,
-          fareAmount: fare,
-          feeAmount: fee,
-          totalAmount: totalVenta,
-          providerCommissionRate: provCommRate,
-          providerCommissionAmount: provCommAmount,
-          netCostToProvider: netCost
-        };
+        existingNd.depositAccountId = depositAccountId;
+        existingNd.totalAmountBob = totalConsolidadoBob;
+        existingNd.totalAmountUsd = totalConsolidadoUsd;
+        existingNd.balanceBob = isPaid ? 0 : totalConsolidadoBob;
+        existingNd.balanceUsd = isPaid ? 0 : totalConsolidadoUsd;
+        existingNd.status = isPaid ? 'PAGADA' : 'IMPAGA';
+        existingNd.observations = observations;
 
-        if (existingNd.items[0].gdsTicketId) {
-          const tkt = (data.gdsTickets || []).find(t => t.id === existingNd.items[0].gdsTicketId);
-          if (tkt) {
-            tkt.ticketNumber = voucherNumber;
-            tkt.passengerName = passengerName;
-            tkt.operatorId = providerId;
-            tkt.fareAmount = fare;
-            tkt.feeAmount = fee;
-            tkt.totalAmount = totalVenta;
-            tkt.ticketPrice = fare;
-            tkt.route = serviceDetails.flightRoute || tkt.route;
-          }
-        }
+        existingNd.items = this.activeNdItems.map((it, idx) => {
+          const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
+          const fare = parseFloat(it.fareAmount) || 0;
+          const fee = parseFloat(it.feeAmount) || 0;
+          const provCommRate = parseFloat(it.providerCommissionRate) || 0;
+          const provCommAmount = fare * (provCommRate / 100);
+          const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
+          const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+
+          return {
+            id: it.id || ('NDI-' + Date.now() + '-' + idx),
+            serviceType: it.serviceType,
+            ticketNumber: it.voucherNumber || ('VCH-' + Date.now()),
+            passengerName: it.passengerName,
+            passengerDocId: it.passengerDoc,
+            operatorId: it.providerId,
+            operatorName: prov.name,
+            description: it.description || `${it.serviceType} - ${it.passengerName}`,
+            serviceDetails: it.serviceDetails || {},
+            settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
+            fareAmount: fare,
+            feeAmount: fee,
+            totalAmount: fare + fee,
+            providerCommissionRate: provCommRate,
+            providerCommissionAmount: provCommAmount,
+            netCostToProvider: netCost,
+            currency: 'BOB'
+          };
+        });
 
         window.db.save(data);
         window.app.closeModal('modal-unified-operation');
@@ -1437,41 +1918,76 @@ class OperationsHubModule {
       }
     }
 
-    // CREACIÓN NUEVA OPERACIÓN INTEGRAL
+    // CREACIÓN NUEVA ND CONSOLIDADA
     const nextNdNumber = (data.debitNotes || []).reduce((max, n) => Math.max(max, n.ndNumber || 0), 1000) + 1;
     const newNdId = 'ND-' + Date.now();
-    const itemId = 'NDI-' + Date.now();
 
-    let ticketId = null;
-    if (serviceType === 'BOLETO_AEREO' || serviceType === 'BOLETO_GDS') {
-      ticketId = 'TKT-' + Date.now();
-      data.gdsTickets.push({
-        id: ticketId,
-        ticketNumber: voucherNumber,
-        gdsSource: 'BOLETO_AEREO',
-        counter: '',
-        issueDate: issueDate,
-        passengerName: passengerName,
-        passengerDocId: passengerDoc,
-        route: description || 'VVI-LPB',
-        airlineCode: (provider.code || 'AEREO').substring(0, 4),
-        operatorId: providerId,
+    const mappedItems = this.activeNdItems.map((it, idx) => {
+      const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
+      const fare = parseFloat(it.fareAmount) || 0;
+      const fee = parseFloat(it.feeAmount) || 0;
+      const provCommRate = parseFloat(it.providerCommissionRate) || 0;
+      const provCommAmount = fare * (provCommRate / 100);
+      const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
+      const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+
+      let ticketId = null;
+      if (it.serviceType === 'BOLETO_AEREO' || it.serviceType === 'BOLETO_GDS') {
+        ticketId = 'TKT-' + Date.now() + '-' + idx;
+        data.gdsTickets.push({
+          id: ticketId,
+          ticketNumber: it.voucherNumber || ('TKT-' + Date.now()),
+          gdsSource: 'BOLETO_AEREO',
+          counter: '',
+          issueDate: issueDate,
+          passengerName: it.passengerName,
+          passengerDocId: it.passengerDoc,
+          route: it.serviceDetails?.flightRoute || 'Ruta Aérea',
+          airlineCode: (prov.code || 'AEREO').substring(0, 4),
+          operatorId: it.providerId,
+          fareAmount: fare,
+          ticketPrice: fare,
+          netAmount: netCost,
+          taxAmount: 0,
+          totalAmount: fare,
+          currency: 'BOB',
+          commissionRate: provCommRate,
+          commissionAmount: provCommAmount,
+          feeAmount: fee,
+          totalWithFee: fare + fee,
+          status: 'FACTURADO',
+          createdAt: new Date().toLocaleString()
+        });
+      }
+
+      return {
+        id: 'NDI-' + Date.now() + '-' + idx,
+        serviceType: it.serviceType,
+        gdsTicketId: ticketId,
+        ticketNumber: it.voucherNumber || ('VCH-' + Date.now().toString().slice(-6)),
+        passengerName: it.passengerName,
+        passengerDocId: it.passengerDoc,
+        operatorId: it.providerId,
+        operatorName: prov.name,
+        description: it.description || `${it.serviceType} - ${it.passengerName}`,
+        serviceDetails: it.serviceDetails || {},
+        settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
         fareAmount: fare,
-        ticketPrice: fare,
-        netAmount: netCost,
-        taxAmount: 0,
-        totalAmount: fare,
-        currency: 'BOB',
-        commissionRate: provCommRate,
-        commissionAmount: provCommAmount,
         feeAmount: fee,
-        totalWithFee: totalVenta,
-        status: 'FACTURADO',
-        createdAt: new Date().toLocaleString()
-      });
-    }
+        totalAmount: fare + fee,
+        providerCommissionRate: provCommRate,
+        providerCommissionAmount: provCommAmount,
+        clientCommissionRate: 0,
+        clientCommissionAmount: 0,
+        counterCommissionAmount: 0,
+        netCostToProvider: netCost,
+        currency: 'BOB'
+      };
+    });
 
-    const isPaid = (paymentTerm === 'AL_CONTADO');
+    const firstPax = mappedItems[0]?.passengerName || 'Pasajero';
+    const paxSummary = mappedItems.length > 1 ? `${firstPax} (+${mappedItems.length - 1} servicios)` : firstPax;
+
     const newNd = {
       id: newNdId,
       ndNumber: nextNdNumber,
@@ -1480,122 +1996,142 @@ class OperationsHubModule {
       accountNit: client.docNumber || '',
       requesterId: null,
       solicitante: client.name,
-      passengerName: passengerName,
+      passengerName: paxSummary,
       issueDate: issueDate,
       paymentTerm: paymentTerm,
       currency: 'BOB',
-      totalAmountBob: totalVenta,
-      totalAmountUsd: parseFloat((totalVenta / 6.96).toFixed(2)),
-      paidAmountBob: isPaid ? totalVenta : 0,
-      paidAmountUsd: isPaid ? parseFloat((totalVenta / 6.96).toFixed(2)) : 0,
-      balanceBob: isPaid ? 0 : totalVenta,
-      balanceUsd: isPaid ? 0 : parseFloat((totalVenta / 6.96).toFixed(2)),
+      frozenExchangeRate: sellRate,
+      exchangeRateUsed: sellRate,
+      totalAmountBob: totalConsolidadoBob,
+      totalAmountUsd: totalConsolidadoUsd,
+      paidAmountBob: isPaid ? totalConsolidadoBob : 0,
+      paidAmountUsd: isPaid ? totalConsolidadoUsd : 0,
+      balanceBob: isPaid ? 0 : totalConsolidadoBob,
+      balanceUsd: isPaid ? 0 : totalConsolidadoUsd,
       status: isPaid ? 'PAGADA' : 'IMPAGA',
-      observations: `Operación Integral ${serviceType} | ${description}`,
+      depositAccountId: isPaid ? depositAccountId : null,
+      financialAccountId: isPaid ? depositAccountId : null,
+      observations: observations || `ND Consolidada (${mappedItems.length} servicios)`,
       createdById: 'USR-001',
       createdByName: 'Luis',
-      items: [
-        {
-          id: itemId,
-          serviceType: serviceType,
-          gdsTicketId: ticketId,
-          ticketNumber: voucherNumber,
-          passengerName: passengerName,
-          passengerDocId: passengerDoc,
-          operatorId: providerId,
-          operatorName: provider.name,
-          description: description,
-          serviceDetails: serviceDetails,
-          route: serviceDetails.flightRoute || serviceDetails.destination || serviceDetails.cruiseItinerary || '',
-          pnr: serviceDetails.pnrCode || '',
-          departureDate: depDate,
-          returnDate: retDate,
-          currency: 'BOB',
-          fareAmount: fare,
-          feeAmount: fee,
-          totalAmount: totalVenta,
-          providerCommissionRate: provCommRate,
-          providerCommissionAmount: provCommAmount,
-          clientCommissionRate: 0,
-          clientCommissionAmount: 0,
-          counterCommissionAmount: 0,
-          netCostToProvider: netCost
-        }
-      ],
+      items: mappedItems,
       createdAt: new Date().toLocaleString()
     };
     data.debitNotes.push(newNd);
 
-    if (netCost > 0) {
-      const nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 500) + 1;
-      data.creditNotes.push({
-        id: 'NC-' + Date.now(),
-        ncNumber: nextNcNumber,
-        providerId: providerId,
-        providerName: provider.name,
-        providerNit: provider.docNumber || '',
-        originDebitNoteId: newNdId,
-        originDebitNoteNumber: nextNdNumber,
-        issueDate: issueDate,
-        concept: `Costo Servicio ${serviceType} - Pax: ${passengerName} (ND #${nextNdNumber})`,
-        currency: 'BOB',
-        totalAmount: netCost,
-        paidAmount: 0,
-        balance: netCost,
-        status: 'IMPAGA',
-        isAutoGenerated: true,
-        createdById: 'USR-001',
-        createdAt: new Date().toLocaleString()
-      });
-    }
-
-    if (isPaid) {
+    // Si fue al contado, generar Recibo de Caja Oficial con cuenta verificada y T/C congelado
+    if (isPaid && validatedFinancialAccount) {
+      const nextRcpNum = (data.cashReceipts || []).length + 1;
       data.cashReceipts.push({
         id: 'RCP-' + Date.now(),
-        receiptNumber: (data.cashReceipts || []).length + 1,
+        receiptNumber: nextRcpNum,
         date: issueDate,
         receiptDate: issueDate,
         accountId: clientId,
         accountName: client.name,
         debitNoteId: newNdId,
         debitNoteNumber: nextNdNumber,
-        totalPaidBob: totalVenta,
-        totalPaidUsd: parseFloat((totalVenta / (data.exchangeRate?.sellRate || 6.96)).toFixed(2)),
-        paymentMethod: depositAccount === 'CAJA_EFECTIVO' ? 'EFECTIVO_BOB' : 'TRANSFERENCIA_BANCO',
-        bankAccountId: depositAccount !== 'CAJA_EFECTIVO' ? depositAccount : null,
+        totalPaidBob: totalConsolidadoBob,
+        totalPaidUsd: totalConsolidadoUsd,
+        exchangeRateUsed: sellRate,
+        frozenExchangeRate: sellRate,
+        paymentMethod: validatedFinancialAccount.bankName || validatedFinancialAccount.cashDeskName || 'Cuenta Financiera',
+        financialAccountId: depositAccountId,
+        bankAccountId: depositAccountId,
         status: 'VALIDO',
-        createdById: data.currentUser?.id || 'USR-001',
-        createdByName: data.currentUser?.name || 'Luis (Admin)',
-        notes: `Cobro al Contado Emisión ND #${nextNdNumber} (${serviceType})`,
+        createdById: 'USR-001',
+        createdByName: 'Luis (Admin)',
+        notes: `Cobro Total Contado ND #${nextNdNumber} (${mappedItems.length} servicios)`,
         createdAt: new Date().toLocaleString()
       });
     }
 
-    if (provCommAmount > 0) {
-      data.otherIncomes.push({
-        id: 'INC-' + Date.now(),
-        originType: 'COMISION_PLATAFORMA',
-        ticketId: ticketId,
-        ticketNumber: voucherNumber,
-        operatorId: providerId,
-        operatorName: provider.name,
-        issueDate: issueDate,
-        passengerName: passengerName,
-        route: description || '-',
-        amount: provCommAmount,
-        currency: 'BOB',
-        description: `Comisión Plataforma por ${serviceType} ${voucherNumber} | Proveedor: ${provider.name} | Pax: ${passengerName}`,
-        status: 'IMPAGA',
-        depositAccountId: depositAccount,
-        createdAt: new Date().toLocaleString()
-      });
-    }
+    // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR
+    const providerGroups = {};
+    mappedItems.forEach(item => {
+      const pId = item.operatorId;
+      if (!providerGroups[pId]) {
+        providerGroups[pId] = {
+          providerId: pId,
+          providerName: item.operatorName,
+          items: [],
+          totalGross: 0,
+          totalNet: 0,
+          totalComm: 0,
+          settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
+        };
+      }
+      providerGroups[pId].items.push(item);
+      providerGroups[pId].totalGross += item.fareAmount;
+      providerGroups[pId].totalNet += item.netCostToProvider;
+      providerGroups[pId].totalComm += item.providerCommissionAmount;
+      if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
+        providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
+      }
+    });
+
+    let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 500);
+
+    Object.values(providerGroups).forEach((grp, gIdx) => {
+      nextNcNumber++;
+      const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
+      const provAmount = isGross ? grp.totalGross : grp.totalNet;
+      const provAcc = (data.accounts || []).find(a => a.id === grp.providerId) || {};
+
+      if (provAmount > 0) {
+        data.creditNotes.push({
+          id: 'NC-' + Date.now() + '-' + gIdx,
+          ncNumber: nextNcNumber,
+          providerId: grp.providerId,
+          providerName: grp.providerName,
+          providerNit: provAcc.docNumber || '',
+          originDebitNoteId: newNdId,
+          originDebitNoteNumber: nextNdNumber,
+          issueDate: issueDate,
+          concept: isGross
+            ? `Liquidación Bruta Consolidador por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Proveedor Bruto]`
+            : `Liquidación Directa Neta por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Deducción Directa / Neto]`,
+          currency: 'BOB',
+          frozenExchangeRate: sellRate,
+          settlementModel: grp.settlementModel,
+          totalAmount: parseFloat(provAmount.toFixed(2)),
+          paidAmount: 0,
+          balance: parseFloat(provAmount.toFixed(2)),
+          status: 'IMPAGA',
+          isAutoGenerated: true,
+          createdById: 'USR-001',
+          createdAt: new Date().toLocaleString()
+        });
+      }
+
+      // Si el modelo es Consolidador Bruto y hay comisión, registrarla como Comisión por Cobrar diferida
+      if (isGross && grp.totalComm > 0) {
+        data.otherIncomes.push({
+          id: 'INC-' + Date.now() + '-' + gIdx,
+          originType: 'COMISION_PLATAFORMA',
+          operatorId: grp.providerId,
+          operatorName: grp.providerName,
+          issueDate: issueDate,
+          passengerName: grp.items[0]?.passengerName || 'Pax',
+          route: `Comisión diferida por ND #${nextNdNumber}`,
+          amount: parseFloat(grp.totalComm.toFixed(2)),
+          currency: 'BOB',
+          frozenExchangeRate: sellRate,
+          description: `Comisión por Cobrar a Proveedor Consolidador ${grp.providerName} por ND #${nextNdNumber}`,
+          status: 'IMPAGA',
+          createdAt: new Date().toLocaleString()
+        });
+      }
+    });
 
     window.db.save(data);
     window.app.closeModal('modal-unified-operation');
     this.render();
     window.app.updateDashboardKpis();
-    window.app.showToast(`¡Operación registrada con éxito! ND #${nextNdNumber} emitida.`, 'success');
+    if (window.creditNotesModule) window.creditNotesModule.render();
+
+    const providerCount = Object.keys(providerGroups).length;
+    window.app.showToast(`¡ND #${nextNdNumber} consolidada con éxito (${mappedItems.length} servicios)! Se bifurcaron ${providerCount} Cuentas por Pagar (NCs) a proveedores.`, 'success');
   }
 
   openEditOperationModal(id) {
@@ -1610,36 +2146,53 @@ class OperationsHubModule {
     const modalTitle = document.getElementById('unified-modal-title');
     if (modalTitle) modalTitle.innerHTML = `<i data-lucide="edit-3"></i> Editar Operación Integral (ND #${nd.ndNumber})`;
 
-    this.populateServiceTypeSelects();
     this.populateAccountsSelects();
 
-    const firstItem = (nd.items && nd.items[0]) || {};
-    const srvType = firstItem.serviceType || 'BOLETO_AEREO';
+    const tcBadge = document.getElementById('uni-tc-badge-display');
+    if (tcBadge) {
+      tcBadge.innerHTML = `
+        <span class="badge badge-blue font-mono" style="font-size:0.75rem; font-weight:700;">
+          <i data-lucide="lock"></i> T/C Congelado: 1 USD = ${(nd.frozenExchangeRate || nd.exchangeRateUsed || 6.96).toFixed(2)} BOB
+        </span>
+      `;
+    }
 
-    document.getElementById('uni-service-type').value = srvType;
-    this.renderDynamicServiceFields(srvType, firstItem.serviceDetails || firstItem);
-
-    document.getElementById('uni-issue-date').value = nd.issueDate || '';
-    document.getElementById('uni-pax-name').value = firstItem.passengerName || nd.passengerName || '';
-    document.getElementById('uni-pax-doc').value = firstItem.passengerDocId || '';
-    document.getElementById('uni-description').value = firstItem.description || '';
-    document.getElementById('uni-voucher-number').value = firstItem.ticketNumber || '';
-    
     document.getElementById('uni-client-select').value = nd.accountId || '';
-    document.getElementById('uni-provider-select').value = firstItem.operatorId || '';
-
-    const fare = firstItem.fareAmount || (Number(nd.totalAmountBob) - (firstItem.feeAmount || 0));
-    const fee = firstItem.feeAmount || 0;
-    const provCommRate = firstItem.providerCommissionRate || 0;
-    const netCost = firstItem.netCostToProvider || 0;
-
-    document.getElementById('uni-fare-amount').value = fare;
-    document.getElementById('uni-fee-amount').value = fee;
-    document.getElementById('uni-prov-comm-rate').value = provCommRate;
-    document.getElementById('uni-net-cost').value = netCost;
+    document.getElementById('uni-issue-date').value = nd.issueDate || new Date().toISOString().split('T')[0];
     document.getElementById('uni-payment-term').value = nd.paymentTerm || 'AL_CONTADO';
+    if (document.getElementById('uni-deposit-account')) {
+      document.getElementById('uni-deposit-account').value = nd.depositAccountId || nd.financialAccountId || '';
+    }
+    if (document.getElementById('uni-observations')) {
+      document.getElementById('uni-observations').value = nd.observations || '';
+    }
 
-    this.calculateUnifiedTotals();
+    if (Array.isArray(nd.items) && nd.items.length > 0) {
+      this.activeNdItems = nd.items.map(it => ({
+        id: it.id || ('NDI-' + Date.now()),
+        serviceType: it.serviceType || 'BOLETO_AEREO',
+        providerId: it.operatorId || it.providerId || '',
+        providerName: it.operatorName || it.providerName || '',
+        settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
+        passengerName: it.passengerName || nd.passengerName || '',
+        passengerDoc: it.passengerDocId || it.passengerDoc || '',
+        voucherNumber: it.ticketNumber || it.voucherNumber || '',
+        description: it.description || '',
+        fareAmount: it.fareAmount || it.totalAmount || 0,
+        feeAmount: it.feeAmount || 0,
+        providerCommissionRate: it.providerCommissionRate || 0,
+        serviceDetails: it.serviceDetails || {}
+      }));
+    } else {
+      this.activeNdItems = [ this.createDefaultItem({
+        passengerName: nd.passengerName,
+        fareAmount: nd.totalAmountBob
+      }) ];
+    }
+
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+    this.onPaymentTermChange();
 
     window.app.openModal('modal-unified-operation');
     if (window.lucide) window.lucide.createIcons();

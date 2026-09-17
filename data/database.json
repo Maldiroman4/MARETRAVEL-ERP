@@ -8,8 +8,8 @@
     "agencyEmail": "administracion@maretravel.bo",
     "vatRate": 14.94,
     "gdsLookbackDays": 30,
-    "activeExchangeBuy": 10.15,
-    "activeExchangeSell": 10.15
+    "activeExchangeBuy": 6.86,
+    "activeExchangeSell": 6.96
   },
   "currentUser": {
     "id": "USR-001",
@@ -19,6 +19,33 @@
     "email": "luis@maretravel.bo"
   },
   "exchangeRates": [
+    {
+      "id": "TC-1789652650715",
+      "date": "2026-09-17",
+      "buyRate": 6.86,
+      "sellRate": 6.96,
+      "createdById": "USR-001",
+      "createdByName": "Luis (Admin)",
+      "createdAt": "17/9/2026, 9:44:10"
+    },
+    {
+      "id": "TC-1789652639388",
+      "date": "2026-09-17",
+      "buyRate": 6.86,
+      "sellRate": 6.96,
+      "createdById": "USR-001",
+      "createdByName": "Luis (Admin)",
+      "createdAt": "17/9/2026, 9:43:59"
+    },
+    {
+      "id": "TC-1789651960758",
+      "date": "2026-09-17",
+      "buyRate": 6.86,
+      "sellRate": 6.96,
+      "createdById": "USR-001",
+      "createdByName": "Luis (Admin)",
+      "createdAt": "17/9/2026, 9:32:40"
+    },
     {
       "id": "TC-1789647714388",
       "date": "2026-09-17",
@@ -46,7 +73,8 @@
       "currency": "BOB",
       "type": "COBRANZAS",
       "bankAccount": "-",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-CSH-CENTRAL-BOB-05"
     },
     {
       "id": "PM-02",
@@ -55,7 +83,8 @@
       "currency": "USD",
       "type": "COBRANZAS",
       "bankAccount": "-",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-CSH-CENTRAL-USD-06"
     },
     {
       "id": "PM-03",
@@ -64,7 +93,8 @@
       "currency": "BOB",
       "type": "AMBOS",
       "bankAccount": "Cta. Cte. 100-29384-2",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-BNK-BMSC-01"
     },
     {
       "id": "PM-04",
@@ -73,7 +103,8 @@
       "currency": "BOB",
       "type": "AMBOS",
       "bankAccount": "Cta. Cte. 401-09823-1",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-BNK-BMSC-01"
     },
     {
       "id": "PM-05",
@@ -82,7 +113,8 @@
       "currency": "USD",
       "type": "AMBOS",
       "bankAccount": "Cta. Dólares 029-91823-7",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-BNK-BISA-USD-03"
     },
     {
       "id": "PM-06",
@@ -109,7 +141,8 @@
       "currency": "BOB",
       "type": "AMBOS",
       "bankAccount": "Cta. Cte. 1051-20948-3",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-BNK-GANADERO-02"
     },
     {
       "id": "PM-09",
@@ -118,17 +151,287 @@
       "currency": "USD",
       "type": "AMBOS",
       "bankAccount": "Wallet ID: 89410293 (Pay)",
-      "status": "ACTIVO"
+      "status": "ACTIVO",
+      "financialAccountId": "ACC-DIG-BINANCE-04"
     }
   ],
-  "bankAccounts": [],
-  "accounts": [],
+  "bankAccounts": [
+    {
+      "id": "ACC-BNK-BMSC-01",
+      "bankName": "Banco Mercantil Santa Cruz BMSC",
+      "accountNumber": "401-09823-1",
+      "accountType": "CORRIENTE",
+      "currency": "BOB",
+      "titularName": "MARETRAVEL S.R.L.",
+      "isActive": true,
+      "createdAt": "16/9/2026, 10:00:00",
+      "updatedAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-BNK-GANADERO-02",
+      "bankName": "Banco Ganadero S.A.",
+      "accountNumber": "1051-20948-3",
+      "accountType": "CORRIENTE",
+      "currency": "BOB",
+      "titularName": "MARETRAVEL S.R.L.",
+      "isActive": true,
+      "createdAt": "16/9/2026, 10:00:00",
+      "updatedAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-BNK-BISA-USD-03",
+      "bankName": "Banco Bisa S.A.",
+      "accountNumber": "029-91823-7",
+      "accountType": "CORRIENTE",
+      "currency": "USD",
+      "titularName": "MARETRAVEL S.R.L.",
+      "isActive": true,
+      "createdAt": "16/9/2026, 10:00:00",
+      "updatedAt": "16/9/2026, 10:00:00"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "ACC-001",
+      "code": "CLI-001",
+      "name": "MINERA SAN CRISTOBAL S.A.",
+      "commercialName": "Minera San Cristóbal",
+      "relationType": "CLIENTE",
+      "docType": "NIT",
+      "docNumber": "1029384021",
+      "email": "facturacion@minerasancristobal.com",
+      "phone": "2798000",
+      "address": "Calacoto Calle 15 #8024, La Paz",
+      "creditLimitBob": 150000,
+      "creditDays": 30,
+      "balanceBob": 0,
+      "balanceUsd": 0,
+      "status": "ACTIVO",
+      "createdAt": "16/9/2026, 12:00:00"
+    },
+    {
+      "id": "ACC-002",
+      "code": "CLI-002",
+      "name": "BANCO SOLIDARIO S.A. (BANCOSOL)",
+      "commercialName": "BancoSol",
+      "relationType": "CLIENTE",
+      "docType": "NIT",
+      "docNumber": "1002938491",
+      "email": "viajes@bancosol.com.bo",
+      "phone": "2435000",
+      "address": "Calle Nicolás Acosta #289, San Pedro, La Paz",
+      "creditLimitBob": 80000,
+      "creditDays": 15,
+      "balanceBob": 0,
+      "balanceUsd": 0,
+      "status": "ACTIVO",
+      "createdAt": "16/9/2026, 12:00:00"
+    },
+    {
+      "id": "ACC-003",
+      "code": "PRV-001",
+      "name": "BOLIVIANA DE AVIACION (BoA)",
+      "commercialName": "BoA",
+      "relationType": "PROVEEDOR",
+      "docType": "NIT",
+      "docNumber": "154829028",
+      "email": "agencias@boa.bo",
+      "phone": "800-10-3010",
+      "address": "Av. Simón López #1582, Cochabamba",
+      "settlementModel": "DEDUCCION_DIRECTA",
+      "balanceBob": 0,
+      "status": "ACTIVO",
+      "createdAt": "16/9/2026, 12:00:00"
+    },
+    {
+      "id": "ACC-004",
+      "code": "PRV-002",
+      "name": "BOOKING.COM B.V. (HOTELES)",
+      "commercialName": "Booking.com",
+      "relationType": "PROVEEDOR",
+      "docType": "NIT",
+      "docNumber": "998201948",
+      "email": "partners@booking.com",
+      "phone": "+31 20 709 1000",
+      "address": "Herengracht 597, Amsterdam",
+      "settlementModel": "CONSOLIDADOR_BRUTO",
+      "balanceBob": 0,
+      "status": "ACTIVO",
+      "createdAt": "16/9/2026, 12:00:00"
+    },
+    {
+      "id": "ACC-005",
+      "code": "PRV-003",
+      "name": "ASSIST CARD BOLIVIA S.A.",
+      "commercialName": "Assist Card",
+      "relationType": "PROVEEDOR",
+      "docType": "NIT",
+      "docNumber": "1029482019",
+      "email": "emisiones@assistcard.bo",
+      "phone": "2440011",
+      "address": "Av. Arce Edif Multicentro Torre B, La Paz",
+      "settlementModel": "DEDUCCION_DIRECTA",
+      "balanceBob": 0,
+      "status": "ACTIVO",
+      "createdAt": "16/9/2026, 12:00:00"
+    }
+  ],
   "accountHistory": [],
   "companyContacts": [],
   "gdsTickets": [],
-  "debitNotes": [],
-  "creditNotes": [],
-  "cashReceipts": [],
+  "debitNotes": [
+    {
+      "id": "ND-TEST-1789652650721",
+      "ndNumber": 4001,
+      "accountId": "ACC-001",
+      "accountName": "MINERA SAN CRISTOBAL S.A.",
+      "accountCode": "CLI-001",
+      "solicitante": "GERENCIA GENERAL TEST",
+      "issueDate": "2026-09-17",
+      "issueTime": "11:00",
+      "currency": "BOB",
+      "frozenExchangeRate": 6.96,
+      "exchangeRateUsed": 6.96,
+      "paymentTerm": "CREDITO_15",
+      "depositAccountId": "ACC-BNK-BMSC-01",
+      "items": [
+        {
+          "id": "ITM-1",
+          "serviceType": "BOLETO_AEREO",
+          "description": "Vuelo VVI-LPB-VVI BOA",
+          "providerId": "ACC-003",
+          "providerName": "BOLIVIANA DE AVIACION (BoA)",
+          "netFare": 1400,
+          "agencyFee": 100,
+          "subtotal": 1500,
+          "currency": "BOB",
+          "settlementModel": "CONSOLIDADOR_BRUTO",
+          "serviceDetails": {
+            "flightRoute": "VVI-LPB-VVI",
+            "pnrCode": "AZ77SK",
+            "travelDates": "DEL 20/09/2026 AL 25/09/2026"
+          }
+        },
+        {
+          "id": "ITM-2",
+          "serviceType": "HOTEL",
+          "description": "Hotel Los Tajibos 3 Noches",
+          "providerId": "ACC-003",
+          "providerName": "BOLIVIANA DE AVIACION (BoA)",
+          "netFare": 1200,
+          "agencyFee": 80,
+          "subtotal": 1280,
+          "currency": "BOB",
+          "settlementModel": "DEDUCCION_DIRECTA",
+          "serviceDetails": {
+            "hotelName": "Los Tajibos Hotel",
+            "hotelCity": "Santa Cruz",
+            "checkIn": "2026-09-20",
+            "checkOut": "2026-09-23"
+          }
+        }
+      ],
+      "totalAmountBob": 2780,
+      "totalAmountUsd": 399.43,
+      "balanceBob": 0,
+      "balanceUsd": 0,
+      "paidAmountBob": 2780,
+      "paidAmountUsd": 399.43,
+      "status": "PAGADA",
+      "observations": "ND Multi-Servicio de prueba E2E (Vuelo BOA + Hotel Tajibos)"
+    }
+  ],
+  "creditNotes": [
+    {
+      "id": "NC-TEST-1789652650722-1",
+      "ncNumber": 7001,
+      "providerId": "ACC-003",
+      "providerName": "BOLIVIANA DE AVIACION (BoA)",
+      "originDebitNoteId": "ND-TEST-1789652650721",
+      "originDebitNoteNumber": 4001,
+      "issueDate": "2026-09-17",
+      "concept": "BOA: Vuelo VVI-LPB-VVI (Consolidador Bruto)",
+      "currency": "BOB",
+      "settlementModel": "CONSOLIDADOR_BRUTO",
+      "grossAmount": 1400,
+      "commissionAmount": 100,
+      "totalAmount": 1400,
+      "paidAmount": 0,
+      "balance": 1400,
+      "status": "IMPAGA",
+      "frozenExchangeRate": 6.96,
+      "isAutoGenerated": true
+    },
+    {
+      "id": "NC-TEST-1789652650722-2",
+      "ncNumber": 7002,
+      "providerId": "ACC-003",
+      "providerName": "BOLIVIANA DE AVIACION (BoA)",
+      "originDebitNoteId": "ND-TEST-1789652650721",
+      "originDebitNoteNumber": 4001,
+      "issueDate": "2026-09-17",
+      "concept": "Hotel Los Tajibos 3 Noches (Deducción Directa)",
+      "currency": "BOB",
+      "settlementModel": "DEDUCCION_DIRECTA",
+      "netCost": 1200,
+      "totalAmount": 1200,
+      "paidAmount": 1200,
+      "balance": 0,
+      "status": "PAGADA",
+      "frozenExchangeRate": 6.96,
+      "isAutoGenerated": true
+    }
+  ],
+  "cashReceipts": [
+    {
+      "id": "CR-TEST-2",
+      "receiptNumber": 2002,
+      "receiptCode": "RCP-02002",
+      "accountId": "ACC-001",
+      "accountName": "MINERA SAN CRISTOBAL S.A.",
+      "paymentType": "TOTAL",
+      "totalPaidBob": 1780,
+      "totalPaidUsd": 255.75,
+      "remainingBalanceBob": 0,
+      "exchangeRateUsed": 6.96,
+      "frozenExchangeRate": 6.96,
+      "status": "VALIDO",
+      "payments": [
+        {
+          "financialAccountId": "ACC-BNK-GAN-02",
+          "paymentMethodName": "Banco Ganadero - Cta. 1051-20948-3 (MARETRAVEL S.R.L.)",
+          "currency": "BOB",
+          "amount": 1780,
+          "exchangeRateUsed": 6.96,
+          "reference": "Transf. Test Final #002"
+        }
+      ]
+    },
+    {
+      "id": "CR-TEST-1",
+      "receiptNumber": 2001,
+      "receiptCode": "RCP-02001",
+      "accountId": "ACC-001",
+      "accountName": "MINERA SAN CRISTOBAL S.A.",
+      "paymentType": "PARCIAL",
+      "totalPaidBob": 1000,
+      "totalPaidUsd": 143.68,
+      "remainingBalanceBob": 1780,
+      "exchangeRateUsed": 6.96,
+      "frozenExchangeRate": 6.96,
+      "status": "VALIDO",
+      "payments": [
+        {
+          "financialAccountId": "ACC-BNK-BMSC-01",
+          "paymentMethodName": "Banco Mercantil Santa Cruz BMSC - Cta. 401-09823-1 (MARETRAVEL S.R.L.)",
+          "currency": "BOB",
+          "amount": 1000,
+          "exchangeRateUsed": 6.96,
+          "reference": "Transf. Test #001"
+        }
+      ]
+    }
+  ],
   "cashTransactions": [],
   "expenses": [],
   "travelReminders": [],
@@ -195,6 +498,99 @@
       "code": "OTRO",
       "name": "OTRO SERVICIO",
       "category": "VARIOS"
+    }
+  ],
+  "financialAccounts": [
+    {
+      "id": "ACC-BNK-BMSC-01",
+      "type": "BANCO",
+      "bankName": "Banco Mercantil Santa Cruz BMSC",
+      "accountNumber": "401-09823-1",
+      "accountType": "CORRIENTE",
+      "titularName": "MARETRAVEL S.R.L.",
+      "currency": "BOB",
+      "isActive": true,
+      "currentBalance": 45200,
+      "createdAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-BNK-GANADERO-02",
+      "type": "BANCO",
+      "bankName": "Banco Ganadero S.A.",
+      "accountNumber": "1051-20948-3",
+      "accountType": "CORRIENTE",
+      "titularName": "MARETRAVEL S.R.L.",
+      "currency": "BOB",
+      "isActive": true,
+      "currentBalance": 32850.5,
+      "createdAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-BNK-BISA-USD-03",
+      "type": "BANCO",
+      "bankName": "Banco Bisa S.A.",
+      "accountNumber": "029-91823-7",
+      "accountType": "CORRIENTE",
+      "titularName": "MARETRAVEL S.R.L.",
+      "currency": "USD",
+      "isActive": true,
+      "currentBalance": 12400,
+      "createdAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-DIG-BINANCE-04",
+      "type": "BINANCE",
+      "bankName": "Binance Pay / P2P",
+      "accountNumber": "89410293",
+      "binanceId": "89410293",
+      "walletAddress": "0x89410293MareTravelPayWallet",
+      "titularName": "MARETRAVEL CRYPTO SRL",
+      "currency": "USDT",
+      "isActive": true,
+      "currentBalance": 8500,
+      "createdAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-CSH-CENTRAL-BOB-05",
+      "type": "EFECTIVO",
+      "bankName": "Caja Central Oficina General",
+      "cashDeskName": "Caja General Oficina Central BOB",
+      "accountNumber": "CAJA-BOB-01",
+      "custodianName": "Luis (Cajero Principal)",
+      "titularName": "MARETRAVEL S.R.L. (Custodio: Luis)",
+      "currency": "BOB",
+      "isActive": true,
+      "currentBalance": 5000,
+      "createdAt": "16/9/2026, 10:00:00"
+    },
+    {
+      "id": "ACC-CSH-CENTRAL-USD-06",
+      "type": "EFECTIVO",
+      "bankName": "Caja Central Oficina Dólares",
+      "cashDeskName": "Caja General Oficina Central USD",
+      "accountNumber": "CAJA-USD-01",
+      "custodianName": "Luis (Cajero Principal)",
+      "titularName": "MARETRAVEL S.R.L. (Custodio: Luis)",
+      "currency": "USD",
+      "isActive": true,
+      "currentBalance": 2100,
+      "createdAt": "16/9/2026, 10:00:00"
+    }
+  ],
+  "providerPayments": [
+    {
+      "id": "PPR-TEST-1",
+      "receiptNumber": 8001,
+      "receiptCode": "OP-08001",
+      "providerId": "ACC-003",
+      "providerName": "BOLIVIANA DE AVIACION (BoA)",
+      "totalPaid": 1200,
+      "currency": "BOB",
+      "financialAccountId": "ACC-BNK-BMSC-01",
+      "financialAccountName": "Banco Mercantil Santa Cruz BMSC - Cta. 401-09823-1",
+      "exchangeRateUsed": 6.96,
+      "frozenExchangeRate": 6.96,
+      "status": "VALIDO"
     }
   ]
 }

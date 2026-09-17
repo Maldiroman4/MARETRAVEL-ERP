@@ -1885,14 +1885,17 @@ window.debitNotesModule = {
       }).join('<div class="nd-item-subdivider"></div>');
     }
 
+    // Tipo de cambio congelado al emitir
+    const tcUsed = nd.frozenExchangeRate || nd.exchangeRateUsed || (data.systemSettings ? data.systemSettings.activeExchangeSell : 6.96) || 6.96;
+
     // Totales
     let totalUsdFormatted = '0.00';
     let totalBobFormatted = '0.00';
     if (nd.currency === 'USD') {
-      totalUsdFormatted = Number(nd.totalAmountUsd || (nd.totalAmountBob / 6.96)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      totalUsdFormatted = Number(nd.totalAmountUsd || (nd.totalAmountBob / tcUsed)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       totalBobFormatted = Number(nd.totalAmountBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } else {
-      totalUsdFormatted = '0.00';
+      totalUsdFormatted = Number(nd.totalAmountBob / tcUsed).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       totalBobFormatted = Number(nd.totalAmountBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
@@ -1903,6 +1906,34 @@ window.debitNotesModule = {
     } else {
       obsText = (nd.observations || (nd.items && nd.items[0] && nd.items[0].description) || 'BOLETO AEREO NAL').toUpperCase();
     }
+
+    // Información de cuenta bancaria/financiera para el comprobante
+    let depositInfoHtml = '';
+    if (nd.depositAccountId) {
+      let acc = null;
+      if (window.financialGuard) acc = window.financialGuard.getAccountById(nd.depositAccountId);
+      if (!acc && data.financialAccounts) acc = data.financialAccounts.find(a => a.id === nd.depositAccountId);
+      if (!acc && data.bankAccounts) acc = data.bankAccounts.find(a => a.id === nd.depositAccountId);
+      if (acc) {
+        const accSummary = acc.type === 'BANCO' ? `${acc.bankName} - Cta. ${acc.accountNumber} (${acc.currency}) [Titular: ${acc.titularName}]` :
+                           acc.type === 'BINANCE' ? `Binance Pay ID: ${acc.binanceId || acc.walletAddress} (${acc.currency})` :
+                           `${acc.cashDeskName || 'Caja Central'} (${acc.currency})`;
+        depositInfoHtml = `
+          <div style="margin-top: 6px; font-size: 0.76rem; color: #1e293b; background: #f0fdf4; padding: 4px 8px; border-radius: 4px; border: 1px solid #bbf7d0;">
+            <strong style="color: #15803d;">Cuenta de Cobro Asignada:</strong> ${accSummary}
+          </div>
+        `;
+      }
+    }
+
+    // Cuentas oficiales autorizadas para depósito del cliente
+    const activeBankAccounts = (data.financialAccounts || []).filter(a => a.isActive !== false && a.type === 'BANCO').slice(0, 3);
+    const bankListText = activeBankAccounts.map(b => `<strong>${b.bankName}:</strong> ${b.accountNumber} (${b.currency})`).join(' &nbsp;|&nbsp; ');
+    const bankListHtml = bankListText ? `
+      <div style="margin-top: 5px; font-size: 0.72rem; color: #475569; background: #f8fafc; padding: 4px 8px; border-radius: 4px; border: 1px dashed #cbd5e1;">
+        <span style="color: #0369a1; font-weight: 700;">Cuentas Bancarias Habilitadas para Depósito:</span> ${bankListText}
+      </div>
+    ` : '';
 
     return `
       <div class="nd-official-container">
@@ -1932,6 +1963,10 @@ window.debitNotesModule = {
               <tr>
                 <td class="nd-lbl-cell">Empresa/Cliente :</td>
                 <td class="nd-val-cell font-bold">${clientNameUpper}</td>
+              </tr>
+              <tr>
+                <td class="nd-lbl-cell">T/C Aplicado :</td>
+                <td class="nd-val-cell font-mono font-bold" style="color: #047857;">1 USD = ${Number(tcUsed).toFixed(2)} BOB (Fijado)</td>
               </tr>
             </table>
           </div>
@@ -1983,6 +2018,8 @@ window.debitNotesModule = {
             <span class="nd-obs-badge">Observaciones ND:</span>
             <span class="nd-obs-content font-bold">${obsText}</span>
           </div>
+          ${depositInfoHtml}
+          ${bankListHtml}
         </div>
 
         <!-- 4. FIRMAS -->
