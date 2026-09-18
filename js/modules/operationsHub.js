@@ -188,6 +188,12 @@ class OperationsHubModule {
       panel.style.display = 'none';
     });
 
+    // Control del botón "+ Nueva Emisión" (ocultar en Caja - Cobranzas ya que es redundante)
+    const btnEmision = document.getElementById('hub-btn-nueva-emision');
+    if (btnEmision) {
+      btnEmision.style.display = (tabName === 'cash') ? 'none' : 'inline-flex';
+    }
+
     if (tabName === 'nds' || tabName === 'all') {
       const activePanel = document.getElementById('hub-panel-all');
       if (activePanel) {

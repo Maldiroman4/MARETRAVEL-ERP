@@ -6,7 +6,7 @@
   <title>MARETRAVEL - Sistema ERP Contable y Comercial</title>
   <!-- BUILD: v20260917-TABS4 -->
   <!-- Estilos y Tipografía -->
-  <link rel="stylesheet" href="css/style.css?v=20260917_v2">
+  <link rel="stylesheet" href="css/style.css?v=20260917_v3">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js para Gráficos Estadísticos (Local) -->
@@ -456,425 +456,67 @@
             <!-- PANEL 5: DIRECTORIO DE CUENTAS -->
             <div id="hub-panel-accounts" class="hub-tab-panel" style="display: none;"></div>
 
-            <!-- PANEL: CAJA, COBRANZAS, NDs Y NCs (INTEGRACIÓN TOTAL) -->
+            <!-- PANEL: CAJA & COBRANZAS (HISTORIAL DE IMPRIMIBLES ND & NC) -->
             <div id="hub-panel-cash" class="hub-tab-panel" style="display: none;">
-              <!-- Sub-tabs de Caja -->
-              <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 8px; flex-wrap: wrap;">
-                <button type="button" class="btn btn-primary cash-tab-btn active" data-tab="cobranzas">
-                  <i data-lucide="file-spreadsheet"></i> Notas de Débito (ND) &amp; Cobranzas
-                </button>
-                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="pagos">
-                  <i data-lucide="file-minus-2"></i> Notas de Crédito (NC) &amp; Liquidaciones
-                </button>
-                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="historial">
-                  <i data-lucide="receipt"></i> Historial de Recibos &amp; Reversión
-                </button>
-                <button type="button" class="btn btn-secondary cash-tab-btn" data-tab="arqueo">
-                  <i data-lucide="wallet"></i> Arqueo Diario de Caja
-                </button>
-              </div>
-
-              <!-- SUB-VIEW 1: NOTAS DE DÉBITO (ND) & COBRANZAS -->
-              <div id="cash-view-cobranzas" class="cash-subview">
-                <!-- Barra de Navegación Interna y Acciones Rápidas de ND -->
-                <div class="card" style="padding: 12px 16px; margin-bottom: 14px; background: #fff;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div style="display: flex; gap: 8px;">
-                      <button type="button" class="btn btn-primary btn-sm nd-subview-toggle active" data-subview="collection" onclick="window.cashRegisterModule.switchNdSubView('collection')">
-                        <i data-lucide="dollar-sign"></i> Cobranza a Clientes
-                      </button>
-                      <button type="button" class="btn btn-secondary btn-sm nd-subview-toggle" data-subview="history" onclick="window.cashRegisterModule.switchNdSubView('history')">
-                        <i data-lucide="list"></i> Historial de Notas de Débito (<span id="cash-nd-badge">0</span>)
-                      </button>
-                    </div>
-                    <div>
-                      <button type="button" class="btn btn-primary btn-sm" onclick="window.debitNotesModule.openNewModal()" style="font-weight: 700; box-shadow: 0 3px 8px rgba(0, 174, 239, 0.3);">
-                        <i data-lucide="plus-circle"></i> + Nueva Nota de Débito
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- SECCIÓN 1A: COBRANZAS A CLIENTES (MULTIMONEDA) -->
-                <div id="nd-subview-collection" class="nd-subview-panel">
-                  <div class="card">
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                      <div class="card-title">
-                        <i data-lucide="dollar-sign"></i> Cobranza de Notas de Débito (Cobro Multimoneda Mixto)
-                      </div>
-                      <div id="cash-tc-badge-cobranzas"></div>
-                    </div>
-
-                    <!-- Selector de Cliente -->
-                    <div class="form-group">
-                      <label class="form-label">Seleccione el Cliente a Cobrar:</label>
-                      <select id="cash-client-select" class="form-control" style="font-size: 1rem; font-weight: 600;">
-                        <!-- Dinámico -->
-                      </select>
-                    </div>
-
-                    <!-- Tabla de NDs pendientes del cliente -->
-                    <div style="margin: 16px 0;">
-                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Notas de Débito Pendientes de Pago:</label>
-                      <div class="table-container">
-                        <table class="erp-table">
-                          <thead>
-                            <tr>
-                              <th style="width: 40px; text-align: center;">Sel.</th>
-                              <th>Nro ND</th>
-                              <th>Emisión</th>
-                              <th style="text-align: right;">Total ND</th>
-                              <th style="text-align: right;">Saldo Actual</th>
-                              <th style="text-align: right;">Importe a Amortizar (BOB)</th>
-                              <th>Estado</th>
-                            </tr>
-                          </thead>
-                          <tbody id="client-pending-nds-table-body">
-                            <tr>
-                              <td colspan="7" style="text-align:center; padding: 20px; color: var(--text-muted);">
-                                Selecciona un cliente arriba para ver sus deudas pendientes.
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <!-- Formas de Pago Mixtas -->
-                    <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin: 20px 0;">
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <label class="form-label" style="font-weight: 700; color: var(--navy); margin-bottom: 0;">
-                          Desglose de Formas de Pago (Soporte Multimoneda Mixto BOB / USD):
-                        </label>
-                        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-payment-method-row">
-                          <i data-lucide="plus"></i> Añadir Forma de Pago
-                        </button>
-                      </div>
-
-                      <div id="payment-methods-breakdown-list">
-                        <!-- Dinámico -->
-                      </div>
-
-                      <!-- Resumen de Cuadre de Cobranza -->
-                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed #cbd5e1;">
-                        <div>
-                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">TOTAL DEUDA SELECCIONADA:</span>
-                          <div id="sum-total-nds-bob" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: var(--navy);">BOB 0.00</div>
-                        </div>
-                        <div>
-                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">TOTAL MEDIOS DE PAGO (BOB):</span>
-                          <div id="sum-total-entered-bob" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: #0369a1;">BOB 0.00</div>
-                        </div>
-                        <div>
-                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">EQUIVALENTE EN USD:</span>
-                          <div id="sum-total-entered-usd" class="font-mono" style="font-size: 1.1rem; font-weight: 800; color: #0369a1;">USD 0.00</div>
-                        </div>
-                        <div>
-                          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">ESTADO / SALDO RESTANTE:</span>
-                          <div id="sum-diff-bob" class="font-mono" style="font-size: 1.05rem; font-weight: 800; color: #15803d;">CUADRADO (0.00)</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Botón Finalizar Cobro -->
-                    <div style="text-align: right;">
-                      <button type="button" class="btn btn-primary" id="btn-process-collection" style="padding: 12px 24px; font-size: 0.95rem;">
-                        <i data-lucide="check-circle-2"></i> Procesar Cobro y Emitir Recibo Oficial
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- SECCIÓN 1B: HISTORIAL COMPLETO DE NOTAS DE DÉBITO -->
-                <div id="nd-subview-history" class="nd-subview-panel" style="display: none;">
-                  <div class="card">
-                    <div class="card-header">
-                      <div class="card-title">
-                        <i data-lucide="file-spreadsheet"></i> Historial Completo de Notas de Débito (Cuentas por Cobrar)
-                      </div>
-                    </div>
-
-                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-                      <div style="flex: 2; min-width: 240px;">
-                        <input type="text" id="cash-nd-search-input" class="form-control" placeholder="Buscar por Nro ND, Cliente o Solicitante..." oninput="window.cashRegisterModule.renderNdHistory()">
-                      </div>
-                      <div style="flex: 1; min-width: 180px;">
-                        <select id="cash-nd-status-filter" class="form-control" onchange="window.cashRegisterModule.renderNdHistory()">
-                          <option value="TODOS">Todos los Estados</option>
-                          <option value="IMPAGA">IMPAGA</option>
-                          <option value="PARCIAL">PARCIAL</option>
-                          <option value="PAGADA">PAGADA</option>
-                          <option value="CERRADA">CERRADA</option>
-                          <option value="BORRADOR">BORRADOR</option>
-                          <option value="ANULADA">ANULADA</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class="table-container">
-                      <table class="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Nro ND</th>
-                            <th>Emisión</th>
-                            <th>Cliente / Solicitante</th>
-                            <th>Plazo</th>
-                            <th style="text-align: right;">Total Facturado</th>
-                            <th style="text-align: right;">Saldo Exigible</th>
-                            <th>Estado</th>
-                            <th>Ítems</th>
-                            <th style="text-align: center;">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody id="cash-nd-history-table-body">
-                          <!-- Dinámico -->
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- SUB-VIEW 2: NOTAS DE CRÉDITO (NC) & LIQUIDACIONES -->
-              <div id="cash-view-pagos" class="cash-subview" style="display: none;">
-                <!-- Barra de Navegación Interna y Acciones Rápidas de NC -->
-                <div class="card" style="padding: 12px 16px; margin-bottom: 14px; background: #fff;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div style="display: flex; gap: 8px;">
-                      <button type="button" class="btn btn-primary btn-sm nc-subview-toggle active" data-subview="payment" onclick="window.cashRegisterModule.switchNcSubView('payment')">
-                        <i data-lucide="arrow-up-circle"></i> Liquidación a Proveedores
-                      </button>
-                      <button type="button" class="btn btn-secondary btn-sm nc-subview-toggle" data-subview="history" onclick="window.cashRegisterModule.switchNcSubView('history')">
-                        <i data-lucide="list"></i> Historial de Notas de Crédito (<span id="cash-nc-badge">0</span>)
-                      </button>
-                    </div>
-                    <div>
-                      <button type="button" class="btn btn-primary btn-sm" onclick="window.creditNotesModule.openNewModal()" style="font-weight: 700; box-shadow: 0 3px 8px rgba(0, 174, 239, 0.3);">
-                        <i data-lucide="plus-circle"></i> + Registrar NC Manual
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- SECCIÓN 2A: LIQUIDACIÓN A PROVEEDORES -->
-                <div id="nc-subview-payment" class="nc-subview-panel">
-                  <div class="card">
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                      <div class="card-title">
-                        <i data-lucide="arrow-up-circle"></i> Pago y Liquidación de Notas de Crédito a Proveedores
-                      </div>
-                      <div id="cash-tc-badge-pagos"></div>
-                    </div>
-
-                    <div class="form-group">
-                      <label class="form-label">Seleccione el Proveedor / Aerolínea:</label>
-                      <select id="cash-prov-select" class="form-control" style="font-size: 1rem; font-weight: 600;">
-                        <!-- Dinámico -->
-                      </select>
-                    </div>
-
-                    <div style="margin: 16px 0;">
-                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Notas de Crédito Pendientes de Liquidación:</label>
-                      <div class="table-container">
-                        <table class="erp-table">
-                          <thead>
-                            <tr>
-                              <th style="width: 40px; text-align: center;">Sel.</th>
-                              <th>Nro NC</th>
-                              <th>Fecha</th>
-                              <th>Concepto / Origen</th>
-                              <th style="text-align: right;">Total NC</th>
-                              <th style="text-align: right;">Saldo Pendiente</th>
-                              <th style="text-align: right;">Monto a Liquidar</th>
-                            </tr>
-                          </thead>
-                          <tbody id="provider-pending-ncs-table-body">
-                            <!-- Dinámico -->
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div class="form-row" style="margin-top: 16px; background: #f8fafc; padding: 16px; border-radius: 8px;">
-                      <div>
-                        <label class="form-label">Cuenta de Origen / Medio de Pago (Obligatorio Cuenta Activa):</label>
-                        <select id="prov-payment-method-select" class="form-control" onchange="window.cashRegisterModule.onProvAccountChange()">
-                          <!-- Solo cuentas financieras activas -->
-                        </select>
-                        <div id="prov-account-guard-pill" style="margin-top: 6px; font-size: 0.8rem;"></div>
-                      </div>
-                      <div>
-                        <label class="form-label">Nro de Referencia / Transferencia Bancaria:</label>
-                        <input type="text" id="prov-pay-ref" class="form-control" placeholder="Ej: Transf. BNB #9201948">
-                      </div>
-                    </div>
-
-                    <div style="text-align: right; margin-top: 16px;">
-                      <button type="button" class="btn btn-primary" id="btn-process-prov-payment" style="padding: 12px 24px;">
-                        <i data-lucide="check"></i> Confirmar Pago a Proveedor
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- SECCIÓN 2B: HISTORIAL COMPLETO DE NOTAS DE CRÉDITO -->
-                <div id="nc-subview-history" class="nc-subview-panel" style="display: none;">
-                  <div class="card">
-                    <div class="card-header">
-                      <div class="card-title">
-                        <i data-lucide="file-minus-2"></i> Historial Completo de Notas de Crédito (Cuentas por Pagar)
-                      </div>
-                    </div>
-
-                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-                      <div style="flex: 2; min-width: 240px;">
-                        <input type="text" id="cash-nc-search-input" class="form-control" placeholder="Buscar por Nro NC, Proveedor, Concepto u Origen..." oninput="window.cashRegisterModule.renderNcHistory()">
-                      </div>
-                      <div style="flex: 1; min-width: 180px;">
-                        <select id="cash-nc-status-filter" class="form-control" onchange="window.cashRegisterModule.renderNcHistory()">
-                          <option value="TODOS">Todos los Estados</option>
-                          <option value="IMPAGA">IMPAGA</option>
-                          <option value="PARCIAL">PARCIAL</option>
-                          <option value="PAGADA">PAGADA</option>
-                          <option value="ANULADA">ANULADA</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class="table-container">
-                      <table class="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Nro NC</th>
-                            <th>Emisión</th>
-                            <th>Proveedor &amp; Concepto</th>
-                            <th>Origen</th>
-                            <th style="text-align: right;">Total NC</th>
-                            <th style="text-align: right;">Monto Pagado</th>
-                            <th style="text-align: right;">Saldo Pendiente</th>
-                            <th>Estado</th>
-                            <th style="text-align: center;">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody id="cash-nc-history-table-body">
-                          <!-- Dinámico -->
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- SUB-VIEW 3: HISTORIAL DE RECIBOS Y REVERSIÓN -->
-              <div id="cash-view-historial" class="cash-subview" style="display: none;">
-                <div class="card">
-                  <div class="card-header">
-                    <div class="card-title">
-                      <i data-lucide="history"></i> Historial de Recibos de Caja Emitidos
-                    </div>
-                  </div>
-
-                  <div class="table-container">
-                    <table class="erp-table">
-                      <thead>
-                        <tr>
-                          <th>Nro Recibo</th>
-                          <th>Fecha / Hora</th>
-                          <th>Cliente</th>
-                          <th style="text-align: right;">Total BOB</th>
-                          <th style="text-align: right;">Total USD</th>
-                          <th>Estado</th>
-                          <th>Cajero</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody id="receipts-history-table-body">
-                        <!-- Dinámico -->
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <!-- SUB-VIEW 4: ARQUEO DIARIO DE CAJA (CONSERVADO Y CENTRALIZADO) -->
-              <div id="cash-view-arqueo" class="cash-subview" style="display: none;">
-                <!-- Barra de Filtros del Arqueo Diario -->
-                <div class="card" style="padding: 16px; margin-bottom: 16px; background: #fff;">
-                  <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
-                    <div>
-                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Desde:</label>
-                      <input type="date" id="cash-arqueo-date-from" class="form-control font-mono">
-                    </div>
-                    <div>
-                      <label class="form-label" style="font-weight: 700; color: var(--navy);">Fecha Hasta:</label>
-                      <input type="date" id="cash-arqueo-date-to" class="form-control font-mono">
-                    </div>
-                    <button type="button" class="btn btn-primary" id="btn-filter-cash-arqueo" onclick="window.cashRegisterModule.renderArqueo()" style="height: 38px;">
-                      <i data-lucide="filter"></i> Filtrar Período
-                    </button>
-                    <button type="button" class="btn btn-success" id="btn-export-cash-arqueo-csv" onclick="window.cashRegisterModule.exportArqueoCsv()" style="height: 38px;">
-                      <i data-lucide="file-spreadsheet"></i> Descargar Excel (.CSV)
-                    </button>
-                    <button type="button" class="btn btn-secondary" id="btn-print-cash-arqueo" onclick="window.cashRegisterModule.printArqueo()" style="height: 38px;">
-                      <i data-lucide="printer"></i> Imprimir Reporte Oficial
-                    </button>
-                  </div>
-                </div>
-
-                <div class="card">
-                  <div class="card-header">
-                    <div class="card-title">
-                      <i data-lucide="wallet"></i> Arqueo y Movimiento Diario de Caja
-                    </div>
-                  </div>
-
-                  <!-- 1. Resumen por Medio de Pago -->
-                  <div style="margin-bottom: 24px;">
-                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 10px;">
-                      1. Recaudación Consolidada por Medio de Pago
-                    </h3>
-                    <div class="table-container">
-                      <table class="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Medio de Pago / Cuenta</th>
-                            <th>Moneda</th>
-                            <th style="text-align: center;">Transacciones</th>
-                            <th style="text-align: right;">Total Recaudado</th>
-                          </tr>
-                        </thead>
-                        <tbody id="cash-arqueo-summary-tbody">
-                          <!-- Dinámico -->
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <!-- 2. Detalle Cronológico -->
+              <div class="card" style="padding: 16px 20px;">
+                <!-- Cabecera de Imprimibles con Filtros Rápidos -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                   <div>
-                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 10px;">
-                      2. Detalle Cronológico de Movimientos de Caja
+                    <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                      <i data-lucide="printer" style="color: #00a884;"></i> Imprimibles de Caja: Recibos (ND) y Comprobantes de Pago (NC)
                     </h3>
-                    <div class="table-container">
-                      <table class="erp-table">
-                        <thead>
-                          <tr>
-                            <th>Recibo</th>
-                            <th>ND Cobrada</th>
-                            <th>Fecha</th>
-                            <th>Cliente</th>
-                            <th style="text-align: right;">Monto Cobrado</th>
-                            <th style="text-align: right;">Saldo Rest.</th>
-                            <th>Forma de Pago</th>
-                            <th>Tipo</th>
-                          </tr>
-                        </thead>
-                        <tbody id="cash-arqueo-details-tbody">
-                          <!-- Dinámico -->
-                        </tbody>
-                      </table>
-                    </div>
+                    <p style="margin: 2px 0 0; font-size: 0.82rem; color: #64748b;">
+                      Listado oficial de recibos de cobranza a clientes y comprobantes de liquidación a proveedores listos para imprimir y verificar.
+                    </p>
                   </div>
+                  <!-- Filtros rápidos de Tipo de Imprimible -->
+                  <div class="hub-tabs-bar" style="padding: 3px; gap: 4px;">
+                    <button type="button" class="hub-tab-btn cash-filter-pill active" data-filter="ALL" onclick="window.cashRegisterModule.setPrintablesFilter('ALL')">
+                      <i data-lucide="list"></i> Todos
+                    </button>
+                    <button type="button" class="hub-tab-btn cash-filter-pill" data-filter="ND" onclick="window.cashRegisterModule.setPrintablesFilter('ND')">
+                      <i data-lucide="file-spreadsheet"></i> Recibos (ND)
+                    </button>
+                    <button type="button" class="hub-tab-btn cash-filter-pill" data-filter="NC" onclick="window.cashRegisterModule.setPrintablesFilter('NC')">
+                      <i data-lucide="file-minus-2"></i> Pagos (NC)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Buscador de Recibos/Comprobantes -->
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 260px;">
+                    <input type="text" id="cash-receipts-search" class="form-control" placeholder="Buscar por Nro Recibo, Cliente, Proveedor, Nro ND / NC..." oninput="window.cashRegisterModule.renderReceiptsHistory()">
+                  </div>
+                  <div style="width: 180px;">
+                    <select id="cash-receipts-status" class="form-control" onchange="window.cashRegisterModule.renderReceiptsHistory()">
+                      <option value="ALL">Todos los Estados</option>
+                      <option value="VALIDO">Válidos</option>
+                      <option value="REVERTIDO">Revertidos / Anulados</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Tabla de Imprimibles -->
+                <div class="table-container" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow-x: auto;">
+                  <table class="erp-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 110px;">Tipo</th>
+                        <th style="width: 120px;">Nro Documento</th>
+                        <th style="width: 120px;">Fecha / Hora</th>
+                        <th>Cliente / Proveedor</th>
+                        <th style="text-align: right; width: 130px;">Total (BOB)</th>
+                        <th style="text-align: right; width: 120px;">Total (USD)</th>
+                        <th style="text-align: center; width: 100px;">Estado</th>
+                        <th style="width: 120px;">Cajero</th>
+                        <th style="text-align: center; width: 120px;">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="receipts-history-table-body">
+                      <!-- Dinámico -->
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -3235,20 +2877,20 @@
   <div id="print-area"></div>
 
   <!-- Scripts del Sistema ERP -->
-  <script src="js/db.js?v=20260917_v2"></script>
-  <script src="js/modules/financialGuard.js?v=20260917_v2"></script>
-  <script src="js/modules/bankAccounts.js?v=20260917_v2"></script>
-  <script src="js/modules/accounts.js?v=20260917_v2"></script>
-  <script src="js/modules/gds.js?v=20260917_v2"></script>
-  <script src="js/modules/debitNotes.js?v=20260917_v2"></script>
-  <script src="js/modules/creditNotes.js?v=20260917_v2"></script>
-  <script src="js/modules/cashRegister.js?v=20260917_v2"></script>
-  <script src="js/modules/otherIncomes.js?v=20260917_v2"></script>
-  <script src="js/modules/reports.js?v=20260917_v2"></script>
-  <script src="js/modules/calendar.js?v=20260917_v2"></script>
-  <script src="js/modules/settings.js?v=20260917_v2"></script>
-  <script src="js/modules/operationsHub.js?v=20260917_v2"></script>
-  <script src="js/app.js?v=20260917_v2"></script>
+  <script src="js/db.js?v=20260917_v3"></script>
+  <script src="js/modules/financialGuard.js?v=20260917_v3"></script>
+  <script src="js/modules/bankAccounts.js?v=20260917_v3"></script>
+  <script src="js/modules/accounts.js?v=20260917_v3"></script>
+  <script src="js/modules/gds.js?v=20260917_v3"></script>
+  <script src="js/modules/debitNotes.js?v=20260917_v3"></script>
+  <script src="js/modules/creditNotes.js?v=20260917_v3"></script>
+  <script src="js/modules/cashRegister.js?v=20260917_v3"></script>
+  <script src="js/modules/otherIncomes.js?v=20260917_v3"></script>
+  <script src="js/modules/reports.js?v=20260917_v3"></script>
+  <script src="js/modules/calendar.js?v=20260917_v3"></script>
+  <script src="js/modules/settings.js?v=20260917_v3"></script>
+  <script src="js/modules/operationsHub.js?v=20260917_v3"></script>
+  <script src="js/app.js?v=20260917_v3"></script>
 
 
 

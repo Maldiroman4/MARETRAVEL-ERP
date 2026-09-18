@@ -5,10 +5,19 @@
  */
 
 window.cashRegisterModule = {
-  currentTab: 'cobranzas',
+  currentTab: 'historial',
+  printablesFilter: 'ALL',
   selectedClientNds: [],
   selectedProviderNcs: [],
   activePaymentRows: [],
+
+  setPrintablesFilter(filter) {
+    this.printablesFilter = filter;
+    document.querySelectorAll('.cash-filter-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    this.renderReceiptsHistory();
+  },
 
   init() {
     if (!this._eventsBound) {
@@ -1072,52 +1081,124 @@ window.cashRegisterModule = {
 
   renderReceiptsHistory() {
     const data = window.db.get();
-    const receipts = data.cashReceipts || [];
+    const search = (document.getElementById('cash-receipts-search')?.value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('cash-receipts-status')?.value || 'ALL';
+    const filter = this.printablesFilter || 'ALL';
+
+    const items = [];
+
+    // 1. Recibos de Cobranza (ND)
+    if (filter === 'ALL' || filter === 'ND') {
+      (data.cashReceipts || []).forEach(r => {
+        items.push({
+          type: 'ND',
+          id: r.id,
+          number: r.receiptCode || ('REC #' + r.receiptNumber),
+          date: r.receiptDate || r.date || (r.createdAt ? r.createdAt.split(',')[0] : '-'),
+          party: r.accountName || 'Cliente General',
+          amountBob: Number(r.totalPaidBob || 0),
+          amountUsd: Number(r.totalPaidUsd || 0),
+          status: r.status || 'VALIDO',
+          user: r.createdByName || r.cajero || 'Luis (Admin)',
+          reversalReason: r.reversalReason,
+          raw: r
+        });
+      });
+    }
+
+    // 2. Comprobantes de Pago a Proveedores (NC)
+    if (filter === 'ALL' || filter === 'NC') {
+      (data.providerPayments || []).forEach(p => {
+        const amtBob = Number(p.totalPaid || 0);
+        const tc = Number(p.exchangeRateUsed || 6.96);
+        items.push({
+          type: 'NC',
+          id: p.id,
+          number: p.receiptCode || ('OP #' + p.receiptNumber),
+          date: p.paymentDate || (p.createdAt ? p.createdAt.split(',')[0] : '-'),
+          party: p.providerName || 'Proveedor',
+          amountBob: amtBob,
+          amountUsd: amtBob / tc,
+          status: p.status || 'VALIDO',
+          user: p.createdByName || 'Administrador',
+          reversalReason: p.reversalReason,
+          raw: p
+        });
+      });
+    }
+
+    // Filtrar por estado
+    let filtered = items;
+    if (statusFilter !== 'ALL') {
+      filtered = filtered.filter(it => it.status === statusFilter);
+    }
+
+    // Filtrar por búsqueda
+    if (search) {
+      filtered = filtered.filter(it =>
+        it.number.toLowerCase().includes(search) ||
+        it.party.toLowerCase().includes(search) ||
+        (it.user && it.user.toLowerCase().includes(search))
+      );
+    }
+
+    // Ordenar cronológicamente descendente
+    filtered.sort((a, b) => (b.raw.createdAt || b.raw.id || '').localeCompare(a.raw.createdAt || a.raw.id || ''));
+
     const tbody = document.getElementById('receipts-history-table-body');
     if (!tbody) return;
 
-    if (receipts.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px; color: var(--text-muted);">Sin recibos de cobranza emitidos.</td></tr>`;
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; padding: 36px 20px; color: #64748b;">
+            <i data-lucide="inbox" style="width: 36px; height: 36px; display: block; margin: 0 auto 8px; color: #94a3b8;"></i>
+            Sin comprobantes de caja registrados.
+          </td>
+        </tr>
+      `;
+      if (window.lucide) window.lucide.createIcons();
       return;
     }
 
-    tbody.innerHTML = receipts.map(r => {
-      const isValid = r.status === 'VALIDO';
-      const badge = isValid ? 'badge-emerald' : 'badge-rose';
+    tbody.innerHTML = filtered.map(it => {
+      const isNd = it.type === 'ND';
+      const isValid = it.status === 'VALIDO';
+      const typeBadge = isNd
+        ? '<span class="badge badge-emerald" style="font-weight:700;"><i data-lucide="arrow-down-left" style="width:13px;height:13px;"></i> Cobro ND</span>'
+        : '<span class="badge badge-purple" style="font-weight:700;"><i data-lucide="arrow-up-right" style="width:13px;height:13px;"></i> Pago NC</span>';
+      const statusBadge = isValid
+        ? '<span class="badge badge-emerald">VÁLIDO</span>'
+        : '<span class="badge badge-rose">REVERTIDO</span>';
 
-      const displayDate = r.receiptDate || r.date || (r.createdAt ? r.createdAt.split(',')[0] : '-');
-      const displayUser = r.createdByName || r.cajero || 'Luis (Admin)';
+      const printAction = isNd
+        ? `window.cashRegisterModule.printReceipt('${it.id}')`
+        : `window.cashRegisterModule.printProviderPayment('${it.id}')`;
 
       return `
         <tr>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">REC #${r.receiptNumber}</td>
-          <td class="font-mono">${displayDate}</td>
-          <td>
-            <strong>${r.accountName}</strong>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Sol: ${r.solicitante || '-'}</div>
-          </td>
-          <td class="font-mono" style="text-align: right; font-weight: 700; color: #15803d;">
-            BOB ${Number(r.totalPaidBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+          <td>${typeBadge}</td>
+          <td class="font-mono" style="font-weight: 700; color: #0f172a;">${it.number}</td>
+          <td class="font-mono" style="font-size: 0.82rem;">${it.date}</td>
+          <td><strong>${it.party}</strong></td>
+          <td class="font-mono" style="text-align: right; font-weight: 700; color: ${isNd ? '#15803d' : '#b45309'};">
+            BOB ${it.amountBob.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </td>
           <td class="font-mono" style="text-align: right; color: #0369a1;">
-            USD ${Number(r.totalPaidUsd).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            USD ${it.amountUsd.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </td>
-          <td><span class="badge ${badge}">${r.status}</span></td>
-          <td style="font-size: 0.75rem;">${displayUser}</td>
-          <td>
-            <div style="display: flex; gap: 6px;">
-              <button class="btn btn-secondary btn-sm" onclick="window.cashRegisterModule.printReceipt('${r.id}')" title="Reimprimir Recibo">
-                <i data-lucide="printer"></i>
+          <td style="text-align: center;">${statusBadge}</td>
+          <td style="font-size: 0.8rem; color: #475569;">${it.user}</td>
+          <td style="text-align: center;">
+            <div style="display: inline-flex; align-items: center; gap: 6px; justify-content: center;">
+              <button class="btn btn-secondary btn-sm" onclick="${printAction}" title="Imprimir Comprobante Oficial" style="padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="printer" style="width:14px;height:14px;"></i> Imprimir
               </button>
-              ${isValid ? `
-                <button class="btn btn-danger btn-sm" onclick="window.cashRegisterModule.openReversalModal('${r.id}')" title="Revertir Pago con Auditoría">
-                  <i data-lucide="rotate-ccw"></i> Revertir
+              ${(isNd && isValid) ? `
+                <button class="btn btn-danger btn-sm" onclick="window.cashRegisterModule.openReversalModal('${it.id}')" title="Revertir Recibo" style="padding: 4px 8px;">
+                  <i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i>
                 </button>
-              ` : `
-                <span style="font-size: 0.72rem; color: #b91c1c;" title="${r.reversalReason || 'Revertido'}">
-                  Rev: ${(r.reversalReason || '').substring(0, 15)}...
-                </span>
-              `}
+              ` : ''}
             </div>
           </td>
         </tr>
@@ -1326,6 +1407,110 @@ window.cashRegisterModule = {
 
     window.print();
   },
+
+  /**
+   * Impresión Oficial de Comprobante de Pago / Liquidación a Proveedor (NC)
+   */
+  printProviderPayment(paymentId) {
+    const data = window.db.get();
+    const p = (data.providerPayments || []).find(x => x.id === paymentId);
+    if (!p) return;
+
+    const settings = data.systemSettings || {};
+    const printArea = document.getElementById('print-area');
+    if (!printArea) return;
+
+    const tc = Number(p.exchangeRateUsed || 6.96);
+    const totalUsd = Number(p.totalPaid) / tc;
+
+    printArea.innerHTML = `
+      <div class="print-page short-format" style="max-width: 170mm;">
+        <!-- Membrete Oficial MARETRAVEL -->
+        <div class="print-header">
+          <img src="${window.maretravelLogoBase64 || (settings && settings.logoBase64) || 'assets/logo.png'}" class="print-logo" alt="MARETRAVEL Logo">
+          <div class="print-agency-info">
+            <div class="print-agency-title">${settings.agencyCommercialName || 'MARETRAVEL S.R.L.'}</div>
+            <div>NIT: ${settings.agencyNit || '1028374021'}</div>
+            <div>${settings.agencyAddress || 'La Paz - Bolivia'}</div>
+            <div>Telf: ${settings.agencyPhone || '+591 2 244-1234'}</div>
+          </div>
+        </div>
+
+        <div class="print-doc-title">
+          <h2>COMPROBANTE OFICIAL DE EGRESO / PAGO A PROVEEDOR</h2>
+          <div class="print-doc-number">${p.receiptCode || ('OP-' + String(p.receiptNumber).padStart(5, '0'))}</div>
+          ${p.status === 'REVERTIDO' ? '<div style="color:red; font-weight:800; font-size:12pt; margin-top:4px;">*** ANULADO / REVERTIDO ***</div>' : ''}
+        </div>
+
+        <!-- Datos del Proveedor y Liquidación -->
+        <div class="print-meta-grid">
+          <div><strong>Proveedor / Beneficiario:</strong> ${p.providerName}</div>
+          <div><strong>Fecha / Hora:</strong> ${p.paymentDate}</div>
+          <div><strong>Cuenta Financiera:</strong> ${p.financialAccountName || 'Caja Central'}</div>
+          <div><strong>Cajero / Emisor:</strong> ${p.createdByName || 'Administrador'}</div>
+          <div><strong>T/C Aplicado:</strong> 1 USD = ${tc.toFixed(2)} BOB</div>
+          <div><strong>Referencia Operativa:</strong> ${p.reference || '-'}</div>
+        </div>
+
+        <!-- Detalle de Notas de Crédito Liquidadas -->
+        <div style="font-size: 8.5pt; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #0f2742;">
+          Notas de Crédito (NC) Liquidadas:
+        </div>
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th>Documento</th>
+              <th style="text-align: right;">Saldo Ant. (BOB)</th>
+              <th style="text-align: right;">Monto Liquidado (BOB)</th>
+              <th style="text-align: right;">Saldo Rest. (BOB)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(p.details || []).map(d => `
+              <tr>
+                <td class="font-mono"><strong>NC #${d.ncNumber || d.creditNoteId}</strong></td>
+                <td class="font-mono" style="text-align: right;">${Number(d.previousBalance || 0).toFixed(2)}</td>
+                <td class="font-mono" style="text-align: right; font-weight: 700; color: #b45309;">${Number(d.amountPaid || 0).toFixed(2)}</td>
+                <td class="font-mono" style="text-align: right; color: #059669;">${Number(d.remainingBalance || 0).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <!-- Totales -->
+        <table class="print-totals" style="width: 100%; margin-top: 8px;">
+          <tr class="total-row">
+            <td style="font-size: 11pt;">TOTAL LIQUIDADO / EGRESO (BOB):</td>
+            <td class="font-mono" style="text-align: right; font-size: 12pt; font-weight: 800; color: #b45309;">
+              BOB ${Number(p.totalPaid).toFixed(2)}
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size: 9.5pt; color: #475569;">Equivalente en Dólares (USD):</td>
+            <td class="font-mono" style="text-align: right; font-size: 10pt; font-weight: 700; color: #0369a1;">
+              USD ${totalUsd.toFixed(2)}
+            </td>
+          </tr>
+        </table>
+
+        <div class="print-signatures" style="margin-top: 25px;">
+          <div class="signature-box">
+            <strong>CAJERO / RESPONSABLE</strong><br>
+            ${p.createdByName || 'Administrador'}<br>
+            MARETRAVEL
+          </div>
+          <div class="signature-box">
+            <strong>PROVEEDOR / BENEFICIARIO</strong><br>
+            ${p.providerName}<br>
+            Firma y Aclaración
+          </div>
+        </div>
+      </div>
+    `;
+
+    window.print();
+  },
+
 
   // ==========================================
   // SUB-MÓDULO: ARQUEO DIARIO DE CAJA (CONSERVADO Y UNIFICADO)
