@@ -2433,8 +2433,22 @@ class OperationsHubModule {
         }
       });
 
-      // 3. Borrado en cascada de Recibos de Caja (RCP)
-      data.cashReceipts = (data.cashReceipts || []).filter(r => r.debitNoteId !== id && r.debitNoteNumber !== nd.ndNumber);
+      // 3. Borrado en cascada de Recibos de Caja (RCP) vinculados
+      data.cashReceipts = (data.cashReceipts || []).filter(r => {
+        if (r.debitNoteId === id || r.debitNoteNumber === nd.ndNumber) return false;
+        if (r.details && r.details.some(d => d.debitNoteId === id || d.ndNumber === nd.ndNumber)) return false;
+        return true;
+      });
+
+      // Limpiar también cualquier recibo huérfano sin ND existente
+      const remainingNdIds = new Set((data.debitNotes || []).filter(n => n.id !== id).map(n => n.id));
+      const remainingNdNums = new Set((data.debitNotes || []).filter(n => n.id !== id).map(n => n.ndNumber));
+      data.cashReceipts = (data.cashReceipts || []).filter(r => {
+        if (!r.details || r.details.length === 0) {
+          return (r.debitNoteId && remainingNdIds.has(r.debitNoteId)) || (r.debitNoteNumber && remainingNdNums.has(r.debitNoteNumber));
+        }
+        return r.details.some(d => remainingNdIds.has(d.debitNoteId) || remainingNdNums.has(d.ndNumber));
+      });
 
       // 4. Borrado en cascada de Otros Ingresos (Comisiones)
       data.otherIncomes = (data.otherIncomes || []).filter(inc => {
@@ -2456,6 +2470,7 @@ class OperationsHubModule {
       this.updateHubKpis();
       window.app.updateDashboardKpis();
       if (window.creditNotesModule) window.creditNotesModule.render();
+      if (window.cashRegisterModule) window.cashRegisterModule.renderReceiptsHistory();
       window.app.showToast(`Operación ND #${nd.ndNumber} eliminada en cascada correctamente`, 'success');
     } catch (err) {
       console.error('Error en eliminación en cascada:', err);
@@ -2505,8 +2520,19 @@ class OperationsHubModule {
       }
     });
 
+    // Invalidar en cascada los recibos de caja asociados para que no figuren en Caja
+    (data.cashReceipts || []).forEach(r => {
+      const isLinked = (r.debitNoteId === id || r.debitNoteNumber === nd.ndNumber) ||
+                       (r.details && r.details.some(d => d.debitNoteId === id || d.ndNumber === nd.ndNumber));
+      if (isLinked) {
+        r.status = 'REVERTIDO';
+        r.reversalReason = `ND #${nd.ndNumber} anulada`;
+      }
+    });
+
     window.db.save(data);
     this.render();
+    if (window.cashRegisterModule) window.cashRegisterModule.renderReceiptsHistory();
     window.app.updateDashboardKpis();
     window.app.showToast(`Operación ND #${nd.ndNumber} ANULADA correctamente (Saldos en 0.00)`, 'warning');
   }

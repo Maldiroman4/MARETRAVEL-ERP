@@ -1145,17 +1145,18 @@ window.cashRegisterModule = {
     };
 
     const raw = item.raw || {};
+    const linked = item.linkedDoc || raw;
 
     if (item.tipo === 'NC') {
-      if (typeMatches(raw.serviceType) || typeMatches(raw.concept) || typeMatches(raw.providerName)) {
+      if (typeMatches(linked.serviceType) || typeMatches(linked.concept) || typeMatches(linked.providerName)) {
         return true;
       }
       const allKnown = ['BOLETO_AEREO', 'HOTEL', 'SEGURO_VIAJE', 'CERTIFICACION_FA', 'ASESORAMIENTO_VISAS', 'PAQUETES', 'RENT_A_CAR'];
-      const otherMatched = allKnown.find(t => t !== fs && (typeMatches(raw.concept, t) || typeMatches(raw.providerName, t)));
+      const otherMatched = allKnown.find(t => t !== fs && (typeMatches(linked.concept, t) || typeMatches(linked.providerName, t)));
       if (otherMatched) return false;
 
-      if (raw.originDebitNoteId) {
-        const originNd = (data.debitNotes || []).find(n => n.id === raw.originDebitNoteId || String(n.ndNumber) === String(raw.originDebitNoteNumber));
+      if (linked.originDebitNoteId) {
+        const originNd = (data.debitNotes || []).find(n => n.id === linked.originDebitNoteId || String(n.ndNumber) === String(linked.originDebitNoteNumber));
         if (originNd && originNd.items && originNd.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description))) {
           return true;
         }
@@ -1163,24 +1164,19 @@ window.cashRegisterModule = {
       return false;
     }
 
-    if (raw.items && raw.items.length > 0) {
-      return raw.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description));
+    // Para ND: Validar contra los ítems de la Nota de Débito vinculada real
+    if (linked.items && linked.items.length > 0) {
+      return linked.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description));
     }
-    if (typeMatches(raw.serviceType) || typeMatches(raw.concept)) {
+    if (typeMatches(linked.serviceType) || typeMatches(linked.concept)) {
       return true;
     }
 
     if (raw.details && raw.details.length > 0) {
-      const hasMatch = raw.details.some(d => {
+      return raw.details.some(d => {
         const nd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
         return nd && nd.items && nd.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description));
       });
-      if (hasMatch) return true;
-    }
-
-    if (item.tipo === 'ND' && raw.accountId) {
-      const clientNds = (data.debitNotes || []).filter(n => n.accountId === raw.accountId);
-      return clientNds.some(n => n.items && n.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description)));
     }
 
     return false;
@@ -1212,93 +1208,199 @@ window.cashRegisterModule = {
 
     const transaccionesCaja = [];
 
-    // 1. Recibos de Cobranza (ND)
+    // =========================================================================
+    // 1. RECIBOS DE COBRANZA (ND)
+    // REGLA DE INTEGRIDAD CONTABLE ESTRICTA: Un recibo de caja de ND ÚNICAMENTE
+    // puede existir y mostrarse si corresponde a una Nota de Débito REAL que:
+    // a) Exista activamente en data.debitNotes (no haya sido borrada ni sea huérfana).
+    // b) No esté anulada (status !== 'ANULADA').
+    // c) Esté pagada (status === 'PAGADA' o saldo_pendiente <= 0.01).
+    // d) Pertenezca al servicio activo seleccionado.
+    // =========================================================================
     (data.cashReceipts || []).forEach(r => {
+      if (r.status === 'REVERTIDO' || r.status === 'ANULADO') return;
+
+      // Localizar la ND vinculada
+      let linkedNd = null;
+      if (r.details && r.details.length > 0) {
+        for (const d of r.details) {
+          linkedNd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+          if (linkedNd) break;
+        }
+      }
+      if (!linkedNd && (r.debitNoteId || r.debitNoteNumber)) {
+        linkedNd = (data.debitNotes || []).find(n => n.id === r.debitNoteId || n.ndNumber === r.debitNoteNumber);
+      }
+
+      // SI NO EXISTE LA NOTA DE DÉBITO EN EL SISTEMA, EL RECIBO ES HUÉRFANO Y SE EXCLUYE
+      if (!linkedNd) {
+        return;
+      }
+
+      // Si la ND de origen fue anulada, invalidar recibo en la vista
+      if (linkedNd.status === 'ANULADA') {
+        return;
+      }
+
+      // Verificar que la ND esté efectivamente saldada
+      const balBob = Number(linkedNd.saldo_pendiente ?? linkedNd.balanceBob ?? 0);
+      if (linkedNd.status !== 'PAGADA' && balBob > 0.01) {
+        return;
+      }
+
+      // Aislamiento contextual por servicio activo de la ND
+      if (!this.matchesServiceCategory({ raw: r, linkedDoc: linkedNd, tipo: 'ND' }, activeService)) {
+        return;
+      }
+
       transaccionesCaja.push({
         tipo: 'ND',
         id: r.id,
         number: r.receiptCode || ('REC #' + r.receiptNumber),
         date: r.receiptDate || r.date || (r.createdAt ? r.createdAt.split(',')[0] : '-'),
-        party: r.accountName || 'Cliente General',
-        amountBob: Number(r.totalPaidBob || 0),
-        amountUsd: Number(r.totalPaidUsd || 0),
-        estado: r.status === 'REVERTIDO' ? 'REVERTIDO' : 'PAGADA',
-        status: r.status || 'VALIDO',
-        saldo_pendiente: Number(r.remainingBalanceBob || 0),
+        party: linkedNd.accountName || r.accountName || 'Cliente General',
+        amountBob: Number(r.totalPaidBob || linkedNd.total_documento || linkedNd.totalAmountBob || 0),
+        amountUsd: Number(r.totalPaidUsd || linkedNd.totalAmountUsd || 0),
+        estado: 'PAGADA',
+        status: 'VALIDO',
+        saldo_pendiente: 0,
         user: r.createdByName || r.cajero || 'Luis (Admin)',
         reversalReason: r.reversalReason,
-        raw: r
+        raw: r,
+        linkedDoc: linkedNd
       });
     });
 
-    // Notas de Débito (ND)
+    // =========================================================================
+    // 2. NOTAS DE DÉBITO CON ESTADO PAGADA (Emisiones canceladas directamente)
+    // =========================================================================
     (data.debitNotes || []).forEach(nd => {
-      const hasReceipt = transaccionesCaja.some(t => t.raw && (t.raw.id === nd.id || (t.raw.details && t.raw.details.some(d => d.debitNoteId === nd.id))));
-      if (!hasReceipt) {
-        const balBob = Number(nd.saldo_pendiente ?? nd.balanceBob ?? nd.balance ?? 0);
-        const paidBob = Number(nd.monto_acumulado_pagado ?? nd.paidAmountBob ?? 0);
-        const totalBob = Number(nd.total_documento ?? nd.totalAmountBob ?? 0);
-        transaccionesCaja.push({
-          tipo: 'ND',
-          id: nd.id,
-          number: 'ND #' + (nd.ndNumber || nd.id),
-          date: nd.issueDate || (nd.createdAt ? nd.createdAt.split(',')[0] : '-'),
-          party: nd.accountName || 'Cliente General',
-          amountBob: totalBob,
-          amountUsd: Number(nd.totalAmountUsd || 0),
-          estado: String(nd.status || (paidBob === 0 ? 'IMPAGA' : (balBob <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
-          status: String(nd.status || (paidBob === 0 ? 'IMPAGA' : (balBob <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
-          saldo_pendiente: balBob,
-          user: nd.solicitante || 'Administrador',
-          raw: nd
-        });
+      if (nd.status === 'ANULADA') return;
+
+      const balBob = Number(nd.saldo_pendiente ?? nd.balanceBob ?? nd.balance ?? 0);
+      const paidBob = Number(nd.monto_acumulado_pagado ?? nd.paidAmountBob ?? 0);
+      const totalBob = Number(nd.total_documento ?? nd.totalAmountBob ?? 0);
+
+      // Solo si está 100% pagada
+      if (nd.status !== 'PAGADA' && balBob > 0.01) {
+        return;
       }
+
+      // Evitar duplicar si ya existe un recibo de caja agregado para esta ND
+      const alreadyAdded = transaccionesCaja.some(t => 
+        t.raw && (t.raw.id === nd.id || (t.raw.details && t.raw.details.some(d => d.debitNoteId === nd.id)))
+      );
+      if (alreadyAdded) return;
+
+      // Aislamiento contextual por servicio activo
+      if (!this.matchesServiceCategory({ raw: nd, linkedDoc: nd, tipo: 'ND' }, activeService)) {
+        return;
+      }
+
+      transaccionesCaja.push({
+        tipo: 'ND',
+        id: nd.id,
+        number: 'ND #' + (nd.ndNumber || nd.id),
+        date: nd.issueDate || (nd.createdAt ? nd.createdAt.split(',')[0] : '-'),
+        party: nd.accountName || 'Cliente General',
+        amountBob: totalBob,
+        amountUsd: Number(nd.totalAmountUsd || 0),
+        estado: 'PAGADA',
+        status: 'VALIDO',
+        saldo_pendiente: 0,
+        user: nd.solicitante || 'Administrador',
+        raw: nd,
+        linkedDoc: nd
+      });
     });
 
-    // 2. Comprobantes de Pago a Proveedores (NC)
+    // =========================================================================
+    // 3. COMPROBANTES DE PAGO A PROVEEDORES (NC)
+    // =========================================================================
     (data.providerPayments || []).forEach(p => {
-      const amtBob = Number(p.totalPaid || 0);
+      if (p.status === 'REVERTIDO' || p.status === 'ANULADO') return;
+
+      let linkedNc = null;
+      if (p.details && p.details.length > 0) {
+        for (const d of p.details) {
+          linkedNc = (data.creditNotes || []).find(c => c.id === d.creditNoteId || c.ncNumber === d.ncNumber);
+          if (linkedNc) break;
+        }
+      }
+      if (!linkedNc && p.creditNoteId) {
+        linkedNc = (data.creditNotes || []).find(c => c.id === p.creditNoteId || c.ncNumber === p.ncNumber);
+      }
+      if (!linkedNc && p.ncIds && p.ncIds.length > 0) {
+        linkedNc = (data.creditNotes || []).find(c => p.ncIds.includes(c.id));
+      }
+
+      // Si no existe la NC en el sistema o está anulada, excluir
+      if (!linkedNc || linkedNc.status === 'ANULADA') return;
+
+      const balBob = Number(linkedNc.saldo_pendiente ?? linkedNc.balance ?? 0);
+      if (linkedNc.status !== 'PAGADA' && balBob > 0.01) return;
+
+      if (!this.matchesServiceCategory({ raw: p, linkedDoc: linkedNc, tipo: 'NC' }, activeService)) {
+        return;
+      }
+
+      const amtBob = Number(p.totalPaid || linkedNc.total_documento || linkedNc.totalAmount || 0);
       const tc = Number(p.exchangeRateUsed || 6.96);
+
       transaccionesCaja.push({
         tipo: 'NC',
         id: p.id,
         number: p.receiptCode || ('OP #' + p.receiptNumber),
         date: p.paymentDate || (p.createdAt ? p.createdAt.split(',')[0] : '-'),
-        party: p.providerName || 'Proveedor',
+        party: linkedNc.providerName || p.providerName || 'Proveedor',
         amountBob: amtBob,
         amountUsd: amtBob / tc,
-        estado: p.status === 'REVERTIDO' ? 'REVERTIDO' : 'PAGADA',
-        status: p.status || 'VALIDO',
+        estado: 'PAGADA',
+        status: 'VALIDO',
         saldo_pendiente: 0,
         user: p.createdByName || 'Administrador',
         reversalReason: p.reversalReason,
-        raw: p
+        raw: p,
+        linkedDoc: linkedNc
       });
     });
 
-    // Notas de Crédito (NC)
+    // =========================================================================
+    // 4. NOTAS DE CRÉDITO CON ESTADO PAGADA (Liquidación a proveedor directa)
+    // =========================================================================
     (data.creditNotes || []).forEach(nc => {
-      const hasPayment = transaccionesCaja.some(t => t.raw && (t.raw.id === nc.id || (t.raw.ncIds && t.raw.ncIds.includes(nc.id))));
-      if (!hasPayment) {
-        const amtBob = Number(nc.total_documento ?? nc.totalAmount ?? 0);
-        const tc = Number(nc.frozenExchangeRate || 6.96);
-        const bal = Number(nc.saldo_pendiente ?? nc.balance ?? 0);
-        const paid = Number(nc.monto_acumulado_pagado ?? nc.paidAmount ?? 0);
-        transaccionesCaja.push({
-          tipo: 'NC',
-          id: nc.id,
-          number: 'NC #' + (nc.ncNumber || nc.id),
-          date: nc.issueDate || (nc.createdAt ? nc.createdAt.split(',')[0] : '-'),
-          party: nc.providerName || 'Proveedor',
-          amountBob: amtBob,
-          amountUsd: amtBob / tc,
-          estado: String(nc.status || (paid === 0 ? 'IMPAGA' : (bal <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
-          status: String(nc.status || (paid === 0 ? 'IMPAGA' : (bal <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
-          saldo_pendiente: bal,
-          user: 'Administrador',
-          raw: nc
-        });
+      if (nc.status === 'ANULADA') return;
+
+      const bal = Number(nc.saldo_pendiente ?? nc.balance ?? 0);
+      if (nc.status !== 'PAGADA' && bal > 0.01) return;
+
+      const alreadyAdded = transaccionesCaja.some(t => 
+        t.raw && (t.raw.id === nc.id || (t.raw.ncIds && t.raw.ncIds.includes(nc.id)))
+      );
+      if (alreadyAdded) return;
+
+      if (!this.matchesServiceCategory({ raw: nc, linkedDoc: nc, tipo: 'NC' }, activeService)) {
+        return;
       }
+
+      const amtBob = Number(nc.total_documento ?? nc.totalAmount ?? 0);
+      const tc = Number(nc.frozenExchangeRate || 6.96);
+
+      transaccionesCaja.push({
+        tipo: 'NC',
+        id: nc.id,
+        number: 'NC #' + (nc.ncNumber || nc.id),
+        date: nc.issueDate || (nc.createdAt ? nc.createdAt.split(',')[0] : '-'),
+        party: nc.providerName || 'Proveedor',
+        amountBob: amtBob,
+        amountUsd: amtBob / tc,
+        estado: 'PAGADA',
+        status: 'VALIDO',
+        saldo_pendiente: 0,
+        user: 'Administrador',
+        raw: nc,
+        linkedDoc: nc
+      });
     });
 
     // =========================================================================
