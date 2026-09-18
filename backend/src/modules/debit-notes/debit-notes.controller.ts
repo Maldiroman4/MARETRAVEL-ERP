@@ -43,22 +43,30 @@ export class DebitNotesController {
   }
 
   @Post(':id/close')
-  close(@Param('id') id: string) {
-    return this.service.close(id);
+  close(@Param('id') id: string, @Req() req: { user: { id: string } }) {
+    return this.service.close(id, req.user.id);
   }
 
   @Post(':id/reopen')
-  reopen(@Param('id') id: string) {
-    return this.service.reopen(id);
+  reopen(@Param('id') id: string, @Req() req: { user: { id: string } }) {
+    return this.service.reopen(id, req.user.id);
   }
 
   @Post(':id/void')
-  void(@Param('id') id: string, @Body() dto: VoidDebitNoteDto) {
-    return this.service.void(id, dto.motivo);
+  void(
+    @Param('id') id: string,
+    @Body() dto: VoidDebitNoteDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.service.void(id, dto.motivo, req.user.id);
   }
 
   @Post(':id/correct')
-  correct(@Param('id') id: string, @Body() dto: CorrectDebitNoteDto) {
-    return this.service.correct(id, dto);
+  correct(
+    @Param('id') id: string,
+    @Body() dto: CorrectDebitNoteDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.service.correct(id, dto, req.user.id);
   }
 }

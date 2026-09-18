@@ -130,19 +130,28 @@ export class DebitNotesService {
     });
   }
 
-  async close(id: string) {
+  async close(id: string, userId?: string) {
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
       include: { items: true },
     });
     if (!nd) throw new NotFoundException('Nota de débito no encontrada');
-    if (nd.status !== 'BORRADOR') {
-      throw new BadRequestException(
-        'Solo se pueden cerrar notas de débito en estado BORRADOR',
-      );
-    }
+
+    const totalUsd = Number(nd.totalAmountUsd);
+    const totalBob = Number(nd.totalAmountBob);
+    const rate = totalUsd > 0 ? totalBob / totalUsd : DEFAULT_RATE;
 
     return this.prisma.$transaction(async (tx) => {
+      const guard = await tx.debitNote.updateMany({
+        where: { id, status: DebitNoteStatus.BORRADOR },
+        data: { status: DebitNoteStatus.IMPAGA },
+      });
+      if (guard.count !== 1) {
+        throw new BadRequestException(
+          'Solo se pueden cerrar notas de débito en estado BORRADOR',
+        );
+      }
+
       for (const item of nd.items) {
         if (item.ticketId) {
           await tx.ticket.update({
@@ -168,10 +177,10 @@ export class DebitNotesService {
         let usd: number;
         if (nd.currency === Currency.BOB) {
           bob = round2(sum);
-          usd = round2(sum / DEFAULT_RATE);
+          usd = round2(sum / rate);
         } else {
           usd = round2(sum);
-          bob = round2(sum * DEFAULT_RATE);
+          bob = round2(sum * rate);
         }
         await tx.creditNote.create({
           data: {
@@ -197,6 +206,7 @@ export class DebitNotesService {
           action: 'CLOSE',
           entityType: 'DEBIT_NOTE',
           entityId: nd.id,
+          userId,
           newValue: { status: 'IMPAGA' },
         },
       });
@@ -209,17 +219,12 @@ export class DebitNotesService {
     });
   }
 
-  async reopen(id: string) {
+  async reopen(id: string, userId?: string) {
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
       include: { items: true, paymentLines: true, creditNotes: true },
     });
     if (!nd) throw new NotFoundException('Nota de débito no encontrada');
-    if (nd.status !== 'IMPAGA' && nd.status !== 'PARCIAL') {
-      throw new BadRequestException(
-        'Solo se pueden reabrir notas de débito cerradas (IMPAGA/PARCIAL)',
-      );
-    }
     const hasPayments =
       nd.paymentLines.length > 0 ||
       Number(nd.paidAmountBob) > 0 ||
@@ -234,6 +239,19 @@ export class DebitNotesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const guard = await tx.debitNote.updateMany({
+        where: {
+          id,
+          status: { in: [DebitNoteStatus.IMPAGA, DebitNoteStatus.PARCIAL] },
+        },
+        data: { status: DebitNoteStatus.BORRADOR },
+      });
+      if (guard.count !== 1) {
+        throw new BadRequestException(
+          'Solo se pueden reabrir notas de débito cerradas (IMPAGA/PARCIAL)',
+        );
+      }
+
       for (const item of nd.items) {
         if (item.ticketId) {
           await tx.ticket.update({
@@ -251,6 +269,7 @@ export class DebitNotesService {
           action: 'REOPEN',
           entityType: 'DEBIT_NOTE',
           entityId: id,
+          userId,
           newValue: { status: 'BORRADOR' },
         },
       });
@@ -262,7 +281,7 @@ export class DebitNotesService {
     });
   }
 
-  async void(id: string, motivo?: string) {
+  async void(id: string, motivo?: string, userId?: string) {
     this.assertMotivo(motivo);
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
@@ -271,6 +290,25 @@ export class DebitNotesService {
     if (!nd) throw new NotFoundException('Nota de débito no encontrada');
 
     return this.prisma.$transaction(async (tx) => {
+      const guard = await tx.debitNote.updateMany({
+        where: {
+          id,
+          status: {
+            in: [
+              DebitNoteStatus.BORRADOR,
+              DebitNoteStatus.IMPAGA,
+              DebitNoteStatus.PARCIAL,
+            ],
+          },
+        },
+        data: { status: DebitNoteStatus.ANULADA },
+      });
+      if (guard.count !== 1) {
+        throw new BadRequestException(
+          'No se puede anular una nota de débito en su estado actual',
+        );
+      }
+
       for (const item of nd.items) {
         if (item.ticketId) {
           await tx.ticket.update({
@@ -291,6 +329,7 @@ export class DebitNotesService {
           action: 'VOID',
           entityType: 'DEBIT_NOTE',
           entityId: id,
+          userId,
           reason: motivo,
           newValue: { status: 'ANULADA' },
         },
@@ -303,7 +342,7 @@ export class DebitNotesService {
     });
   }
 
-  async correct(id: string, dto: CorrectDebitNoteDto) {
+  async correct(id: string, dto: CorrectDebitNoteDto, userId?: string) {
     this.assertMotivo(dto.motivo);
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
@@ -359,6 +398,7 @@ export class DebitNotesService {
           action: 'CORRECT',
           entityType: 'DEBIT_NOTE',
           entityId: id,
+          userId,
           oldValue: oldValue as Prisma.InputJsonValue,
           newValue: newValue as Prisma.InputJsonValue,
           reason: dto.motivo,

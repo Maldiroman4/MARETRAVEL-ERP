@@ -18,6 +18,7 @@ describe('DebitNotesService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     debitNoteItem: { create: jest.fn() },
     creditNote: {
@@ -36,6 +37,7 @@ describe('DebitNotesService', () => {
       findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     debitNoteItem: { create: jest.Mock };
     creditNote: {
@@ -55,6 +57,7 @@ describe('DebitNotesService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prisma.debitNote.updateMany.mockResolvedValue({ count: 1 });
     const moduleRef = await Test.createTestingModule({
       providers: [
         DebitNotesService,
@@ -210,13 +213,65 @@ describe('DebitNotesService', () => {
     expect(result.status).toBe('IMPAGA');
   });
 
-  it('close rejects a note that is not BORRADOR', async () => {
+  it('close rejects a note that is not BORRADOR (TOCTOU guard fails)', async () => {
     prisma.debitNote.findUnique.mockResolvedValue({
       id: 'nd1',
       status: 'IMPAGA',
       items: [],
+      totalAmountBob: 0,
+      totalAmountUsd: 0,
     });
+    prisma.debitNote.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.close('nd1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('close derives the NC counter-currency rate from the ND totals', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'BORRADOR',
+      currency: 'USD',
+      totalAmountBob: 1400,
+      totalAmountUsd: 200,
+      items: [
+        {
+          id: 'i1',
+          ticketId: 't1',
+          operatorId: 'op1',
+          currency: 'USD',
+          totalAmount: 100,
+          netCostToProvider: 100,
+        },
+      ],
+    });
+    prisma.debitNote.updateMany.mockResolvedValue({ count: 1 });
+    prisma.creditNote.findFirst.mockResolvedValue(null);
+    prisma.creditNote.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nc', ...data }),
+    );
+    prisma.ticket.update.mockResolvedValue({});
+    prisma.auditLog.create.mockResolvedValue({});
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+
+    await service.close('nd1');
+
+    const nc = prisma.creditNote.create.mock.calls[0]?.[0].data;
+    expect(nc.totalAmountUsd).toBe(100);
+    expect(nc.totalAmountBob).toBeCloseTo(700, 2);
+  });
+
+  it('void on an already-voided (ANULADA) ND throws BadRequestException', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'ANULADA',
+      observations: '',
+      items: [],
+    });
+    prisma.debitNote.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.void('nd1', 'duplicado')).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
