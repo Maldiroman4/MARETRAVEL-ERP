@@ -1150,20 +1150,20 @@ class OperationsHubModule {
           <div style="background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 10px;">
             <div class="form-row" style="grid-template-columns: 1.2fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem;">Tarifa Base (BOB) / Costo Proveedor:</label>
-                <input type="number" step="0.01" class="form-control font-mono font-bold" value="${item.fareAmount || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right;" required>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">Costo Prov. (Bruto):</label>
+                <input type="number" step="0.01" min="0" id="uni-item-fare-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${item.fareAmount !== undefined ? item.fareAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right; border-color: #fca5a5;" required>
               </div>
               <div>
-                <label class="form-label" style="font-size: 0.75rem;">Fee Agencia (BOB):</label>
-                <input type="number" step="0.01" class="form-control font-mono" value="${item.feeAmount || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'feeAmount', parseFloat(this.value) || 0)" style="text-align: right;">
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Fee Agencia (BOB):</label>
+                <input type="number" step="0.01" min="0" id="uni-item-fee-${idx}" class="form-control font-mono" placeholder="0.00" value="${item.feeAmount !== undefined ? item.feeAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'feeAmount', parseFloat(this.value) || 0)" style="text-align: right;">
               </div>
               <div>
                 <label class="form-label" style="font-size: 0.75rem;">% Comis. Prov:</label>
-                <input type="number" step="0.01" class="form-control font-mono" value="${item.providerCommissionRate || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'providerCommissionRate', parseFloat(this.value) || 0)" style="text-align: right;">
+                <input type="number" step="0.01" min="0" id="uni-item-rate-${idx}" class="form-control font-mono" placeholder="0.00" value="${item.providerCommissionRate || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'providerCommissionRate', parseFloat(this.value) || 0)" style="text-align: right;">
               </div>
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">
-                  Costo Prov. (${isGross ? 'Bruto' : 'Neto'}):
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #64748b;">
+                  ${isGross ? 'Costo Prov. Liquidable:' : 'Costo Prov. Neto (NC):'}
                 </label>
                 <div id="uni-item-net-cost-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 0.88rem; color: #b91c1c;">
                   BOB ${netCost.toFixed(2)}
@@ -1319,18 +1319,28 @@ class OperationsHubModule {
     this.activeNdItems[index][field] = value;
     if (field === 'fareAmount' || field === 'feeAmount' || field === 'providerCommissionRate') {
       const item = this.activeNdItems[index];
-      const fare = parseFloat(item.fareAmount) || 0;
-      const fee = parseFloat(item.feeAmount) || 0;
+      const fare = parseFloat(item.fareAmount) || 0; // Costo Prov. (Bruto)
+      const fee = parseFloat(item.feeAmount) || 0;   // Fee Agencia
       const rate = parseFloat(item.providerCommissionRate) || 0;
       const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
       const commAmount = fare * (rate / 100);
       const netCost = isGross ? fare : Math.max(0, fare - commAmount);
-      item.totalAmount = fare + fee;
+      
+      // Regla de cálculo reactiva: Total Ítem (A Cobrar) = Costo Prov. (Bruto) + Fee Agencia
+      const lineTotal = fare + fee;
+      item.totalAmount = lineTotal;
+      item.netCost = netCost;
 
       const netCostEl = document.getElementById(`uni-item-net-cost-${index}`);
       const lineTotalEl = document.getElementById(`uni-item-line-total-${index}`);
-      if (netCostEl) netCostEl.textContent = `BOB ${netCost.toFixed(2)}`;
-      if (lineTotalEl) lineTotalEl.textContent = `BOB ${(fare + fee).toFixed(2)}`;
+      if (netCostEl) {
+        if (netCostEl.tagName === 'INPUT') netCostEl.value = `BOB ${netCost.toFixed(2)}`;
+        else netCostEl.textContent = `BOB ${netCost.toFixed(2)}`;
+      }
+      if (lineTotalEl) {
+        if (lineTotalEl.tagName === 'INPUT') lineTotalEl.value = `BOB ${lineTotal.toFixed(2)}`;
+        else lineTotalEl.textContent = `BOB ${lineTotal.toFixed(2)}`;
+      }
 
       if (!this._debouncedCalcTotals) {
         this._debouncedCalcTotals = (window.debounce || (fn => fn))(() => this.calculateConsolidatedTotals(), 300);
