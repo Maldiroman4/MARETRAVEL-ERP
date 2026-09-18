@@ -198,10 +198,15 @@ window.debitNotesModule = {
           <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 600;">
             ${nd.currency} ${Number(nd.balanceBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
           </td>
-          <td><span class="badge ${statusBadge}">${nd.status}</span></td>
+          <td>${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nd.status, (Number(nd.totalAmountBob || 0) - Number(nd.balanceBob || 0)), Number(nd.balanceBob || 0)) : `<span class="badge ${statusBadge}">${nd.status}</span>`}</td>
           <td style="font-size: 0.78rem;">${(nd.isCommissionNd || nd.serviceType === 'COMISION_PLATAFORMA') ? '<span class="badge badge-emerald">Comisión</span>' : ((nd.items?.length || 0) + ' serv.')}</td>
           <td>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+              ${nd.status !== 'ANULADA' ? `
+                <button type="button" class="btn ${Number(nd.balanceBob || 0) > 0.01 ? 'btn-success' : 'btn-secondary'} btn-sm" onclick="window.cashRegisterModule.openPaymentModal('ND', '${nd.id}')" title="Cobrar / Amortizar" style="padding: 4px 8px; font-weight: 700; ${Number(nd.balanceBob || 0) > 0.01 ? 'background: #00a884; border-color: #008f70; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="hand-coins" style="width: 14px; height: 14px;"></i> Cobrar
+                </button>
+              ` : ''}
               ${!isLocked ? `
                 <button class="btn btn-primary btn-sm" onclick="window.debitNotesModule.closeNd('${nd.id}')" title="Cerrar ND y generar NCs a proveedores">
                   <i data-lucide="lock"></i> Cerrar

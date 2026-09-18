@@ -90,9 +90,14 @@ window.creditNotesModule = {
           <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 700;">
             ${nc.currency} ${Number(nc.balance).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
           </td>
-          <td><span class="badge ${statusBadge}">${nc.status}</span></td>
+          <td>${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nc.status, nc.paidAmount, nc.balance) : `<span class="badge ${statusBadge}">${nc.status}</span>`}</td>
           <td style="text-align: center;">
-            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; align-items: center;">
+              ${nc.status !== 'ANULADA' ? `
+                <button type="button" class="btn ${Number(nc.balance || 0) > 0.01 ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="window.cashRegisterModule.openPaymentModal('NC', '${nc.id}')" title="Pagar / Amortizar a Proveedor" style="padding: 4px 8px; font-weight: 700; ${Number(nc.balance || 0) > 0.01 ? 'background: #0284c7; border-color: #0369a1; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="wallet" style="width: 14px; height: 14px;"></i> Pagar
+                </button>
+              ` : ''}
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('NC', '${nc.id}')" title="Corrección Contable">
                 <i data-lucide="edit-3"></i>
               </button>

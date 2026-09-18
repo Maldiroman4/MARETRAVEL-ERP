@@ -523,6 +523,26 @@ body {
 .badge-slate { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .badge-indigo { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
 
+/* Semáforo Visual de Estados por Bordes (ND y NC) */
+.badge-status-pagada, .border-success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 2px solid #00a884 !important;
+  font-weight: 700 !important;
+}
+.badge-status-pendiente, .border-warning {
+  background: #fefce8 !important;
+  color: #b45309 !important;
+  border: 2px solid #eab308 !important;
+  font-weight: 700 !important;
+}
+.badge-status-impaga, .border-secondary {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 2px solid #94a3b8 !important;
+  font-weight: 700 !important;
+}
+
 /* Botones */
 .btn {
   display: inline-flex;

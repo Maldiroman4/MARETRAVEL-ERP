@@ -380,10 +380,15 @@ class OperationsHubModule {
               BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
             </td>
             <td style="text-align: center; white-space: nowrap;">
-              <span class="badge ${badgeClass}">${nd.status}</span>
+              ${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nd.status, (Number(nd.totalAmountBob || 0) - Number(nd.balanceBob || 0)), Number(nd.balanceBob || 0)) : `<span class="badge ${badgeClass}">${nd.status}</span>`}
             </td>
             <td style="white-space: nowrap; width: 1%; min-width: 150px; text-align: right;">
               <div class="table-actions-inline" style="display: inline-flex; align-items: center; gap: 4px;">
+                ${nd.status !== 'ANULADA' ? `
+                  <button type="button" class="btn ${Number(nd.balanceBob || 0) > 0.01 ? 'btn-success' : 'btn-secondary'} btn-xs" onclick="window.cashRegisterModule.openPaymentModal('ND', '${nd.id}')" title="Cobrar / Amortizar" style="padding: 4px 8px; font-weight: 700; ${Number(nd.balanceBob || 0) > 0.01 ? 'background: #00a884; border-color: #008f70; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
+                    <i data-lucide="hand-coins" style="width: 12px; height: 12px;"></i> Cobrar
+                  </button>
+                ` : ''}
                 <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.toggleNdAccordion('${nd.id}')" title="Ver / Ocultar detalle operativo interno" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="chevron-down"></i> Detalle
                 </button>
