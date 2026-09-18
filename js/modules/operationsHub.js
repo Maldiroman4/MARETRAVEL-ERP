@@ -2757,6 +2757,7 @@ class OperationsHubModule {
           if (window.gdsModule) window.gdsModule.render();
           if (window.debitNotesModule) window.debitNotesModule.render();
           if (window.otherIncomesModule) window.otherIncomesModule.render();
+          if (window.cashRegisterModule) window.cashRegisterModule.render();
           window.app.showToast(`¡Operación ND #${existingNd.ndNumber} actualizada con éxito!`, 'success');
           return;
         }
@@ -2996,6 +2997,7 @@ class OperationsHubModule {
       if (window.gdsModule) window.gdsModule.render();
       if (window.debitNotesModule) window.debitNotesModule.render();
       if (window.otherIncomesModule) window.otherIncomesModule.render();
+      if (window.cashRegisterModule) window.cashRegisterModule.render();
 
       const providerCount = Object.keys(providerGroups).length;
       window.app.showToast(`¡ND #${nextNdNumber} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');

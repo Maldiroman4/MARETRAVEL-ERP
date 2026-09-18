@@ -1129,8 +1129,8 @@ window.debitNotesModule = {
     const isNc = explicitDocType === 'NC' || doc.ncNumber !== undefined || doc.docType === 'NC' || doc.type === 'NC';
     const docType = isNc ? 'NC' : 'ND';
     const docTitle = isTransaction
-      ? (isNc ? 'Comprobante Oficial de Pago' : 'Recibo Oficial de Caja')
-      : (isNc ? 'Nota de Crédito' : 'Nota de Débito');
+      ? 'RECIBO DE PAGO'
+      : (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
     const docNumber = isTransaction
       ? (tx.receiptCode || ('RCP-' + String(tx.receiptNumber).padStart(5, '0')))
       : (isNc 
@@ -2155,9 +2155,9 @@ window.debitNotesModule = {
   /**
    * Ejecución de impresión infalible mediante iframe aislado (evita páginas en blanco en Chrome)
    */
-  executePrint(voucherHtml, docType = 'ND') {
+  executePrint(voucherHtml, docType = 'ND', customTitle = null) {
     const isNc = docType === 'NC';
-    const docTitle = isNc ? 'Nota de Crédito' : 'Nota de Débito';
+    const docTitle = customTitle || (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
 
     // 1. Inyectar en #print-area para soporte nativo
     const printArea = document.getElementById('print-area');
@@ -2371,10 +2371,14 @@ window.debitNotesModule = {
     let doc = null;
     if (tx) {
       if (tx.tipo === 'NC' || docType === 'NC') {
-        doc = (data.creditNotes || []).find(n => n.id === tx.creditNoteId || n.ncNumber === tx.creditNoteNumber);
+        const ncId = tx.creditNoteId || (tx.details && tx.details[0] && tx.details[0].creditNoteId);
+        const ncNum = tx.creditNoteNumber || (tx.details && tx.details[0] && tx.details[0].ncNumber);
+        doc = (data.creditNotes || []).find(n => (ncId && n.id === ncId) || (ncNum && n.ncNumber === ncNum));
         docType = 'NC';
       } else {
-        doc = (data.debitNotes || []).find(n => n.id === tx.debitNoteId || n.ndNumber === tx.debitNoteNumber);
+        const ndId = tx.debitNoteId || (tx.details && tx.details[0] && tx.details[0].debitNoteId);
+        const ndNum = tx.debitNoteNumber || (tx.details && tx.details[0] && tx.details[0].ndNumber);
+        doc = (data.debitNotes || []).find(n => (ndId && n.id === ndId) || (ndNum && n.ndNumber === ndNum));
         docType = 'ND';
       }
     }
@@ -2390,6 +2394,7 @@ window.debitNotesModule = {
     }
     if (!doc) return;
     const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType, tx);
-    this.executePrint(voucherHtml, docType);
+    const resolvedTitle = tx ? 'RECIBO DE PAGO' : (docType === 'NC' ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
+    this.executePrint(voucherHtml, docType, resolvedTitle);
   }
 };
