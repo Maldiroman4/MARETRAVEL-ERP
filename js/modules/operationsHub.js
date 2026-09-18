@@ -927,12 +927,9 @@ class OperationsHubModule {
         // -------------------------------------------------------------
         // 2 & 3. PLANTILLA EXCLUSIVA: SEGURO DE VIAJE (Surgical Refactoring)
         // Eliminados: Sub-servicio, Doc. Identidad, Destino Cobertura.
-        // Conservados: Proveedor, Modelo Liq, Pasajero, Voucher, Plan, Fechas Cobertura.
+        // Conservados: Proveedor, Modelo Liq, Pasajero, Voucher, Fechas Cobertura.
         // Fila 5 columnas reactivas y toggle multi-moneda [ BOB | USD ].
         // -------------------------------------------------------------
-        const savedPlans = this.getInsurancePlans();
-        const planOptionsHtml = savedPlans.map(p => `<option value="${p}"></option>`).join('');
-
         return `
           <div class="item-card" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
             <!-- Cabecera de Ítem -->
@@ -981,26 +978,15 @@ class OperationsHubModule {
               </div>
             </div>
 
-            <!-- Fila 3: Plan con Datalist y Coberturas (Inicio / Fin) -->
+            <!-- Fila 3: Fechas de Cobertura (Inicio / Fin) -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
-              <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+              <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div>
-                  <label class="form-label font-bold font-mono" style="font-size: 0.75rem; color: #0369a1;">Plan</label>
-                  <input type="text" class="form-control font-bold font-mono" list="planes-guardados-${idx}" 
-                    placeholder="Ej: AC-60 Mundial" 
-                    value="${item.serviceDetails?.insurancePlan || ''}" 
-                    oninput="window.operationsHubModule.onInsurancePlanInput(${idx}, this.value)"
-                    onchange="window.operationsHubModule.onInsurancePlanChange(${idx}, this.value)">
-                  <datalist id="planes-guardados-${idx}">
-                    ${planOptionsHtml}
-                  </datalist>
-                </div>
-                <div>
-                  <label class="form-label font-mono" style="font-size: 0.75rem;">Cobertura Inicio:</label>
+                  <label class="form-label font-mono font-bold" style="font-size: 0.75rem;">Cobertura Inicio:</label>
                   <input type="date" class="form-control font-mono" value="${item.serviceDetails?.coverageStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageStartDate', this.value)">
                 </div>
                 <div>
-                  <label class="form-label font-mono" style="font-size: 0.75rem;">Cobertura Fin:</label>
+                  <label class="form-label font-mono font-bold" style="font-size: 0.75rem;">Cobertura Fin:</label>
                   <input type="date" class="form-control font-mono" value="${item.serviceDetails?.coverageEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageEndDate', this.value)">
                 </div>
               </div>
