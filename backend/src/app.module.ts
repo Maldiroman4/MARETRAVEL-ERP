@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { GdsTicketsModule } from './modules/gds-tickets/gds-tickets.module';
 import { JwtAuthGuard } from './common/jwt-auth.guard';
 
 @Module({
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from './common/jwt-auth.guard';
     PrismaModule,
     AuthModule,
     AccountsModule,
+    GdsTicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
