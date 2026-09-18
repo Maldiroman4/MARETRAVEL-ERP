@@ -41,16 +41,20 @@ window.cashRegisterModule = {
     if (st === 'ANULADA') {
       return `<span class="badge badge-rose" style="border: 2px solid #f43f5e; font-weight: 700;">ANULADA</span>`;
     }
-    if (st === 'PAGADA' || (paid > 0 && bal <= 0.01)) {
+
+    // Regla matemática estricta: Si tiene saldo pendiente mayor a 0, NUNCA puede ser PAGADA
+    if (bal <= 0.005 && (st === 'PAGADA' || paid > 0)) {
       return `<span class="badge border-success badge-status-pagada" style="background: #ecfdf5; color: #047857; border: 2px solid #00a884; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">
         <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> PAGADA
       </span>`;
     }
-    if (paid > 0 && bal > 0.01) {
+
+    if (paid > 0 && bal > 0.005) {
       return `<span class="badge border-warning badge-status-pendiente" style="background: #fefce8; color: #b45309; border: 2px solid #eab308; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">
         <i data-lucide="clock" style="width: 12px; height: 12px;"></i> PENDIENTE
       </span>`;
     }
+
     return `<span class="badge border-secondary badge-status-impaga" style="background: #f1f5f9; color: #475569; border: 2px solid #94a3b8; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">
       <i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> IMPAGA
     </span>`;
@@ -299,6 +303,11 @@ window.cashRegisterModule = {
       montoAbonadoBob = inputAmount * tc;
     }
 
+    // 1. CÁLCULO DE SALDOS Y AMORTIZACIONES
+    const totalDocumento = isNd
+      ? Number(doc.total_documento ?? doc.totalAmountBob ?? 0)
+      : Number(doc.total_documento ?? doc.totalAmount ?? 0);
+
     const saldoActualBob = isNd
       ? Number(doc.saldo_pendiente ?? doc.balanceBob ?? 0)
       : Number(doc.saldo_pendiente ?? doc.balance ?? 0);
@@ -308,38 +317,46 @@ window.cashRegisterModule = {
       return;
     }
 
-    const nuevoSaldoBob = Math.max(0, parseFloat((saldoActualBob - montoAbonadoBob).toFixed(2)));
-    const nuevoSaldoUsd = tc > 0 ? parseFloat((nuevoSaldoBob / tc).toFixed(2)) : 0;
-
     const acumuladoPrevioBob = Number(doc.monto_acumulado_pagado ?? (isNd ? doc.paidAmountBob : doc.paidAmount) ?? 0);
-    const nuevoAcumuladoBob = parseFloat((acumuladoPrevioBob + montoAbonadoBob).toFixed(2));
-    const nuevoAcumuladoUsd = tc > 0 ? parseFloat((nuevoAcumuladoBob / tc).toFixed(2)) : 0;
+    const montoAcumuladoPagado = parseFloat((acumuladoPrevioBob + montoAbonadoBob).toFixed(2));
+    const saldoPendiente = Math.max(0, parseFloat((totalDocumento - montoAcumuladoPagado).toFixed(2)));
+    const saldoPendienteUsd = tc > 0 ? parseFloat((saldoPendiente / tc).toFixed(2)) : 0;
+    const montoAcumuladoUsd = tc > 0 ? parseFloat((montoAcumuladoPagado / tc).toFixed(2)) : 0;
 
-    // 1. ACTUALIZAR SALDOS Y SEMÁFORO DEL DOCUMENTO
-    doc.saldo_pendiente = nuevoSaldoBob;
-    doc.monto_acumulado_pagado = nuevoAcumuladoBob;
+    // ACTUALIZACIÓN DE SALDOS EN EL DOCUMENTO
+    doc.total_documento = totalDocumento;
+    doc.saldo_pendiente = saldoPendiente;
+    doc.monto_acumulado_pagado = montoAcumuladoPagado;
 
     if (isNd) {
-      doc.balanceBob = nuevoSaldoBob;
-      doc.balanceUsd = nuevoSaldoUsd;
-      doc.paidAmountBob = nuevoAcumuladoBob;
-      doc.paidAmountUsd = nuevoAcumuladoUsd;
+      doc.balanceBob = saldoPendiente;
+      doc.balanceUsd = saldoPendienteUsd;
+      doc.paidAmountBob = montoAcumuladoPagado;
+      doc.paidAmountUsd = montoAcumuladoUsd;
     } else {
-      doc.balance = nuevoSaldoBob;
-      doc.paidAmount = nuevoAcumuladoBob;
+      doc.balance = saldoPendiente;
+      doc.paidAmount = montoAcumuladoPagado;
     }
 
-    // Regla de Semáforo:
-    // - saldo_pendiente === 0 -> PAGADA
-    // - monto_abonado > 0 && saldo_pendiente > 0 -> PENDIENTE
-    // - monto_abonado === 0 -> IMPAGA
-    if (nuevoSaldoBob <= 0.01) {
-      doc.status = 'PAGADA';
-    } else if (nuevoAcumuladoBob > 0) {
-      doc.status = 'PENDIENTE';
+    // CONDICIÓN MATEMÁTICA ESTRICTA DE CANCELACIÓN Y GLOSA
+    let nuevoEstado = 'IMPAGA';
+    let reciboGlosa = '';
+
+    if (saldoPendiente <= 0.005) {
+      nuevoEstado = 'PAGADA';
+      reciboGlosa = isNd ? 'Cobro total ND' : 'Pago total NC';
+    } else if (saldoPendiente > 0.005 && montoAcumuladoPagado > 0) {
+      nuevoEstado = 'PENDIENTE';
+      reciboGlosa = isNd
+        ? `Abono parcial ND (Saldo pendiente: BOB ${saldoPendiente.toFixed(2)})`
+        : `Abono parcial NC (Saldo pendiente: BOB ${saldoPendiente.toFixed(2)})`;
     } else {
-      doc.status = 'IMPAGA';
+      nuevoEstado = 'IMPAGA';
+      reciboGlosa = isNd ? 'Cobro ND' : 'Pago NC';
     }
+
+    doc.estado = nuevoEstado;
+    doc.status = nuevoEstado;
 
     // 2. GENERAR NÚMERO DE RECIBO CONSECUTIVO RCP-XXXXX
     let maxRcp = 2000;
@@ -354,7 +371,7 @@ window.cashRegisterModule = {
     const nextReceiptNum = maxRcp + 1;
     const receiptCode = `RCP-${String(nextReceiptNum).padStart(5, '0')}`;
 
-    // 3. DETERMINAR SERVICIO ACTIVO Y GLOSA
+    // 3. DETERMINAR SERVICIO ACTIVO Y GLOSA FINAL
     const rawActive = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'ALL';
     let serviceCategory = rawActive;
     if (serviceCategory === 'ALL' && doc.items && doc.items.length > 0) {
@@ -363,12 +380,8 @@ window.cashRegisterModule = {
       serviceCategory = doc.serviceType;
     }
 
-    const isTotal = (nuevoSaldoBob <= 0.01);
     const docNumLabel = isNd ? `ND #${doc.ndNumber}` : `NC #${doc.ncNumber}`;
-    const defaultGlosa = isTotal
-      ? `Pago Total de ${docNumLabel}`
-      : `Abono Parcial a ${docNumLabel} (Saldo restante: BOB ${nuevoSaldoBob.toFixed(2)})`;
-    const glosaFinal = userNotes ? `${userNotes} [${defaultGlosa}]` : defaultGlosa;
+    const glosaFinal = userNotes ? `${userNotes} - ${reciboGlosa}` : reciboGlosa;
 
     // 4. INSERTAR RECIBO INDEPENDIENTE EN CAJA
     if (isNd) {
@@ -378,7 +391,7 @@ window.cashRegisterModule = {
         receiptCode: receiptCode,
         receiptDate: new Date().toISOString().split('T')[0],
         tipo: 'ND',
-        tipoTransaccion: 'COBRO ND',
+        tipoTransaccion: (saldoPendiente <= 0.005) ? 'COBRO TOTAL ND' : 'ABONO PARCIAL ND',
         documentoOrigen: docNumLabel,
         debitNoteId: doc.id,
         debitNoteNumber: doc.ndNumber,
@@ -386,12 +399,17 @@ window.cashRegisterModule = {
         accountName: doc.accountName,
         serviceCategory: serviceCategory,
         serviceType: serviceCategory,
+        monto_transaccion: parseFloat(montoAbonadoBob.toFixed(2)),
+        monto_transaccion_usd: parseFloat(montoAbonadoUsd.toFixed(2)),
         totalPaidBob: parseFloat(montoAbonadoBob.toFixed(2)),
         totalPaidUsd: parseFloat(montoAbonadoUsd.toFixed(2)),
+        total_documento: totalDocumento,
+        saldo_pendiente: saldoPendiente,
+        monto_acumulado_pagado: montoAcumuladoPagado,
+        isPartial: (saldoPendiente > 0.005),
         exchangeRateUsed: tc,
         status: 'VALIDO',
-        estado: 'PAGADA',
-        saldo_pendiente: 0,
+        estado: nuevoEstado,
         glosa: glosaFinal,
         concept: glosaFinal,
         paymentMethod: payMethod,
@@ -403,10 +421,11 @@ window.cashRegisterModule = {
           debitNoteId: doc.id,
           ndNumber: doc.ndNumber,
           serviceType: serviceCategory,
+          totalDocumento: totalDocumento,
           amountPaidBob: parseFloat(montoAbonadoBob.toFixed(2)),
           amountPaidUsd: parseFloat(montoAbonadoUsd.toFixed(2)),
           previousBalanceBob: saldoActualBob,
-          remainingBalanceBob: nuevoSaldoBob
+          remainingBalanceBob: saldoPendiente
         }],
         payments: [{
           paymentMethodName: payMethod,
@@ -427,7 +446,7 @@ window.cashRegisterModule = {
         receiptCode: receiptCode,
         paymentDate: new Date().toISOString().split('T')[0],
         tipo: 'NC',
-        tipoTransaccion: 'PAGO NC',
+        tipoTransaccion: (saldoPendiente <= 0.005) ? 'PAGO TOTAL NC' : 'ABONO PARCIAL NC',
         documentoOrigen: docNumLabel,
         creditNoteId: doc.id,
         creditNoteNumber: doc.ncNumber,
@@ -435,13 +454,18 @@ window.cashRegisterModule = {
         providerName: doc.providerName,
         serviceCategory: serviceCategory,
         serviceType: serviceCategory,
+        monto_transaccion: parseFloat(montoAbonadoBob.toFixed(2)),
+        monto_transaccion_usd: parseFloat(montoAbonadoUsd.toFixed(2)),
         totalPaid: parseFloat(montoAbonadoBob.toFixed(2)),
         totalPaidBob: parseFloat(montoAbonadoBob.toFixed(2)),
         totalPaidUsd: parseFloat(montoAbonadoUsd.toFixed(2)),
+        total_documento: totalDocumento,
+        saldo_pendiente: saldoPendiente,
+        monto_acumulado_pagado: montoAcumuladoPagado,
+        isPartial: (saldoPendiente > 0.005),
         exchangeRateUsed: tc,
         status: 'VALIDO',
-        estado: 'PAGADA',
-        saldo_pendiente: 0,
+        estado: nuevoEstado,
         glosa: glosaFinal,
         concept: glosaFinal,
         paymentMethod: payMethod,
@@ -453,11 +477,12 @@ window.cashRegisterModule = {
           creditNoteId: doc.id,
           ncNumber: doc.ncNumber,
           serviceType: serviceCategory,
+          totalDocumento: totalDocumento,
           amountPaid: parseFloat(montoAbonadoBob.toFixed(2)),
           amountPaidBob: parseFloat(montoAbonadoBob.toFixed(2)),
           amountPaidUsd: parseFloat(montoAbonadoUsd.toFixed(2)),
           previousBalanceBob: saldoActualBob,
-          remainingBalanceBob: nuevoSaldoBob
+          remainingBalanceBob: saldoPendiente
         }]
       };
       if (!data.providerPayments) data.providerPayments = [];
@@ -1696,22 +1721,29 @@ window.cashRegisterModule = {
         return;
       }
 
+      const isPartial = r.isPartial || (Number(r.saldo_pendiente ?? linkedNd.saldo_pendiente ?? linkedNd.balanceBob ?? 0) > 0.005);
+      const saldoPend = Number(r.saldo_pendiente ?? linkedNd.saldo_pendiente ?? linkedNd.balanceBob ?? 0);
+      const amtBob = Number(r.monto_transaccion ?? r.totalPaidBob ?? 0);
+      const tc = Number(r.exchangeRateUsed || 6.96);
+
       transaccionesCaja.push({
         tipo: 'ND',
         id: r.id,
-        number: r.receiptCode || ('REC #' + r.receiptNumber),
+        number: r.receiptCode || ('RCP-' + String(r.receiptNumber).padStart(5, '0')),
         date: r.receiptDate || r.date || (r.createdAt ? r.createdAt.split(',')[0] : '-'),
         party: linkedNd.accountName || r.accountName || 'Cliente General',
         documentoOrigen: r.documentoOrigen || (linkedNd ? `ND #${linkedNd.ndNumber}` : ''),
-        tipoTransaccion: r.tipoTransaccion || 'COBRO ND',
+        tipoTransaccion: r.tipoTransaccion || (isPartial ? 'ABONO PARCIAL ND' : 'COBRO TOTAL ND'),
         servicio: r.serviceCategory || (linkedNd.items && linkedNd.items[0]?.serviceType) || 'GENERAL',
         serviceCategory: r.serviceCategory || (linkedNd.items && linkedNd.items[0]?.serviceType) || 'GENERAL',
         glosa: r.glosa || r.concept || '',
-        amountBob: Number(r.totalPaidBob || linkedNd.total_documento || linkedNd.totalAmountBob || 0),
-        amountUsd: Number(r.totalPaidUsd || linkedNd.totalAmountUsd || 0),
-        estado: 'PAGADA',
+        amountBob: amtBob,
+        amountUsd: Number(r.monto_transaccion_usd ?? r.totalPaidUsd ?? (amtBob / tc)),
+        estado: isPartial ? 'PENDIENTE' : 'PAGADA',
         status: 'VALIDO',
-        saldo_pendiente: 0,
+        saldo_pendiente: saldoPend,
+        total_documento: Number(r.total_documento ?? linkedNd.total_documento ?? linkedNd.totalAmountBob ?? 0),
+        isPartial: isPartial,
         user: r.createdByName || r.cajero || 'Luis (Admin)',
         reversalReason: r.reversalReason,
         raw: r,
@@ -1752,7 +1784,7 @@ window.cashRegisterModule = {
         date: nd.issueDate || (nd.createdAt ? nd.createdAt.split(',')[0] : '-'),
         party: nd.accountName || 'Cliente General',
         documentoOrigen: `ND #${nd.ndNumber}`,
-        tipoTransaccion: 'COBRO ND',
+        tipoTransaccion: 'COBRO TOTAL ND',
         servicio: (nd.items && nd.items[0]?.serviceType) || nd.serviceType || 'GENERAL',
         serviceCategory: (nd.items && nd.items[0]?.serviceType) || nd.serviceType || 'GENERAL',
         glosa: nd.observations || 'Cancelación directa al emitir',
@@ -1761,6 +1793,8 @@ window.cashRegisterModule = {
         estado: 'PAGADA',
         status: 'VALIDO',
         saldo_pendiente: 0,
+        total_documento: totalBob,
+        isPartial: false,
         user: nd.solicitante || 'Administrador',
         raw: nd,
         linkedDoc: nd
@@ -1794,25 +1828,29 @@ window.cashRegisterModule = {
         return;
       }
 
-      const amtBob = Number(p.totalPaid || linkedNc.total_documento || linkedNc.totalAmount || 0);
+      const isPartial = p.isPartial || (Number(p.saldo_pendiente ?? linkedNc.saldo_pendiente ?? linkedNc.balance ?? 0) > 0.005);
+      const saldoPend = Number(p.saldo_pendiente ?? linkedNc.saldo_pendiente ?? linkedNc.balance ?? 0);
+      const amtBob = Number(p.monto_transaccion ?? p.totalPaid ?? p.totalPaidBob ?? 0);
       const tc = Number(p.exchangeRateUsed || 6.96);
 
       transaccionesCaja.push({
         tipo: 'NC',
         id: p.id,
-        number: p.receiptCode || ('OP #' + p.receiptNumber),
+        number: p.receiptCode || ('RCP-' + String(p.receiptNumber).padStart(5, '0')),
         date: p.paymentDate || (p.createdAt ? p.createdAt.split(',')[0] : '-'),
         party: linkedNc.providerName || p.providerName || 'Proveedor',
         documentoOrigen: p.documentoOrigen || (linkedNc ? `NC #${linkedNc.ncNumber}` : ''),
-        tipoTransaccion: p.tipoTransaccion || 'PAGO NC',
+        tipoTransaccion: p.tipoTransaccion || (isPartial ? 'ABONO PARCIAL NC' : 'PAGO TOTAL NC'),
         servicio: p.serviceCategory || linkedNc.serviceCategory || 'GENERAL',
         serviceCategory: p.serviceCategory || linkedNc.serviceCategory || 'GENERAL',
         glosa: p.glosa || p.concept || '',
         amountBob: amtBob,
-        amountUsd: amtBob / tc,
-        estado: 'PAGADA',
+        amountUsd: Number(p.monto_transaccion_usd ?? p.totalPaidUsd ?? (amtBob / tc)),
+        estado: isPartial ? 'PENDIENTE' : 'PAGADA',
         status: 'VALIDO',
-        saldo_pendiente: 0,
+        saldo_pendiente: saldoPend,
+        total_documento: Number(p.total_documento ?? linkedNc.total_documento ?? linkedNc.totalAmount ?? 0),
+        isPartial: isPartial,
         user: p.createdByName || 'Administrador',
         reversalReason: p.reversalReason,
         raw: p,
@@ -1848,7 +1886,7 @@ window.cashRegisterModule = {
         date: nc.issueDate || (nc.createdAt ? nc.createdAt.split(',')[0] : '-'),
         party: nc.providerName || 'Proveedor',
         documentoOrigen: `NC #${nc.ncNumber}`,
-        tipoTransaccion: 'PAGO NC',
+        tipoTransaccion: 'PAGO TOTAL NC',
         servicio: nc.serviceCategory || 'GENERAL',
         serviceCategory: nc.serviceCategory || 'GENERAL',
         glosa: nc.concept || 'Liquidación directa al emitir',
@@ -1857,6 +1895,8 @@ window.cashRegisterModule = {
         estado: 'PAGADA',
         status: 'VALIDO',
         saldo_pendiente: 0,
+        total_documento: amtBob,
+        isPartial: false,
         user: 'Administrador',
         raw: nc,
         linkedDoc: nc
@@ -1866,8 +1906,8 @@ window.cashRegisterModule = {
     // =========================================================================
     // FILTRADO ESTRICTO EN CAJA - COBRANZAS:
     // 1. Aislamiento contextual por Servicio Activo.
-    // 2. Criterio de Inclusión: Únicamente documentos con estado 'PAGADA' (o saldo_pendiente === 0).
-    // 3. Exclusión automática: 'IMPAGA', 'PENDIENTE', 'ANULADA', 'REVERTIDO' o saldo_pendiente > 0.
+    // 2. Criterio de Inclusión: Comprobantes de caja emitidos válidos y documentos liquidados.
+    // 3. Exclusión automática de transacciones anuladas o revertidas.
     // 4. Sub-filtro horizontal: "Todos", "Recibos (ND)", "Pagos (NC)".
     // =========================================================================
     const imprimiblesCaja = transaccionesCaja.filter(item => {
@@ -1880,20 +1920,21 @@ window.cashRegisterModule = {
       if (filter === 'ND' && item.tipo !== 'ND') return false;
       if (filter === 'NC' && item.tipo !== 'NC') return false;
 
-      // C. Exclusión total de documentos no pagados o revertidos
-      const st = String(item.estado || item.status || '').toUpperCase();
-      if (['IMPAGA', 'PENDIENTE', 'ANULADA', 'REVERTIDO', 'PARCIAL'].includes(st)) {
+      // C. Exclusión de transacciones anuladas o revertidas
+      if (item.reversalReason || item.status === 'REVERTIDO' || item.status === 'ANULADA' || item.estado === 'ANULADA') {
         return false;
       }
 
-      // D. Exclusión terminante si posee saldo pendiente mayor a 0
-      const saldoPendiente = Number(item.saldo_pendiente ?? 0);
-      if (saldoPendiente > 0.01) {
-        return false;
+      // D. Si es un documento base (sin recibo independiente emitido), solo listar si está 100% pagado
+      const isReceipt = Boolean(item.raw && (item.raw.receiptNumber || item.raw.receiptCode));
+      if (!isReceipt) {
+        const saldoPendiente = Number(item.saldo_pendiente ?? 0);
+        if (item.estado !== 'PAGADA' || saldoPendiente > 0.01) {
+          return false;
+        }
       }
 
-      // E. Inclusión exclusiva: estado consolidado 'PAGADA'
-      return st === 'PAGADA' || st === 'VALIDO' || (saldoPendiente <= 0.01 && (item.amountBob > 0 || item.amountUsd > 0));
+      return true;
     });
 
     // Filtrar por búsqueda
@@ -1936,7 +1977,11 @@ window.cashRegisterModule = {
       const typeBadge = isNd
         ? `<span class="badge badge-emerald" style="font-weight:700;"><i data-lucide="arrow-down-left" style="width:13px;height:13px;"></i> ${it.tipoTransaccion || 'COBRO ND'}</span>`
         : `<span class="badge badge-amber" style="font-weight:700; color:#78350f; background:#fef08a; border-color:#fde047;"><i data-lucide="arrow-up-right" style="width:13px;height:13px;"></i> ${it.tipoTransaccion || 'PAGO NC'}</span>`;
-      const statusBadge = `<span class="badge border-success badge-status-pagada" style="background:#ecfdf5; color:#047857; border:2px solid #00a884; font-weight:700;"><i data-lucide="check-circle" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;"></i> PAGADA</span>`;
+
+      const isPartial = it.isPartial || (Number(it.saldo_pendiente || 0) > 0.005) || it.estado === 'PENDIENTE';
+      const statusBadge = isPartial
+        ? window.cashRegisterModule.renderStatusBadge('PENDIENTE', it.amountBob, it.saldo_pendiente)
+        : window.cashRegisterModule.renderStatusBadge('PAGADA', it.amountBob, 0);
 
       return `
         <tr>
@@ -2088,18 +2133,18 @@ window.cashRegisterModule = {
     // 2. Impresión Oficial con la plantilla corporativa MARETRAVEL SRL
     if (nd) {
       if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
-        window.debitNotesModule.directPrint(nd.id, 'ND');
+        window.debitNotesModule.directPrint(nd.id, 'ND', receipt);
         return;
       }
     }
 
     if (nc) {
       if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
-        window.debitNotesModule.directPrint(nc.id, 'NC');
+        window.debitNotesModule.directPrint(nc.id, 'NC', payment);
         return;
       }
       if (window.creditNotesModule && typeof window.creditNotesModule.directPrint === 'function') {
-        window.creditNotesModule.directPrint(nc.id);
+        window.creditNotesModule.directPrint(nc.id, payment);
         return;
       }
     }

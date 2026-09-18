@@ -1116,15 +1116,22 @@ window.debitNotesModule = {
    * por servicio con switch (item.tipo_servicio) para los 10 servicios,
    * tabla de totales en verde #00a884, observaciones y firmas inferiores.
    */
-  generateOfficialVoucherHtml(doc, customEmissionDate, customEmissionTime, explicitDocType = null) {
+  generateOfficialVoucherHtml(doc, customEmissionDate, customEmissionTime, explicitDocType = null, transactionContext = null) {
     if (!doc) return '';
+
+    const tx = transactionContext || (doc && (doc.receiptCode || doc.receiptNumber) ? doc : null);
+    const isTransaction = Boolean(tx);
 
     const isNc = explicitDocType === 'NC' || doc.ncNumber !== undefined || doc.docType === 'NC' || doc.type === 'NC';
     const docType = isNc ? 'NC' : 'ND';
-    const docTitle = isNc ? 'Nota de Crédito' : 'Nota de Débito';
-    const docNumber = isNc 
-      ? (doc.ncNumber != null ? doc.ncNumber : doc.id)
-      : (doc.ndNumber != null ? doc.ndNumber : doc.id);
+    const docTitle = isTransaction
+      ? (isNc ? 'Comprobante Oficial de Pago' : 'Recibo Oficial de Caja')
+      : (isNc ? 'Nota de Crédito' : 'Nota de Débito');
+    const docNumber = isTransaction
+      ? (tx.receiptCode || ('RCP-' + String(tx.receiptNumber).padStart(5, '0')))
+      : (isNc 
+          ? (doc.ncNumber != null ? doc.ncNumber : doc.id)
+          : (doc.ndNumber != null ? doc.ndNumber : doc.id));
 
     const data = window.db.get();
     
@@ -1974,19 +1981,29 @@ window.debitNotesModule = {
     // Tipo de cambio congelado al emitir
     const tcUsed = doc.frozenExchangeRate || doc.exchangeRateUsed || (data.systemSettings ? data.systemSettings.activeExchangeSell : 6.96) || 6.96;
 
-    // Totales
+    // Totales y Mapeo de Transacción (Recibo de Caja / Pago)
     const currencyStr = doc.currency || 'BOB';
-    const amountVal = Number(doc.totalAmountBob != null ? doc.totalAmountBob : (doc.totalAmount || 0));
-    let totalUsdFormatted = '0.00';
-    let totalBobFormatted = '0.00';
+    const totalDocVal = Number(doc.total_documento ?? (docType === 'ND' ? doc.totalAmountBob : doc.totalAmount) ?? 0);
 
-    if (currencyStr === 'USD') {
-      totalUsdFormatted = Number(doc.totalAmountUsd || (amountVal / tcUsed) || doc.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      totalBobFormatted = Number(amountVal * (amountVal === (doc.totalAmountUsd || doc.totalAmount) ? tcUsed : 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } else {
-      totalUsdFormatted = Number(amountVal / tcUsed).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      totalBobFormatted = Number(amountVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+    const montoTransaccionBob = isTransaction
+      ? Number(tx.monto_transaccion ?? tx.totalPaidBob ?? tx.amountPaidBob ?? tx.amountBob ?? 0)
+      : totalDocVal;
+
+    const montoTransaccionUsd = isTransaction
+      ? Number(tx.monto_transaccion_usd ?? tx.totalPaidUsd ?? tx.amountPaidUsd ?? tx.amountUsd ?? (montoTransaccionBob / tcUsed))
+      : Number(doc.totalAmountUsd || (totalDocVal / tcUsed));
+
+    const saldoRemanenteBob = isTransaction
+      ? Number(tx.saldo_pendiente ?? (tx.details && tx.details[0] && tx.details[0].remainingBalanceBob) ?? doc.saldo_pendiente ?? doc.balanceBob ?? doc.balance ?? 0)
+      : Number(doc.saldo_pendiente ?? doc.balanceBob ?? doc.balance ?? 0);
+
+    const isPartialPayment = isTransaction && (saldoRemanenteBob > 0.005 || tx.isPartial || tx.estado === 'PENDIENTE');
+
+    const displayAmountBob = isTransaction ? montoTransaccionBob : totalDocVal;
+    const displayAmountUsd = isTransaction ? montoTransaccionUsd : Number(doc.totalAmountUsd || (totalDocVal / tcUsed));
+
+    const totalBobFormatted = Number(displayAmountBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalUsdFormatted = Number(displayAmountUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Observaciones
     let obsText = '';
@@ -2015,6 +2032,11 @@ window.debitNotesModule = {
             <div class="nd-number-line">Nro.: ${docNumber}</div>
             
             <table class="nd-meta-table">
+              ${isTransaction ? `
+              <tr>
+                <td class="nd-lbl-cell">Documento Origen :</td>
+                <td class="nd-val-cell font-mono font-bold" style="color: #0284c7;">${docType} #${doc.ndNumber || doc.ncNumber || doc.id}</td>
+              </tr>` : ''}
               <tr>
                 <td class="nd-lbl-cell">Fecha de Emisión :</td>
                 <td class="nd-val-cell">${emissionDateFormatted}</td>
@@ -2068,16 +2090,29 @@ window.debitNotesModule = {
               </thead>
               <tbody>
                 <tr>
-                  <td class="nd-td-total-label">Importe Total ${docType}:</td>
-                  <td class="nd-td-total-val font-mono">${currencyStr === 'USD' ? '$us ' + totalUsdFormatted : 'BOB ' + totalBobFormatted}</td>
+                  <td class="nd-td-total-label">${isTransaction ? (isNc ? 'Monto Pagado a Proveedor:' : 'Monto Abonado / Pagado:') : `Importe Total ${docType}:`}</td>
+                  <td class="nd-td-total-val font-mono" style="background: #f0fdf4; color: #15803d; font-size: 0.95rem; font-weight: 800;">
+                    ${currencyStr === 'USD' ? '$us ' + totalUsdFormatted : 'BOB ' + totalBobFormatted}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          ${isPartialPayment ? `
+          <div class="nd-partial-summary" style="margin-top: 6px; margin-bottom: 8px; padding: 6px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #00a884; border-radius: 4px; font-size: 0.8rem; display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end;">
+            <div><span style="color: #64748b; font-weight: 600;">Total Servicio:</span> <strong class="font-mono" style="color: #0f172a;">BOB ${Number(totalDocVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Monto Abonado en este Recibo:</span> <strong class="font-mono" style="color: #00a884;">BOB ${Number(montoTransaccionBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Saldo Remanente:</span> <strong class="font-mono" style="color: #dc2626;">BOB ${Number(saldoRemanenteBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+          </div>
+          ` : ''}
+
           <div class="nd-obs-row">
-            <span class="nd-obs-badge">Observaciones ${docType}:</span>
-            <span class="nd-obs-content font-bold">${obsText}</span>
+            <span class="nd-obs-badge">Observaciones ${isTransaction ? 'Recibo' : docType}:</span>
+            <span class="nd-obs-content font-bold">
+              ${isTransaction && tx.glosa ? tx.glosa : obsText}
+              ${isPartialPayment ? ` | Total Servicio: BOB ${totalDocVal.toFixed(2)} | Monto Abonado en este Recibo: BOB ${montoTransaccionBob.toFixed(2)} | Saldo Remanente: BOB ${saldoRemanenteBob.toFixed(2)}` : ''}
+            </span>
           </div>
         </div>
 
@@ -2313,17 +2348,36 @@ window.debitNotesModule = {
   /**
    * Impresión directa sin modal
    */
-  directPrint(docId, docType = 'ND') {
+  directPrint(docId, docType = 'ND', transactionContext = null) {
     const data = window.db.get();
-    let doc = (docType === 'NC' || String(docId).startsWith('NC'))
-      ? (data.creditNotes || []).find(n => n.id === docId)
-      : (data.debitNotes || []).find(n => n.id === docId);
+    let tx = transactionContext;
+    if (!tx) {
+      tx = (data.cashReceipts || []).find(r => r.id === docId || r.receiptCode === docId)
+        || (data.providerPayments || []).find(p => p.id === docId || p.receiptCode === docId);
+    }
+
+    let doc = null;
+    if (tx) {
+      if (tx.tipo === 'NC' || docType === 'NC') {
+        doc = (data.creditNotes || []).find(n => n.id === tx.creditNoteId || n.ncNumber === tx.creditNoteNumber);
+        docType = 'NC';
+      } else {
+        doc = (data.debitNotes || []).find(n => n.id === tx.debitNoteId || n.ndNumber === tx.debitNoteNumber);
+        docType = 'ND';
+      }
+    }
+
+    if (!doc) {
+      doc = (docType === 'NC' || String(docId).startsWith('NC'))
+        ? (data.creditNotes || []).find(n => n.id === docId)
+        : (data.debitNotes || []).find(n => n.id === docId);
+    }
     if (!doc) {
       doc = (data.creditNotes || []).find(n => n.id === docId);
       if (doc) docType = 'NC';
     }
     if (!doc) return;
-    const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType);
+    const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType, tx);
     this.executePrint(voucherHtml, docType);
   }
 };

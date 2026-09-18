@@ -200,9 +200,9 @@ window.creditNotesModule = {
   /**
    * Impresión directa sin modal de NC
    */
-  directPrint(ncId) {
+  directPrint(ncId, transactionContext = null) {
     if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
-      window.debitNotesModule.directPrint(ncId, 'NC');
+      window.debitNotesModule.directPrint(ncId, 'NC', transactionContext);
     }
   }
 };
