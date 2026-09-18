@@ -10,6 +10,8 @@ import { GdsTicketsModule } from './modules/gds-tickets/gds-tickets.module';
 import { DebitNotesModule } from './modules/debit-notes/debit-notes.module';
 import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
 import { CashReceiptsModule } from './modules/cash-receipts/cash-receipts.module';
+import { SupportModule } from './modules/support/support.module';
+import { PrintModule } from './modules/print/print.module';
 import { JwtAuthGuard } from './common/jwt-auth.guard';
 
 @Module({
@@ -22,6 +24,8 @@ import { JwtAuthGuard } from './common/jwt-auth.guard';
     DebitNotesModule,
     CreditNotesModule,
     CashReceiptsModule,
+    SupportModule,
+    PrintModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],

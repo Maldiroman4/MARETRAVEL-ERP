@@ -310,6 +310,13 @@ model ExchangeRate {
   @@map("exchange_rates")
 }
 
+model SystemSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value Json
+  @@map("system_settings")
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String?  @map("user_id")
