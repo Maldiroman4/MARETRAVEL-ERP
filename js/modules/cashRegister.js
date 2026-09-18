@@ -1191,7 +1191,7 @@ window.cashRegisterModule = {
           <td style="font-size: 0.8rem; color: #475569;">${it.user}</td>
           <td style="text-align: center;">
             <div style="display: inline-flex; align-items: center; gap: 6px; justify-content: center;">
-              <button class="btn btn-secondary btn-sm" onclick="${printAction}" title="Imprimir Comprobante Oficial" style="padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <button class="btn btn-secondary btn-sm btn-imprimir-recibo" onclick="${printAction}" title="Imprimir Comprobante Oficial" style="padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                 <i data-lucide="printer" style="width:14px;height:14px;"></i> Imprimir
               </button>
               ${(isNd && isValid) ? `

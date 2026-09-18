@@ -101,12 +101,6 @@ window.creditNotesModule = {
                   <i data-lucide="x-circle"></i>
                 </button>
               ` : ''}
-              <button class="btn btn-secondary btn-sm" onclick="window.creditNotesModule.directPrint('${nc.id}')" title="Impresión Directa (Oficial)">
-                <i data-lucide="printer"></i>
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="window.creditNotesModule.printPreview('${nc.id}')" title="Vista Previa y Emisión Oficial">
-                <i data-lucide="file-text"></i>
-              </button>
             </div>
           </td>
         </tr>

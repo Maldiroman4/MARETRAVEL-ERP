@@ -286,9 +286,6 @@ window.reportsModule = {
           <td><span class="badge ${statusBadge}">${nd.status}</span></td>
           <td style="text-align: center; text-decoration: none;">
             <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printVoucher('${nd.id}', 'ND')" title="Imprimir ND Oficial">
-                <i data-lucide="printer"></i>
-              </button>
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('ND', '${nd.id}')" title="Corregir datos contables (NIT, Razón Social, Fecha, Glosa)">
                 <i data-lucide="edit-3"></i>
               </button>
@@ -386,9 +383,6 @@ window.reportsModule = {
           </td>
           <td style="text-align: center; text-decoration: none;">
             <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printVoucher('${nc.id}', 'NC')" title="Imprimir NC Oficial">
-                <i data-lucide="printer"></i>
-              </button>
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('NC', '${nc.id}')" title="Corregir datos contables">
                 <i data-lucide="edit-3"></i>
               </button>

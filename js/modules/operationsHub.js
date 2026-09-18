@@ -387,9 +387,6 @@ class OperationsHubModule {
                 <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openEditOperationModal('${nd.id}')" title="Editar Operación Integral" style="padding: 4px 6px; font-size: 12px;">
                   <i data-lucide="edit-3"></i> Editar
                 </button>
-                <button type="button" class="btn btn-secondary btn-xs" onclick="window.debitNotesModule.printVoucher('${nd.id}')" title="Imprimir Nota / Voucher" style="padding: 4px 6px; font-size: 12px;">
-                  <i data-lucide="printer"></i>
-                </button>
                 ${nd.status !== 'ANULADA' ? `
                   <button type="button" class="btn btn-warning btn-xs" onclick="window.operationsHubModule.voidOperation('${nd.id}')" title="Anular Operación" style="padding: 4px 6px; font-size: 12px;">
                     <i data-lucide="ban"></i>

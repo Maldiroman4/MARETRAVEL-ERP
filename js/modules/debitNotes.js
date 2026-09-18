@@ -222,12 +222,6 @@ window.debitNotesModule = {
                   <i data-lucide="x-circle"></i>
                 </button>
               ` : ''}
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.directPrint('${nd.id}')" title="Impresión Directa (Oficial)">
-                <i data-lucide="printer"></i>
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printPreview('${nd.id}', 'long')" title="Vista Previa y Emisión Oficial">
-                <i data-lucide="file-text"></i>
-              </button>
             </div>
           </td>
         </tr>
