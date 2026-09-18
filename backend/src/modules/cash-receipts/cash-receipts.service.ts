@@ -71,7 +71,6 @@ export class CashReceiptsService {
       throw new NotFoundException('Cuenta del cliente no encontrada');
     }
 
-    const receiptNumber = await this.nextReceiptNumber(this.prisma);
     const exchangeRate = dto.exchangeRate ?? DEFAULT_RATE;
     const totalPaidBob = round2(
       dto.lines.reduce((s, l) => s + Number(l.amountPaidBob ?? 0), 0),
@@ -81,6 +80,8 @@ export class CashReceiptsService {
     );
 
     return this.prisma.$transaction(async (tx) => {
+      const receiptNumber = await this.nextReceiptNumber(tx);
+
       for (const line of dto.lines) {
         const nd = await tx.debitNote.findUnique({
           where: { id: line.debitNoteId },
@@ -90,21 +91,28 @@ export class CashReceiptsService {
         }
         if (
           nd.status === DebitNoteStatus.BORRADOR ||
-          nd.status === DebitNoteStatus.ANULADA
+          nd.status === DebitNoteStatus.ANULADA ||
+          nd.status === DebitNoteStatus.PAGADA
         ) {
           throw new BadRequestException(
-            'No se puede pagar una nota de débito en estado BORRADOR o ANULADA',
+            'No se puede pagar una nota de débito en estado BORRADOR, ANULADA o PAGADA',
+          );
+        }
+        if (nd.accountId !== dto.clientAccountId) {
+          throw new BadRequestException(
+            'La nota de débito no pertenece a la cuenta del cliente',
           );
         }
 
         const paidBob = Number(line.amountPaidBob ?? 0);
         const paidUsd = Number(line.amountPaidUsd ?? 0);
-        const newBalanceBob = round2(
-          Math.max(Number(nd.balanceBob) - paidBob, 0),
-        );
-        const newBalanceUsd = round2(
-          Math.max(Number(nd.balanceUsd) - paidUsd, 0),
-        );
+        if (paidBob > Number(nd.balanceBob) || paidUsd > Number(nd.balanceUsd)) {
+          throw new BadRequestException(
+            'El monto pagado supera el saldo de la nota de débito',
+          );
+        }
+        const newBalanceBob = round2(Number(nd.balanceBob) - paidBob);
+        const newBalanceUsd = round2(Number(nd.balanceUsd) - paidUsd);
         const newPaidBob = round2(Number(nd.paidAmountBob) + paidBob);
         const newPaidUsd = round2(Number(nd.paidAmountUsd) + paidUsd);
         const newStatus =
@@ -167,17 +175,25 @@ export class CashReceiptsService {
   async void(id: string, motivo?: string, userId?: string) {
     this.assertMotivo(motivo);
 
-    const receipt = await this.prisma.cashReceipt.findUnique({
-      where: { id },
-      include: { lines: true },
-    });
-    if (!receipt || receipt.status !== CashReceiptStatus.VALIDO) {
-      throw new BadRequestException(
-        'Solo se pueden reversar recibos de caja en estado VÁLIDO',
-      );
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      const upd = await tx.cashReceipt.updateMany({
+        where: { id, status: CashReceiptStatus.VALIDO },
+        data: { status: CashReceiptStatus.REVERSADO, voidReason: motivo },
+      });
+      if (upd.count !== 1) {
+        throw new BadRequestException(
+          'Solo se pueden reversar recibos de caja en estado VÁLIDO',
+        );
+      }
+
+      const receipt = await tx.cashReceipt.findUnique({
+        where: { id },
+        include: { lines: true },
+      });
+      if (!receipt) {
+        throw new NotFoundException('Recibo de caja no encontrado');
+      }
+
       for (const line of receipt.lines) {
         const nd = await tx.debitNote.findUnique({
           where: { id: line.debitNoteId },
@@ -218,12 +234,6 @@ export class CashReceiptsService {
         });
       }
 
-      const updated = await tx.cashReceipt.update({
-        where: { id },
-        data: { status: CashReceiptStatus.REVERSADO, voidReason: motivo },
-        include: { lines: true },
-      });
-
       await tx.auditLog.create({
         data: {
           action: 'VOID_RECEIPT',
@@ -235,7 +245,7 @@ export class CashReceiptsService {
         },
       });
 
-      return updated;
+      return { ...receipt, status: CashReceiptStatus.REVERSADO };
     });
   }
 }

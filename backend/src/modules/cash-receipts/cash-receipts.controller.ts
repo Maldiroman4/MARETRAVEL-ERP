@@ -20,9 +20,9 @@ export class CashReceiptsController {
   @Post()
   create(
     @Body() dto: CreateCashReceiptDto,
-    @Req() req: { user?: { id?: string } },
+    @Req() req: { user: { id: string } },
   ) {
-    return this.service.create(dto, req.user?.id);
+    return this.service.create(dto, req.user.id);
   }
 
   @Post(':id/void')
