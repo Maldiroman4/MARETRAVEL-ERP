@@ -803,6 +803,7 @@ class OperationsHubModule {
       description: custom.description || (firstSub ? firstSub.serviceName : ''),
       currency: custom.currency || 'BOB',
       fareAmount: (custom.fareAmount !== undefined) ? parseFloat(custom.fareAmount) : 0,
+      grossCost: (custom.grossCost !== undefined) ? parseFloat(custom.grossCost) : ((custom.fareAmount !== undefined) ? parseFloat(custom.fareAmount) : 0),
       feeAmount: (custom.feeAmount !== undefined) ? parseFloat(custom.feeAmount) : 0,
       providerCommissionRate: (custom.providerCommissionRate !== undefined) ? parseFloat(custom.providerCommissionRate) : defaultCommission,
       serviceDetails: custom.serviceDetails || (resolvedService === 'SEGURO_VIAJE' ? {
@@ -914,9 +915,13 @@ class OperationsHubModule {
       const fare = parseFloat(item.fareAmount) || 0;
       const fee = parseFloat(item.feeAmount) || 0;
       const rate = parseFloat(item.providerCommissionRate) || 0;
+      const grossCost = (item.grossCost !== undefined && item.grossCost !== null && !isNaN(item.grossCost))
+        ? parseFloat(item.grossCost)
+        : fare;
+      item.grossCost = grossCost;
       const commAmt = fare * (rate / 100);
-      const netCost = isGross ? fare : Math.max(0, fare - commAmt);
-      const lineTotal = fare + fee;
+      const netCost = isGross ? grossCost : Math.max(0, grossCost - commAmt);
+      const lineTotal = isInsurance ? (fare + fee) : (grossCost + fee);
 
       // Conversión para el subtexto
       let subtextConversion = '';
@@ -1149,26 +1154,27 @@ class OperationsHubModule {
           <!-- Fila 4: Estructura Financiera e Importes -->
           <div style="background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 10px;">
             <div class="form-row" style="grid-template-columns: 1.2fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
+              <!-- 1. AIR FARE: Inicial, modificable -->
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">Costo Prov. (Bruto):</label>
-                <input type="number" step="0.01" min="0" id="uni-item-fare-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${item.fareAmount !== undefined ? item.fareAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right; border-color: #fca5a5;" required>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #0f2742;">AIR FARE:</label>
+                <input type="number" step="0.01" min="0" id="uni-item-fare-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${item.fareAmount !== undefined ? item.fareAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right;" required>
               </div>
+              <!-- 2. Fee Agencia: Modificable -->
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Fee Agencia (BOB):</label>
                 <input type="number" step="0.01" min="0" id="uni-item-fee-${idx}" class="form-control font-mono" placeholder="0.00" value="${item.feeAmount !== undefined ? item.feeAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'feeAmount', parseFloat(this.value) || 0)" style="text-align: right;">
               </div>
+              <!-- 3. % Comis. Prov: Modificable -->
               <div>
                 <label class="form-label" style="font-size: 0.75rem;">% Comis. Prov:</label>
                 <input type="number" step="0.01" min="0" id="uni-item-rate-${idx}" class="form-control font-mono" placeholder="0.00" value="${item.providerCommissionRate || 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'providerCommissionRate', parseFloat(this.value) || 0)" style="text-align: right;">
               </div>
+              <!-- 4. Costo Prov. (Bruto): Cuarta casilla, modificable -->
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem; color: #64748b;">
-                  ${isGross ? 'Costo Prov. Liquidable:' : 'Costo Prov. Neto (NC):'}
-                </label>
-                <div id="uni-item-net-cost-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 0.88rem; color: #b91c1c;">
-                  BOB ${netCost.toFixed(2)}
-                </div>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">Costo Prov. (Bruto):</label>
+                <input type="number" step="0.01" min="0" id="uni-item-gross-cost-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${grossCost !== undefined ? grossCost : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'grossCost', parseFloat(this.value) || 0)" style="text-align: right; border-color: #fca5a5; color: #b91c1c;" required>
               </div>
+              <!-- 5. Total Ítem (A Cobrar): Suma de Fee Agencia + Costo Prov. -->
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem; color: #0369a1;">Total Ítem (A Cobrar):</label>
                 <div id="uni-item-line-total-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
@@ -1317,26 +1323,40 @@ class OperationsHubModule {
   onItemFieldChange(index, field, value) {
     if (!this.activeNdItems[index]) return;
     this.activeNdItems[index][field] = value;
-    if (field === 'fareAmount' || field === 'feeAmount' || field === 'providerCommissionRate') {
+    if (field === 'fareAmount' || field === 'grossCost' || field === 'feeAmount' || field === 'providerCommissionRate') {
       const item = this.activeNdItems[index];
-      const fare = parseFloat(item.fareAmount) || 0; // Costo Prov. (Bruto)
+      const fare = parseFloat(item.fareAmount) || 0; // AIR FARE
       const fee = parseFloat(item.feeAmount) || 0;   // Fee Agencia
-      const rate = parseFloat(item.providerCommissionRate) || 0;
+      const rate = parseFloat(item.providerCommissionRate) || 0; // % Comis. Prov
+
+      // Si el operador cambia AIR FARE y aún no ha personalizado Costo Prov. Bruto, sugerirlo
+      if (field === 'fareAmount') {
+        if (!item._grossCostManual) {
+          item.grossCost = fare;
+          const grossEl = document.getElementById(`uni-item-gross-cost-${index}`);
+          if (grossEl) grossEl.value = fare;
+        }
+      } else if (field === 'grossCost') {
+        item._grossCostManual = true;
+      }
+
+      const grossCost = (item.grossCost !== undefined && item.grossCost !== null && !isNaN(item.grossCost))
+        ? parseFloat(item.grossCost)
+        : fare;
+      item.grossCost = grossCost;
+
       const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
       const commAmount = fare * (rate / 100);
-      const netCost = isGross ? fare : Math.max(0, fare - commAmount);
+      const netCost = isGross ? grossCost : Math.max(0, grossCost - commAmount);
       
-      // Regla de cálculo reactiva: Total Ítem (A Cobrar) = Costo Prov. (Bruto) + Fee Agencia
-      const lineTotal = fare + fee;
+      // Regla de cálculo reactiva: Total Ítem = Costo Prov. (Bruto) + Fee Agencia
+      const lineTotal = grossCost + fee;
       item.totalAmount = lineTotal;
       item.netCost = netCost;
+      item.providerCommissionAmount = commAmount;
+      item.netCostToProvider = netCost;
 
-      const netCostEl = document.getElementById(`uni-item-net-cost-${index}`);
       const lineTotalEl = document.getElementById(`uni-item-line-total-${index}`);
-      if (netCostEl) {
-        if (netCostEl.tagName === 'INPUT') netCostEl.value = `BOB ${netCost.toFixed(2)}`;
-        else netCostEl.textContent = `BOB ${netCost.toFixed(2)}`;
-      }
       if (lineTotalEl) {
         if (lineTotalEl.tagName === 'INPUT') lineTotalEl.value = `BOB ${lineTotal.toFixed(2)}`;
         else lineTotalEl.textContent = `BOB ${lineTotal.toFixed(2)}`;
@@ -1499,12 +1519,16 @@ class OperationsHubModule {
       const fare = parseFloat(item.fareAmount) || 0;
       const fee = parseFloat(item.feeAmount) || 0;
       const rate = parseFloat(item.providerCommissionRate) || 0;
+      const grossCost = (item.grossCost !== undefined && item.grossCost !== null && !isNaN(item.grossCost))
+        ? parseFloat(item.grossCost)
+        : fare;
       const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
 
       const commAmount = fare * (rate / 100);
-      const netCost = isGross ? fare : Math.max(0, fare - commAmount);
-      const lineTotal = fare + fee;
+      const netCost = isGross ? grossCost : Math.max(0, grossCost - commAmount);
+      const lineTotal = (item.serviceType === 'SEGURO_VIAJE') ? (fare + fee) : (grossCost + fee);
 
+      item.grossCost = grossCost;
       item.totalAmount = lineTotal;
       item.providerCommissionAmount = commAmount;
       item.netCostToProvider = netCost;
@@ -1513,7 +1537,7 @@ class OperationsHubModule {
       const feeBob = isUsd ? (fee * sellRate) : fee;
       const commBob = isUsd ? (commAmount * sellRate) : commAmount;
       const netCostBob = isUsd ? (netCost * sellRate) : netCost;
-      const lineTotalBob = fareBob + feeBob;
+      const lineTotalBob = isUsd ? (lineTotal * sellRate) : lineTotal;
 
       totalVentaBob += lineTotalBob;
       totalCostoBob += netCostBob;
@@ -2527,15 +2551,21 @@ class OperationsHubModule {
         const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
         const fare = parseFloat(it.fareAmount) || 0;
         const fee = parseFloat(it.feeAmount) || 0;
+        const grossCost = (it.grossCost !== undefined && it.grossCost !== null && !isNaN(it.grossCost))
+          ? parseFloat(it.grossCost)
+          : fare;
         const provCommRate = parseFloat(it.providerCommissionRate) || 0;
         const provCommAmount = fare * (provCommRate / 100);
         const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
-        const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+        const netCost = isGross ? grossCost : Math.max(0, grossCost - provCommAmount);
         const isUsd = (it.currency === 'USD');
         const fareBob = isUsd ? (fare * sellRate) : fare;
+        const grossCostBob = isUsd ? (grossCost * sellRate) : grossCost;
         const feeBob = isUsd ? (fee * sellRate) : fee;
         const netCostBob = isUsd ? (netCost * sellRate) : netCost;
         const commBob = isUsd ? (provCommAmount * sellRate) : provCommAmount;
+        const lineTotal = (it.serviceType === 'SEGURO_VIAJE') ? (fare + fee) : (grossCost + fee);
+        const lineTotalBob = isUsd ? (lineTotal * sellRate) : lineTotal;
 
         let ticketId = null;
         if (it.serviceType === 'BOLETO_AEREO' || it.serviceType === 'BOLETO_GDS') {
@@ -2552,15 +2582,16 @@ class OperationsHubModule {
             airlineCode: (prov.code || 'AEREO').substring(0, 4),
             operatorId: it.providerId,
             fareAmount: fareBob,
-            ticketPrice: fareBob,
+            ticketPrice: grossCostBob,
+            grossCost: grossCostBob,
             netAmount: netCostBob,
-            taxAmount: 0,
-            totalAmount: fareBob,
+            taxAmount: Math.max(0, grossCostBob - fareBob),
+            totalAmount: grossCostBob,
             currency: 'BOB',
             commissionRate: provCommRate,
             commissionAmount: commBob,
             feeAmount: feeBob,
-            totalWithFee: fareBob + feeBob,
+            totalWithFee: grossCostBob + feeBob,
             status: 'FACTURADO',
             createdAt: new Date().toLocaleString()
           });
@@ -2581,11 +2612,13 @@ class OperationsHubModule {
           settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
           currency: it.currency || 'BOB',
           fareAmount: fare,
+          grossCost: grossCost,
           feeAmount: fee,
-          totalAmount: fare + fee,
+          totalAmount: lineTotal,
           fareAmountBob: fareBob,
+          grossCostBob: grossCostBob,
           feeAmountBob: feeBob,
-          totalAmountBob: fareBob + feeBob,
+          totalAmountBob: lineTotalBob,
           providerCommissionRate: provCommRate,
           providerCommissionAmount: provCommAmount,
           providerCommissionAmountBob: commBob,
