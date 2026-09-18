@@ -985,9 +985,9 @@ class OperationsHubModule {
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
               <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
                 <div>
-                  <label class="form-label font-bold font-mono" style="font-size: 0.75rem; color: #0369a1;">Plan:</label>
+                  <label class="form-label font-bold font-mono" style="font-size: 0.75rem; color: #0369a1;">Plan</label>
                   <input type="text" class="form-control font-bold font-mono" list="planes-guardados-${idx}" 
-                    placeholder="Ej: Assist Card AC-60 Mundial" 
+                    placeholder="Ej: AC-60 Mundial" 
                     value="${item.serviceDetails?.insurancePlan || ''}" 
                     oninput="window.operationsHubModule.onInsurancePlanInput(${idx}, this.value)"
                     onchange="window.operationsHubModule.onInsurancePlanChange(${idx}, this.value)">
@@ -1077,12 +1077,6 @@ class OperationsHubModule {
                     ${subtextConversion}
                   </div>
                 </div>
-              </div>
-
-              <!-- En segundo plano: Costo Neto al proveedor para NC -->
-              <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 8px; font-size: 0.73rem; color: #b91c1c; gap: 6px;">
-                <span>Costo Prov. Neto (NC):</span>
-                <strong id="uni-insurance-netcost-${idx}" class="font-mono">${curr} ${netCost.toFixed(2)}</strong>
               </div>
             </div>
           </div>
