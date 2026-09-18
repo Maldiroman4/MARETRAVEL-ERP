@@ -672,11 +672,70 @@ class OperationsHubModule {
   // --------------------------------------------------------------------------
   // MODAL UNIFICADO: NUEVA VENTA / EMISIÓN INTEGRAL MULTI-SERVICIO
   // --------------------------------------------------------------------------
+  resolveServiceCode(code) {
+    if (!code || code === 'ALL') return 'BOLETO_AEREO';
+    if (code === 'PAQUETES') return 'PAQUETE_TURISTICO';
+    if (code === 'TRASLADO') return 'RENT_A_CAR';
+    if (code === 'HOSPEDAJE') return 'HOTEL';
+    return code;
+  }
+
+  getInsurancePlans() {
+    const data = window.db ? window.db.get() : {};
+    const defaultPlans = [
+      'Assist Card AC-60 Mundial',
+      'Assist Card AC-150 Schengen',
+      'Assist Card AC-250 VIP',
+      'Universal Assistance Excellence',
+      'Universal Assistance Value',
+      'Universal Assistance Schengen Total',
+      'Universal Assistance Master Plus',
+      'April International Plan Euro',
+      'Terrawind Global Plus',
+      'Europ Assistance Global'
+    ];
+    let plans = Array.isArray(data.insurancePlans) ? [...data.insurancePlans] : [];
+    try {
+      const local = JSON.parse(localStorage.getItem('MARETRAVEL_INSURANCE_PLANS') || '[]');
+      if (Array.isArray(local)) {
+        local.forEach(p => { if (p && !plans.includes(p)) plans.push(p); });
+      }
+    } catch(e) {}
+    defaultPlans.forEach(p => {
+      if (!plans.includes(p)) plans.push(p);
+    });
+    return plans;
+  }
+
+  saveInsurancePlan(planName) {
+    if (!planName || typeof planName !== 'string') return;
+    const cleanPlan = planName.trim();
+    if (!cleanPlan) return;
+    const data = window.db ? window.db.get() : {};
+    if (!data.insurancePlans) data.insurancePlans = [];
+    if (!data.insurancePlans.includes(cleanPlan)) {
+      data.insurancePlans.push(cleanPlan);
+      window.db.save(data);
+    }
+    try {
+      const local = JSON.parse(localStorage.getItem('MARETRAVEL_INSURANCE_PLANS') || '[]');
+      if (!local.includes(cleanPlan)) {
+        local.push(cleanPlan);
+        localStorage.setItem('MARETRAVEL_INSURANCE_PLANS', JSON.stringify(local));
+      }
+    } catch(e) {}
+  }
+
   openNewUnifiedModal() {
     this.editingOperationId = null;
+    // Router contextual dinámico: Detectar sección/servicio activo del sidebar
+    const rawActiveService = window.state?.servicioActivo || window.currentServiceCategory || this.filterService || 'BOLETO_AEREO';
+    const resolvedService = this.resolveServiceCode(rawActiveService);
+    const srvName = this.formatServiceName(resolvedService);
+
     const modalTitle = document.getElementById('unified-modal-title');
     if (modalTitle) {
-      modalTitle.innerHTML = `<i data-lucide="layers"></i> Emisión de Nota de Débito Multi-Servicio & Venta Integral`;
+      modalTitle.innerHTML = `<i data-lucide="layers"></i> Nueva Emisión — ${srvName}`;
     }
 
     const form = document.getElementById('unified-operation-form');
@@ -693,8 +752,8 @@ class OperationsHubModule {
       tcBadge.innerHTML = window.financialGuard.renderTcBadgeHtml();
     }
 
-    // Inicializar con 1 ítem por defecto
-    this.activeNdItems = [ this.createDefaultItem() ];
+    // Inicializar con 1 ítem pre-cargado exclusivamente con el servicio activo
+    this.activeNdItems = [ this.createDefaultItem({ serviceType: resolvedService }) ];
     this.renderItemsRepeater();
     this.calculateConsolidatedTotals();
     this.onPaymentTermChange();
@@ -705,13 +764,30 @@ class OperationsHubModule {
 
   createDefaultItem(custom = {}) {
     const data = window.db ? window.db.get() : null;
-    const providers = (data?.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR');
-    const defaultProv = providers[0] || { id: '', name: 'Proveedor', settlementModel: 'DEDUCCION_DIRECTA' };
+    const rawActive = window.state?.servicioActivo || window.currentServiceCategory || this.filterService || 'BOLETO_AEREO';
+    const resolvedService = custom.serviceType || this.resolveServiceCode(rawActive);
+
+    const providers = (data?.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR' || a.type === 'AEROLINEA' || a.type === 'HOTEL');
+    
+    // Proveedor sugerido según la categoría del servicio
+    let defaultProv = null;
+    if (resolvedService === 'SEGURO_VIAJE') {
+      defaultProv = providers.find(p => (p.name || '').toUpperCase().includes('ASSIST') || (p.name || '').toUpperCase().includes('UNIVERSAL') || (p.name || '').toUpperCase().includes('SEGURO'));
+    } else if (resolvedService === 'BOLETO_AEREO' || resolvedService === 'BOLETO_GDS') {
+      defaultProv = providers.find(p => (p.name || '').toUpperCase().includes('BOA') || (p.name || '').toUpperCase().includes('AEREO') || p.type === 'AEROLINEA');
+    } else if (resolvedService === 'HOTEL') {
+      defaultProv = providers.find(p => (p.name || '').toUpperCase().includes('BOOKING') || (p.name || '').toUpperCase().includes('HOTEL') || p.type === 'HOTEL');
+    }
+    if (!defaultProv) {
+      defaultProv = providers[0] || { id: '', name: 'Proveedor', settlementModel: 'DEDUCCION_DIRECTA' };
+    }
+
     const firstSub = (defaultProv.providerServices && defaultProv.providerServices.length > 0) ? defaultProv.providerServices[0] : null;
+    const defaultCommission = (resolvedService === 'SEGURO_VIAJE') ? 20 : (resolvedService === 'BOLETO_AEREO' ? 0 : 10);
 
     return {
       id: 'NDI-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      serviceType: custom.serviceType || 'BOLETO_AEREO',
+      serviceType: resolvedService,
       providerId: custom.providerId || defaultProv.id,
       providerName: custom.providerName || defaultProv.name,
       subServiceName: custom.subServiceName || (firstSub ? firstSub.serviceName : ''),
@@ -720,15 +796,22 @@ class OperationsHubModule {
       passengerDoc: custom.passengerDoc || '',
       voucherNumber: custom.voucherNumber || '',
       description: custom.description || (firstSub ? firstSub.serviceName : ''),
-      fareAmount: parseFloat(custom.fareAmount) || 0,
-      feeAmount: parseFloat(custom.feeAmount) || 0,
-      providerCommissionRate: (custom.providerCommissionRate !== undefined) ? parseFloat(custom.providerCommissionRate) : ((firstSub && firstSub.defaultCommissionRate !== undefined) ? parseFloat(firstSub.defaultCommissionRate) : (custom.serviceType === 'BOLETO_AEREO' ? 0 : 10)),
-      serviceDetails: custom.serviceDetails || {}
+      currency: custom.currency || 'BOB',
+      fareAmount: (custom.fareAmount !== undefined) ? parseFloat(custom.fareAmount) : 0,
+      feeAmount: (custom.feeAmount !== undefined) ? parseFloat(custom.feeAmount) : 0,
+      providerCommissionRate: (custom.providerCommissionRate !== undefined) ? parseFloat(custom.providerCommissionRate) : defaultCommission,
+      serviceDetails: custom.serviceDetails || (resolvedService === 'SEGURO_VIAJE' ? {
+        insurancePlan: '',
+        coverageStartDate: '',
+        coverageEndDate: ''
+      } : {})
     };
   }
 
   addNewItemToNd(custom = {}) {
-    const item = this.createDefaultItem(custom);
+    const rawActive = window.state?.servicioActivo || window.currentServiceCategory || this.filterService || 'BOLETO_AEREO';
+    const resolvedService = this.resolveServiceCode(rawActive);
+    const item = this.createDefaultItem({ serviceType: resolvedService, ...custom });
     this.activeNdItems.push(item);
     this.renderItemsRepeater();
     this.calculateConsolidatedTotals();
@@ -792,7 +875,9 @@ class OperationsHubModule {
 
     const data = window.db.get();
     const serviceTypes = this.getServiceTypes();
-    const providers = (data.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR' || a.type === 'AEROLINEA' || a.type === 'HOTEL');
+    const allProviders = (data.accounts || []).filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS' || a.type === 'PROVEEDOR' || a.type === 'AEROLINEA' || a.type === 'HOTEL');
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
 
     const countBadge = document.getElementById('uni-items-count-badge');
     if (countBadge) {
@@ -800,14 +885,214 @@ class OperationsHubModule {
     }
 
     container.innerHTML = this.activeNdItems.map((item, idx) => {
+      const isInsurance = (item.serviceType === 'SEGURO_VIAJE');
       const srvObj = serviceTypes.find(s => (s.code || s.id) === item.serviceType) || { name: item.serviceType, category: 'GENERAL' };
+      const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
+      const curr = item.currency || 'BOB';
+
+      // Filtrar u ordenar proveedores si es seguro
+      let providers = allProviders;
+      if (isInsurance) {
+        const insuranceProvs = allProviders.filter(p => {
+          const n = (p.name || '').toUpperCase();
+          const svs = (p.providerServices || []).map(s => (s.serviceName || '').toUpperCase());
+          return n.includes('ASSIST') || n.includes('UNIVERSAL') || n.includes('SEGURO') || n.includes('TERRA') || svs.some(s => s.includes('SEG'));
+        });
+        if (insuranceProvs.length > 0) {
+          const otherProvs = allProviders.filter(p => !insuranceProvs.includes(p));
+          providers = [...insuranceProvs, ...otherProvs];
+        }
+      }
+
       const currentProv = providers.find(p => p.id === item.providerId);
       const provSubServices = (currentProv && currentProv.providerServices) ? currentProv.providerServices : [];
-      const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
-      const provCommAmt = (item.fareAmount || 0) * ((item.providerCommissionRate || 0) / 100);
-      const netCost = isGross ? item.fareAmount : Math.max(0, item.fareAmount - provCommAmt);
-      const lineTotal = item.fareAmount + item.feeAmount;
+      const fare = parseFloat(item.fareAmount) || 0;
+      const fee = parseFloat(item.feeAmount) || 0;
+      const rate = parseFloat(item.providerCommissionRate) || 0;
+      const commAmt = fare * (rate / 100);
+      const netCost = isGross ? fare : Math.max(0, fare - commAmt);
+      const lineTotal = fare + fee;
 
+      // Conversión para el subtexto
+      let subtextConversion = '';
+      if (curr === 'USD') {
+        const totalBob = lineTotal * sellRate;
+        subtextConversion = `≈ BOB ${totalBob.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+      } else {
+        const totalUsd = sellRate > 0 ? (lineTotal / sellRate) : 0;
+        subtextConversion = `≈ USD ${totalUsd.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+      }
+
+      if (isInsurance) {
+        // -------------------------------------------------------------
+        // 2 & 3. PLANTILLA EXCLUSIVA: SEGURO DE VIAJE (Surgical Refactoring)
+        // Eliminados: Sub-servicio, Doc. Identidad, Destino Cobertura.
+        // Conservados: Proveedor, Modelo Liq, Pasajero, Voucher, Plan, Fechas Cobertura.
+        // Fila 5 columnas reactivas y toggle multi-moneda [ BOB | USD ].
+        // -------------------------------------------------------------
+        const savedPlans = this.getInsurancePlans();
+        const planOptionsHtml = savedPlans.map(p => `<option value="${p}"></option>`).join('');
+
+        return `
+          <div class="item-card" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <!-- Cabecera de Ítem -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span class="badge badge-blue font-bold" style="font-size: 0.8rem;">Servicio #${idx + 1}</span>
+                <strong style="color: #0f2742; font-size: 0.95rem;">SEGURO DE VIAJE</strong>
+                <span class="badge badge-slate" style="font-size: 0.72rem;">SEGUROS</span>
+                <span class="badge ${isGross ? 'badge-amber' : 'badge-emerald'}" style="font-size: 0.72rem;">
+                  ${isGross ? 'Consolidador Bruto (Comisión Diferida)' : 'Deducción Directa (Neto a Pagar)'}
+                </span>
+              </div>
+              ${this.activeNdItems.length > 1 ? `
+                <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.removeItemFromNd(${idx})" title="Quitar este servicio de la ND" style="display: flex; align-items: center; gap: 4px;">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Quitar Servicio
+                </button>
+              ` : ''}
+            </div>
+
+            <!-- Fila 1: Proveedor / Operador y Modelo de Liquidación -->
+            <div class="form-row" style="grid-template-columns: 1.6fr 1.2fr; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
+                <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
+                  ${providers.map(p => `<option value="${p.id}" ${p.id === item.providerId ? 'selected' : ''}>${p.name} (${p.docNumber || p.code})</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
+                <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
+                  <option value="DEDUCCION_DIRECTA" ${item.settlementModel !== 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Deducción Directa (Neto)</option>
+                  <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Fila 2: Pasajero / Titular del Servicio y Nro Voucher -->
+            <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
+                <input type="text" class="form-control font-mono font-bold" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+              </div>
+              <div>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Nro Voucher / Boleto / Reserva:</label>
+                <input type="text" class="form-control font-mono" placeholder="Ej: 930-4581959448 o RES-8841" value="${item.voucherNumber || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'voucherNumber', this.value)">
+              </div>
+            </div>
+
+            <!-- Fila 3: Plan con Datalist y Coberturas (Inicio / Fin) -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+              <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                <div>
+                  <label class="form-label font-bold font-mono" style="font-size: 0.75rem; color: #0369a1;">Plan:</label>
+                  <input type="text" class="form-control font-bold font-mono" list="planes-guardados-${idx}" 
+                    placeholder="Ej: Assist Card AC-60 Mundial" 
+                    value="${item.serviceDetails?.insurancePlan || ''}" 
+                    oninput="window.operationsHubModule.onInsurancePlanInput(${idx}, this.value)"
+                    onchange="window.operationsHubModule.onInsurancePlanChange(${idx}, this.value)">
+                  <datalist id="planes-guardados-${idx}">
+                    ${planOptionsHtml}
+                  </datalist>
+                </div>
+                <div>
+                  <label class="form-label font-mono" style="font-size: 0.75rem;">Cobertura Inicio:</label>
+                  <input type="date" class="form-control font-mono" value="${item.serviceDetails?.coverageStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageStartDate', this.value)">
+                </div>
+                <div>
+                  <label class="form-label font-mono" style="font-size: 0.75rem;">Cobertura Fin:</label>
+                  <input type="date" class="form-control font-mono" value="${item.serviceDetails?.coverageEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageEndDate', this.value)">
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 4: Toggle de Moneda y Fila de Cálculos de 5 Columnas Reactivas -->
+            <div style="background: #f1f5f9; border-radius: 6px; padding: 12px; margin-top: 10px;">
+              <!-- Selector / Toggle de Moneda -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.78rem; font-weight: 700; color: #334155;">Moneda:</span>
+                  <div class="btn-group" role="group" style="display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1;">
+                    <button type="button" class="btn btn-xs ${curr !== 'USD' ? 'btn-primary font-bold' : 'btn-secondary'}" 
+                      onclick="window.operationsHubModule.onItemCurrencyChange(${idx}, 'BOB')" style="padding: 4px 12px;">
+                      BOB (Bs)
+                    </button>
+                    <button type="button" class="btn btn-xs ${curr === 'USD' ? 'btn-primary font-bold' : 'btn-secondary'}" 
+                      onclick="window.operationsHubModule.onItemCurrencyChange(${idx}, 'USD')" style="padding: 4px 12px;">
+                      USD ($us)
+                    </button>
+                  </div>
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b;">
+                  Tipo de Cambio Oficial: <strong class="font-mono" style="color: #0369a1;">1 USD = ${sellRate.toFixed(2)} BOB</strong>
+                </div>
+              </div>
+
+              <!-- Las 5 Columnas Reactivas -->
+              <div class="form-row" style="grid-template-columns: 1.3fr 0.9fr 1.1fr 1fr 1.4fr; gap: 10px; align-items: flex-start;">
+                <!-- 1. Precio de Seguro ([MONEDA]) (Input editable) -->
+                <div>
+                  <label class="form-label font-bold" style="font-size: 0.75rem;">Precio de Seguro (${curr}):</label>
+                  <input type="number" step="0.01" class="form-control font-mono font-bold" 
+                    value="${item.fareAmount || 0}" 
+                    oninput="window.operationsHubModule.onInsuranceFieldChange(${idx}, 'fareAmount', this.value)" 
+                    style="text-align: right;" required>
+                </div>
+
+                <!-- 2. % Comisión (Input editable) -->
+                <div>
+                  <label class="form-label font-bold" style="font-size: 0.75rem;">% Comisión:</label>
+                  <input type="number" step="0.01" class="form-control font-mono" 
+                    value="${item.providerCommissionRate || 0}" 
+                    oninput="window.operationsHubModule.onInsuranceFieldChange(${idx}, 'providerCommissionRate', this.value)" 
+                    style="text-align: right;">
+                </div>
+
+                <!-- 3. Comisión ([MONEDA]) (Readonly / Calculado) -->
+                <div>
+                  <label class="form-label font-bold" style="font-size: 0.75rem; color: #166534;">Comisión (${curr}):</label>
+                  <input type="text" id="uni-insurance-comm-${idx}" class="form-control font-mono font-bold" 
+                    value="${curr} ${commAmt.toFixed(2)}" readonly 
+                    style="text-align: right; background: #f0fdf4; color: #166534; border-color: #bbf7d0;">
+                </div>
+
+                <!-- 4. Fee Agencia ([MONEDA]) (Input editable, default 0.00) -->
+                <div>
+                  <label class="form-label font-bold" style="font-size: 0.75rem;">Fee Agencia (${curr}):</label>
+                  <input type="number" step="0.01" class="form-control font-mono" 
+                    value="${item.feeAmount || 0}" 
+                    oninput="window.operationsHubModule.onInsuranceFieldChange(${idx}, 'feeAmount', this.value)" 
+                    style="text-align: right;">
+                </div>
+
+                <!-- 5. Total Ítem (A Cobrar) (Readonly / Destacado) -->
+                <div>
+                  <label class="form-label font-bold" style="font-size: 0.75rem; color: #0369a1;">Total Ítem (A Cobrar):</label>
+                  <div id="uni-insurance-total-${idx}" class="font-mono font-bold" 
+                    style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
+                    ${curr} ${lineTotal.toFixed(2)}
+                  </div>
+                  <!-- Subtexto con conversión automática -->
+                  <div id="uni-insurance-subtext-${idx}" class="font-mono" style="font-size: 0.72rem; color: #64748b; text-align: right; margin-top: 3px;">
+                    ${subtextConversion}
+                  </div>
+                </div>
+              </div>
+
+              <!-- En segundo plano: Costo Neto al proveedor para NC -->
+              <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 8px; font-size: 0.73rem; color: #b91c1c; gap: 6px;">
+                <span>Costo Prov. Neto (NC):</span>
+                <strong id="uni-insurance-netcost-${idx}" class="font-mono">${curr} ${netCost.toFixed(2)}</strong>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // -------------------------------------------------------------
+      // 1. PLANTILLA OPERATIVA PARA OTROS SERVICIOS (Boletos, Hotel, Paquetes, etc.)
+      // Sin dropdown genérico de tipo de servicio (Prohibido selector global)
+      // -------------------------------------------------------------
       return `
         <div class="item-card" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
           <!-- Cabecera de Ítem -->
@@ -827,14 +1112,8 @@ class OperationsHubModule {
             ` : ''}
           </div>
 
-          <!-- Fila 1: Selector de Servicio, Proveedor, Sub-servicio y Modelo de Liquidación -->
-          <div class="form-row" style="grid-template-columns: 1fr 1.2fr 1.3fr 1.1fr; gap: 8px;">
-            <div>
-              <label class="form-label font-bold" style="font-size: 0.75rem;">Tipo de Servicio:</label>
-              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemServiceTypeChange(${idx}, this.value)">
-                ${serviceTypes.map(s => `<option value="${s.code || s.id}" ${(s.code || s.id) === item.serviceType ? 'selected' : ''}>${s.name}</option>`).join('')}
-              </select>
-            </div>
+          <!-- Fila 1: Proveedor, Sub-servicio y Modelo de Liquidación (Sin dropdown de Tipo de Servicio) -->
+          <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1.2fr; gap: 8px;">
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
               <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
@@ -854,7 +1133,7 @@ class OperationsHubModule {
             </div>
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
-              <select class="form-control" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
+              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
                 <option value="DEDUCCION_DIRECTA" ${item.settlementModel === 'DEDUCCION_DIRECTA' ? 'selected' : ''}>Deducción Directa (Neto)</option>
                 <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto</option>
               </select>
@@ -966,27 +1245,6 @@ class OperationsHubModule {
           </div>
         </div>
       `;
-    } else if (srv === 'SEGURO_VIAJE') {
-      return `
-        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px;">
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Compañía / Plan:</label>
-            <input type="text" class="form-control" placeholder="Ej: Assist Card AC-60 Mundial" value="${d.insurancePlan || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'insurancePlan', this.value)">
-          </div>
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino Cobertura:</label>
-            <input type="text" class="form-control" placeholder="Europa Schengen / Internacional" value="${d.insuranceDestination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'insuranceDestination', this.value)">
-          </div>
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Cobertura Inicio:</label>
-            <input type="date" class="form-control font-mono" value="${d.coverageStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageStartDate', this.value)">
-          </div>
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Cobertura Fin:</label>
-            <input type="date" class="form-control font-mono" value="${d.coverageEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'coverageEndDate', this.value)">
-          </div>
-        </div>
-      `;
     } else if (srv === 'PAQUETE_TURISTICO' || srv === 'PAQUETE_CRUCERO' || srv === 'PAQUETE_CONCIERTO') {
       return `
         <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
@@ -1018,6 +1276,23 @@ class OperationsHubModule {
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Cita Embajada:</label>
             <input type="date" class="form-control font-mono" value="${d.appointmentDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'appointmentDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'CERTIFICACION_FA') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Certificación / Curso:</label>
+            <input type="text" class="form-control font-bold" placeholder="Ej: CERTIFICACIÓN INTERNACIONAL FA" value="${d.certCourse || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certCourse', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Entidad Emisora:</label>
+            <input type="text" class="form-control" placeholder="Ej: SEDES / MINISTERIO DE SALUD" value="${d.certInstitution || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certInstitution', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Certificación:</label>
+            <input type="date" class="form-control font-mono" value="${d.certDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certDate', this.value)">
           </div>
         </div>
       `;
@@ -1144,6 +1419,75 @@ class OperationsHubModule {
     this.calculateConsolidatedTotals();
   }
 
+  onInsuranceFieldChange(index, field, value) {
+    if (!this.activeNdItems[index]) return;
+    const item = this.activeNdItems[index];
+    item[field] = parseFloat(value) || 0;
+
+    const fare = parseFloat(item.fareAmount) || 0;
+    const rate = parseFloat(item.providerCommissionRate) || 0;
+    const fee = parseFloat(item.feeAmount) || 0;
+    const comm = fare * (rate / 100);
+    const total = fare + fee;
+    const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');
+    const netCost = isGross ? fare : Math.max(0, fare - comm);
+
+    item.providerCommissionAmount = comm;
+    item.totalAmount = total;
+    item.netCostToProvider = netCost;
+
+    const curr = item.currency || 'BOB';
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = rates.sellRate || 6.96;
+
+    const commEl = document.getElementById(`uni-insurance-comm-${index}`);
+    const totalEl = document.getElementById(`uni-insurance-total-${index}`);
+    const subtextEl = document.getElementById(`uni-insurance-subtext-${index}`);
+    const netCostEl = document.getElementById(`uni-insurance-netcost-${index}`);
+
+    if (commEl) commEl.value = `${curr} ${comm.toFixed(2)}`;
+    if (totalEl) totalEl.textContent = `${curr} ${total.toFixed(2)}`;
+    if (netCostEl) netCostEl.textContent = `${curr} ${netCost.toFixed(2)}`;
+
+    if (subtextEl) {
+      if (curr === 'USD') {
+        const convBob = total * sellRate;
+        subtextEl.innerHTML = `≈ BOB ${convBob.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+      } else {
+        const convUsd = sellRate > 0 ? (total / sellRate) : 0;
+        subtextEl.innerHTML = `≈ USD ${convUsd.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+      }
+    }
+
+    if (!this._debouncedCalcTotals) {
+      this._debouncedCalcTotals = (window.debounce || (fn => fn))(() => this.calculateConsolidatedTotals(), 200);
+    }
+    this._debouncedCalcTotals();
+  }
+
+  onInsurancePlanInput(index, val) {
+    if (!this.activeNdItems[index]) return;
+    if (!this.activeNdItems[index].serviceDetails) {
+      this.activeNdItems[index].serviceDetails = {};
+    }
+    this.activeNdItems[index].serviceDetails.insurancePlan = val;
+    this.activeNdItems[index].description = val;
+  }
+
+  onInsurancePlanChange(index, val) {
+    this.onInsurancePlanInput(index, val);
+    this.saveInsurancePlan(val);
+  }
+
+  onItemCurrencyChange(index, newCurrency) {
+    if (!this.activeNdItems[index]) return;
+    const item = this.activeNdItems[index];
+    if (item.currency === newCurrency) return;
+    item.currency = newCurrency;
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
   calculateConsolidatedTotals() {
     const data = window.db ? window.db.get() : null;
     const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
@@ -1156,6 +1500,7 @@ class OperationsHubModule {
     const providerMap = {};
 
     this.activeNdItems.forEach(item => {
+      const isUsd = (item.currency === 'USD');
       const fare = parseFloat(item.fareAmount) || 0;
       const fee = parseFloat(item.feeAmount) || 0;
       const rate = parseFloat(item.providerCommissionRate) || 0;
@@ -1165,9 +1510,19 @@ class OperationsHubModule {
       const netCost = isGross ? fare : Math.max(0, fare - commAmount);
       const lineTotal = fare + fee;
 
-      totalVentaBob += lineTotal;
-      totalCostoBob += netCost;
-      totalComisBob += commAmount;
+      item.totalAmount = lineTotal;
+      item.providerCommissionAmount = commAmount;
+      item.netCostToProvider = netCost;
+
+      const fareBob = isUsd ? (fare * sellRate) : fare;
+      const feeBob = isUsd ? (fee * sellRate) : fee;
+      const commBob = isUsd ? (commAmount * sellRate) : commAmount;
+      const netCostBob = isUsd ? (netCost * sellRate) : netCost;
+      const lineTotalBob = fareBob + feeBob;
+
+      totalVentaBob += lineTotalBob;
+      totalCostoBob += netCostBob;
+      totalComisBob += commBob;
 
       const pId = item.providerId || 'PROV_DEFAULT';
       if (!providerMap[pId]) {
@@ -1183,17 +1538,17 @@ class OperationsHubModule {
         };
       }
       providerMap[pId].services.push(item.serviceType);
-      providerMap[pId].totalGross += fare;
-      providerMap[pId].totalNet += (fare - commAmount);
-      providerMap[pId].totalComm += commAmount;
+      providerMap[pId].totalGross += fareBob;
+      providerMap[pId].totalNet += (fareBob - commBob);
+      providerMap[pId].totalComm += commBob;
       if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
         providerMap[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
       }
     });
 
     const utilidadBob = totalVentaBob - totalCostoBob;
-    const totalVentaUsd = totalVentaBob / sellRate;
-    const utilidadUsd = utilidadBob / sellRate;
+    const totalVentaUsd = sellRate > 0 ? (totalVentaBob / sellRate) : 0;
+    const utilidadUsd = sellRate > 0 ? (utilidadBob / sellRate) : 0;
 
     const elSaleBob = document.getElementById('uni-total-sale-preview');
     const elSaleUsd = document.getElementById('uni-total-sale-usd-preview');
@@ -2074,13 +2429,25 @@ class OperationsHubModule {
       // 4. Tipo de Cambio Oficial Único Congelado (Single Source of Truth)
       const { sellRate } = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
 
-      // 5. Totales Consolidados
+      // Persistir planes de seguros nuevos en el catálogo dinámico
+      this.activeNdItems.forEach(it => {
+        if (it.serviceType === 'SEGURO_VIAJE' && it.serviceDetails?.insurancePlan) {
+          this.saveInsurancePlan(it.serviceDetails.insurancePlan);
+        }
+      });
+
+      // 5. Totales Consolidados (con conversión multi-moneda BOB / USD)
       let totalConsolidadoBob = 0;
       this.activeNdItems.forEach(it => {
-        totalConsolidadoBob += (parseFloat(it.fareAmount) || 0) + (parseFloat(it.feeAmount) || 0);
+        const fare = parseFloat(it.fareAmount) || 0;
+        const fee = parseFloat(it.feeAmount) || 0;
+        const isUsd = (it.currency === 'USD');
+        const fareBob = isUsd ? (fare * sellRate) : fare;
+        const feeBob = isUsd ? (fee * sellRate) : fee;
+        totalConsolidadoBob += (fareBob + feeBob);
       });
       totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
-      const totalConsolidadoUsd = parseFloat((totalConsolidadoBob / sellRate).toFixed(2));
+      const totalConsolidadoUsd = sellRate > 0 ? parseFloat((totalConsolidadoBob / sellRate).toFixed(2)) : 0;
 
       // EDICIÓN DE OPERACIÓN EXISTENTE
       if (this.editingOperationId) {
@@ -2111,25 +2478,36 @@ class OperationsHubModule {
             const provCommAmount = fare * (provCommRate / 100);
             const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
             const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+            const isUsd = (it.currency === 'USD');
+            const fareBob = isUsd ? (fare * sellRate) : fare;
+            const feeBob = isUsd ? (fee * sellRate) : fee;
+            const netCostBob = isUsd ? (netCost * sellRate) : netCost;
+            const commBob = isUsd ? (provCommAmount * sellRate) : provCommAmount;
 
             return {
               id: it.id || ('NDI-' + Date.now() + '-' + idx),
               serviceType: it.serviceType,
               ticketNumber: it.voucherNumber || ('VCH-' + Date.now()),
+              voucherNumber: it.voucherNumber || '',
               passengerName: it.passengerName,
               passengerDocId: it.passengerDoc,
               operatorId: it.providerId,
               operatorName: prov.name,
-              description: it.description || it.subServiceName || `${it.serviceType} - ${it.passengerName}`,
+              description: it.description || it.subServiceName || (it.serviceDetails?.insurancePlan) || `${it.serviceType} - ${it.passengerName}`,
               serviceDetails: it.serviceDetails || {},
               settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
+              currency: it.currency || 'BOB',
               fareAmount: fare,
               feeAmount: fee,
               totalAmount: fare + fee,
+              fareAmountBob: fareBob,
+              feeAmountBob: feeBob,
+              totalAmountBob: fareBob + feeBob,
               providerCommissionRate: provCommRate,
               providerCommissionAmount: provCommAmount,
+              providerCommissionAmountBob: commBob,
               netCostToProvider: netCost,
-              currency: 'BOB'
+              netCostToProviderBob: netCostBob
             };
           });
 
@@ -2158,6 +2536,11 @@ class OperationsHubModule {
         const provCommAmount = fare * (provCommRate / 100);
         const isGross = (it.settlementModel === 'CONSOLIDADOR_BRUTO');
         const netCost = isGross ? fare : Math.max(0, fare - provCommAmount);
+        const isUsd = (it.currency === 'USD');
+        const fareBob = isUsd ? (fare * sellRate) : fare;
+        const feeBob = isUsd ? (fee * sellRate) : fee;
+        const netCostBob = isUsd ? (netCost * sellRate) : netCost;
+        const commBob = isUsd ? (provCommAmount * sellRate) : provCommAmount;
 
         let ticketId = null;
         if (it.serviceType === 'BOLETO_AEREO' || it.serviceType === 'BOLETO_GDS') {
@@ -2173,16 +2556,16 @@ class OperationsHubModule {
             route: it.serviceDetails?.flightRoute || 'Ruta Aérea',
             airlineCode: (prov.code || 'AEREO').substring(0, 4),
             operatorId: it.providerId,
-            fareAmount: fare,
-            ticketPrice: fare,
-            netAmount: netCost,
+            fareAmount: fareBob,
+            ticketPrice: fareBob,
+            netAmount: netCostBob,
             taxAmount: 0,
-            totalAmount: fare,
+            totalAmount: fareBob,
             currency: 'BOB',
             commissionRate: provCommRate,
-            commissionAmount: provCommAmount,
-            feeAmount: fee,
-            totalWithFee: fare + fee,
+            commissionAmount: commBob,
+            feeAmount: feeBob,
+            totalWithFee: fareBob + feeBob,
             status: 'FACTURADO',
             createdAt: new Date().toLocaleString()
           });
@@ -2193,23 +2576,29 @@ class OperationsHubModule {
           serviceType: it.serviceType,
           gdsTicketId: ticketId,
           ticketNumber: it.voucherNumber || ('VCH-' + Date.now().toString().slice(-6)),
+          voucherNumber: it.voucherNumber || '',
           passengerName: it.passengerName,
           passengerDocId: it.passengerDoc,
           operatorId: it.providerId,
           operatorName: prov.name,
-          description: it.description || it.subServiceName || `${it.serviceType} - ${it.passengerName}`,
+          description: it.description || it.subServiceName || (it.serviceDetails?.insurancePlan) || `${it.serviceType} - ${it.passengerName}`,
           serviceDetails: it.serviceDetails || {},
           settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
+          currency: it.currency || 'BOB',
           fareAmount: fare,
           feeAmount: fee,
           totalAmount: fare + fee,
+          fareAmountBob: fareBob,
+          feeAmountBob: feeBob,
+          totalAmountBob: fareBob + feeBob,
           providerCommissionRate: provCommRate,
           providerCommissionAmount: provCommAmount,
+          providerCommissionAmountBob: commBob,
           clientCommissionRate: 0,
           clientCommissionAmount: 0,
           counterCommissionAmount: 0,
           netCostToProvider: netCost,
-          currency: 'BOB'
+          netCostToProviderBob: netCostBob
         };
       });
 
@@ -2263,9 +2652,9 @@ class OperationsHubModule {
           };
         }
         providerGroups[pId].items.push(item);
-        providerGroups[pId].totalGross += item.fareAmount;
-        providerGroups[pId].totalNet += item.netCostToProvider;
-        providerGroups[pId].totalComm += item.providerCommissionAmount;
+        providerGroups[pId].totalGross += item.fareAmountBob;
+        providerGroups[pId].totalNet += item.netCostToProviderBob;
+        providerGroups[pId].totalComm += item.providerCommissionAmountBob;
         if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
           providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
         }

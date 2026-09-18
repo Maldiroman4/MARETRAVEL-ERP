@@ -319,6 +319,22 @@
       "balanceBob": 0,
       "status": "ACTIVO",
       "createdAt": "17/9/2026, 08:00:00"
+    },
+    {
+      "id": "ACC-006",
+      "code": "PRV-004",
+      "name": "UNIVERSAL ASSISTANCE S.A.",
+      "commercialName": "Universal Assistance",
+      "relationType": "PROVEEDOR",
+      "docType": "NIT",
+      "docNumber": "1083920194",
+      "email": "operaciones@universal-assistance.bo",
+      "phone": "2794500",
+      "address": "Av. Montenegro #1120, San Miguel, La Paz",
+      "settlementModel": "DEDUCCION_DIRECTA",
+      "balanceBob": 0,
+      "status": "ACTIVO",
+      "createdAt": "17/9/2026, 08:00:00"
     }
   ],
   "accountHistory": [],
