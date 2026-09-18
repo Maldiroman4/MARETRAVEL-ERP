@@ -374,10 +374,14 @@ class OperationsHubModule {
               </span>
             </td>
             <td class="font-mono" style="text-align: right; font-weight: 800; color: #0f172a; white-space: nowrap;">
-              BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+              ${nd.currency === 'USD' 
+                ? `USD ${Number(nd.totalAmountUsd !== undefined ? nd.totalAmountUsd : ((nd.totalAmountBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+                : `BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
             </td>
-            <td class="font-mono" style="text-align: right; font-weight: 700; color: ${nd.balanceBob > 0 ? '#dc2626' : '#059669'}; white-space: nowrap;">
-              BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            <td class="font-mono" style="text-align: right; font-weight: 700; color: ${(Number(nd.balanceBob || 0) > 0.01 || Number(nd.balanceUsd || 0) > 0.01) ? '#dc2626' : '#059669'}; white-space: nowrap;">
+              ${nd.currency === 'USD' 
+                ? `USD ${Number(nd.balanceUsd !== undefined ? nd.balanceUsd : ((nd.balanceBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+                : `BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
             </td>
             <td style="text-align: center; white-space: nowrap;">
               ${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nd.status, (Number(nd.totalAmountBob || 0) - Number(nd.balanceBob || 0)), Number(nd.balanceBob || 0)) : `<span class="badge ${badgeClass}">${nd.status}</span>`}
@@ -1151,17 +1155,37 @@ class OperationsHubModule {
             ${this.renderItemSpecificFieldsHtml(idx, item)}
           </div>
 
-          <!-- Fila 4: Estructura Financiera e Importes -->
-          <div style="background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 10px;">
+          <!-- Fila 4: Toggle de Moneda y Fila de Cálculos Financieros -->
+          <div style="background: #f1f5f9; border-radius: 6px; padding: 12px; margin-top: 10px;">
+            <!-- Selector / Toggle de Moneda -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #334155;">Moneda:</span>
+                <div class="btn-group" role="group" style="display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1;">
+                  <button type="button" class="btn btn-xs ${curr !== 'USD' ? 'btn-primary font-bold' : 'btn-secondary'}" 
+                    onclick="window.operationsHubModule.onItemCurrencyChange(${idx}, 'BOB')" style="padding: 4px 12px;">
+                    BOB (Bs)
+                  </button>
+                  <button type="button" class="btn btn-xs ${curr === 'USD' ? 'btn-primary font-bold' : 'btn-secondary'}" 
+                    onclick="window.operationsHubModule.onItemCurrencyChange(${idx}, 'USD')" style="padding: 4px 12px;">
+                    USD ($us)
+                  </button>
+                </div>
+              </div>
+              <div style="font-size: 0.75rem; color: #64748b;">
+                Tipo de Cambio Oficial: <strong class="font-mono" style="color: #0369a1;">1 USD = ${sellRate.toFixed(2)} BOB</strong>
+              </div>
+            </div>
+
             <div class="form-row" style="grid-template-columns: 1.2fr 1fr 1fr 1.2fr 1.3fr; gap: 10px; align-items: center;">
               <!-- 1. AIR FARE: Inicial, modificable -->
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem; color: #0f2742;">AIR FARE:</label>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #0f2742;">AIR FARE (${curr}):</label>
                 <input type="number" step="0.01" min="0" id="uni-item-fare-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${item.fareAmount !== undefined ? item.fareAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'fareAmount', parseFloat(this.value) || 0)" style="text-align: right;" required>
               </div>
               <!-- 2. Fee Agencia: Modificable -->
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem;">Fee Agencia (BOB):</label>
+                <label class="form-label font-bold" style="font-size: 0.75rem;">Fee Agencia (${curr}):</label>
                 <input type="number" step="0.01" min="0" id="uni-item-fee-${idx}" class="form-control font-mono" placeholder="0.00" value="${item.feeAmount !== undefined ? item.feeAmount : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'feeAmount', parseFloat(this.value) || 0)" style="text-align: right;">
               </div>
               <!-- 3. % Comis. Prov: Modificable -->
@@ -1171,14 +1195,17 @@ class OperationsHubModule {
               </div>
               <!-- 4. Costo Prov. (Bruto): Cuarta casilla, modificable -->
               <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">Costo Prov. (Bruto):</label>
+                <label class="form-label font-bold" style="font-size: 0.75rem; color: #b91c1c;">Costo Prov. (Bruto) (${curr}):</label>
                 <input type="number" step="0.01" min="0" id="uni-item-gross-cost-${idx}" class="form-control font-mono font-bold" placeholder="0.00" value="${grossCost !== undefined ? grossCost : 0}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'grossCost', parseFloat(this.value) || 0)" style="text-align: right; border-color: #fca5a5; color: #b91c1c;" required>
               </div>
               <!-- 5. Total Ítem (A Cobrar): Suma de Fee Agencia + Costo Prov. -->
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem; color: #0369a1;">Total Ítem (A Cobrar):</label>
                 <div id="uni-item-line-total-${idx}" class="font-mono font-bold" style="padding: 7px 10px; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 4px; text-align: right; font-size: 1.05rem; color: #0369a1;">
-                  BOB ${lineTotal.toFixed(2)}
+                  ${curr} ${lineTotal.toFixed(2)}
+                </div>
+                <div id="uni-item-subtext-${idx}" class="font-mono" style="font-size: 0.72rem; color: #64748b; text-align: right; margin-top: 3px;">
+                  ${subtextConversion}
                 </div>
               </div>
             </div>
@@ -1356,10 +1383,25 @@ class OperationsHubModule {
       item.providerCommissionAmount = commAmount;
       item.netCostToProvider = netCost;
 
+      const curr = item.currency || 'BOB';
+      const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+      const sellRate = rates.sellRate || 6.96;
+
       const lineTotalEl = document.getElementById(`uni-item-line-total-${index}`);
       if (lineTotalEl) {
-        if (lineTotalEl.tagName === 'INPUT') lineTotalEl.value = `BOB ${lineTotal.toFixed(2)}`;
-        else lineTotalEl.textContent = `BOB ${lineTotal.toFixed(2)}`;
+        if (lineTotalEl.tagName === 'INPUT') lineTotalEl.value = `${curr} ${lineTotal.toFixed(2)}`;
+        else lineTotalEl.textContent = `${curr} ${lineTotal.toFixed(2)}`;
+      }
+
+      const subtextEl = document.getElementById(`uni-item-subtext-${index}`);
+      if (subtextEl) {
+        if (curr === 'USD') {
+          const totalBob = lineTotal * sellRate;
+          subtextEl.innerHTML = `≈ BOB ${totalBob.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+        } else {
+          const totalUsd = sellRate > 0 ? (lineTotal / sellRate) : 0;
+          subtextEl.innerHTML = `≈ USD ${totalUsd.toFixed(2)} (T/C: ${sellRate.toFixed(2)})`;
+        }
       }
 
       if (!this._debouncedCalcTotals) {
@@ -2457,16 +2499,22 @@ class OperationsHubModule {
 
       // 5. Totales Consolidados (con conversión multi-moneda BOB / USD)
       let totalConsolidadoBob = 0;
+      let totalConsolidadoUsd = 0;
       this.activeNdItems.forEach(it => {
         const fare = parseFloat(it.fareAmount) || 0;
         const fee = parseFloat(it.feeAmount) || 0;
+        const grossCost = (it.grossCost !== undefined && it.grossCost !== null && !isNaN(it.grossCost))
+          ? parseFloat(it.grossCost)
+          : fare;
         const isUsd = (it.currency === 'USD');
-        const fareBob = isUsd ? (fare * sellRate) : fare;
-        const feeBob = isUsd ? (fee * sellRate) : fee;
-        totalConsolidadoBob += (fareBob + feeBob);
+        const lineTotal = (it.serviceType === 'SEGURO_VIAJE') ? (fare + fee) : (grossCost + fee);
+        const lineTotalBob = isUsd ? (lineTotal * sellRate) : lineTotal;
+        const lineTotalUsd = isUsd ? lineTotal : (sellRate > 0 ? lineTotal / sellRate : 0);
+        totalConsolidadoBob += lineTotalBob;
+        totalConsolidadoUsd += lineTotalUsd;
       });
       totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
-      const totalConsolidadoUsd = sellRate > 0 ? parseFloat((totalConsolidadoBob / sellRate).toFixed(2)) : 0;
+      totalConsolidadoUsd = parseFloat(totalConsolidadoUsd.toFixed(2));
 
       // EDICIÓN DE OPERACIÓN EXISTENTE
       if (this.editingOperationId) {
@@ -2482,10 +2530,16 @@ class OperationsHubModule {
           const paidUsd = existingNd.paidAmountUsd || 0;
           existingNd.balanceBob = Math.max(0, totalConsolidadoBob - paidBob);
           existingNd.balanceUsd = Math.max(0, totalConsolidadoUsd - paidUsd);
-          if (existingNd.balanceBob <= 0 && paidBob > 0) {
+          const hasUsd = this.activeNdItems.some(it => it.currency === 'USD');
+          existingNd.currency = hasUsd ? 'USD' : 'BOB';
+          existingNd.total_documento = existingNd.currency === 'USD' ? totalConsolidadoUsd : totalConsolidadoBob;
+          existingNd.saldo_pendiente = existingNd.currency === 'USD' ? existingNd.balanceUsd : existingNd.balanceBob;
+          if (existingNd.balanceBob <= 0.01 && (paidBob > 0 || paidUsd > 0)) {
             existingNd.status = 'PAGADA';
+            existingNd.estado = 'PAGADA';
           } else {
             existingNd.status = 'PENDIENTE';
+            existingNd.estado = 'PENDIENTE';
           }
           existingNd.observations = observations;
 
@@ -2633,6 +2687,9 @@ class OperationsHubModule {
       const firstPax = mappedItems[0]?.passengerName || 'Pasajero';
       const paxSummary = mappedItems.length > 1 ? `${firstPax} (+${mappedItems.length - 1} servicios)` : firstPax;
 
+      const hasUsd = mappedItems.some(it => it.currency === 'USD');
+      const ndCurrency = hasUsd ? 'USD' : 'BOB';
+
       const newNd = {
         id: newNdId,
         ndNumber: nextNdNumber,
@@ -2644,7 +2701,7 @@ class OperationsHubModule {
         passengerName: paxSummary,
         issueDate: issueDate,
         paymentTerm: 'PENDIENTE',
-        currency: 'BOB',
+        currency: ndCurrency,
         frozenExchangeRate: sellRate,
         exchangeRateUsed: sellRate,
         totalAmountBob: totalConsolidadoBob,
@@ -2653,6 +2710,9 @@ class OperationsHubModule {
         paidAmountUsd: 0,
         balanceBob: totalConsolidadoBob,
         balanceUsd: totalConsolidadoUsd,
+        total_documento: ndCurrency === 'USD' ? totalConsolidadoUsd : totalConsolidadoBob,
+        saldo_pendiente: ndCurrency === 'USD' ? totalConsolidadoUsd : totalConsolidadoBob,
+        monto_acumulado_pagado: 0,
         status: 'PENDIENTE',
         depositAccountId: null,
         financialAccountId: null,
@@ -2668,32 +2728,44 @@ class OperationsHubModule {
       const providerGroups = {};
       mappedItems.forEach(item => {
         const pId = item.operatorId;
+        const isItemUsd = (item.currency === 'USD');
         if (!providerGroups[pId]) {
           providerGroups[pId] = {
             providerId: pId,
             providerName: item.operatorName,
             items: [],
-            totalGross: 0,
-            totalNet: 0,
-            totalComm: 0,
+            currency: item.currency || 'BOB',
+            totalGrossBob: 0,
+            totalNetBob: 0,
+            totalCommBob: 0,
+            totalGrossUsd: 0,
+            totalNetUsd: 0,
+            totalCommUsd: 0,
             settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
           };
         }
+        if (isItemUsd) providerGroups[pId].currency = 'USD';
         providerGroups[pId].items.push(item);
-        providerGroups[pId].totalGross += item.fareAmountBob;
-        providerGroups[pId].totalNet += item.netCostToProviderBob;
-        providerGroups[pId].totalComm += item.providerCommissionAmountBob;
+        providerGroups[pId].totalGrossBob += (item.grossCostBob || item.fareAmountBob || 0);
+        providerGroups[pId].totalNetBob += (item.netCostToProviderBob || 0);
+        providerGroups[pId].totalCommBob += (item.providerCommissionAmountBob || 0);
+        providerGroups[pId].totalGrossUsd += isItemUsd ? (item.grossCost || item.fareAmount || 0) : ((item.grossCostBob || 0) / sellRate);
+        providerGroups[pId].totalNetUsd += isItemUsd ? (item.netCostToProvider || 0) : ((item.netCostToProviderBob || 0) / sellRate);
+        providerGroups[pId].totalCommUsd += isItemUsd ? (item.providerCommissionAmount || 0) : ((item.providerCommissionAmountBob || 0) / sellRate);
         if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
           providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
         }
       });
 
-      let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 500);
-
+      let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 2000);
       Object.values(providerGroups).forEach((grp, gIdx) => {
         nextNcNumber++;
         const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
-        const provAmount = isGross ? grp.totalGross : grp.totalNet;
+        const ncCurrency = grp.currency || 'BOB';
+        const isNcUsd = (ncCurrency === 'USD');
+        const provAmountBob = isGross ? grp.totalGrossBob : grp.totalNetBob;
+        const provAmountUsd = isGross ? grp.totalGrossUsd : grp.totalNetUsd;
+        const provAmount = isNcUsd ? provAmountUsd : provAmountBob;
         const provAcc = (data.accounts || []).find(a => a.id === grp.providerId) || {};
 
         if (provAmount > 0) {
@@ -2709,12 +2781,21 @@ class OperationsHubModule {
             concept: isGross
               ? `Liquidación Bruta Consolidador por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Proveedor Bruto]`
               : `Liquidación Directa Neta por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Deducción Directa / Neto]`,
-            currency: 'BOB',
+            currency: ncCurrency,
             frozenExchangeRate: sellRate,
             settlementModel: grp.settlementModel,
             totalAmount: parseFloat(provAmount.toFixed(2)),
+            totalAmountBob: parseFloat(provAmountBob.toFixed(2)),
+            totalAmountUsd: parseFloat(provAmountUsd.toFixed(2)),
             paidAmount: 0,
+            paidAmountBob: 0,
+            paidAmountUsd: 0,
             balance: parseFloat(provAmount.toFixed(2)),
+            balanceBob: parseFloat(provAmountBob.toFixed(2)),
+            balanceUsd: parseFloat(provAmountUsd.toFixed(2)),
+            total_documento: parseFloat(provAmount.toFixed(2)),
+            saldo_pendiente: parseFloat(provAmount.toFixed(2)),
+            monto_acumulado_pagado: 0,
             status: 'PENDIENTE',
             isAutoGenerated: true,
             createdById: 'USR-001',

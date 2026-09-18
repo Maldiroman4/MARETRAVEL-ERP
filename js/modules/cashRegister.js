@@ -61,6 +61,53 @@ window.cashRegisterModule = {
   },
 
   // =========================================================================
+  // HELPER: OBTENCIÓN NORMALIZADA DE SALDOS EN BOB Y USD (ND Y NC)
+  // =========================================================================
+  getDocumentNormalizedBalances(doc, isNd, tc = 6.96) {
+    let totalBob = 0;
+    let totalUsd = 0;
+    let balanceBob = 0;
+    let balanceUsd = 0;
+
+    const rate = tc > 0 ? tc : 6.96;
+    const isDocUsd = (doc.currency === 'USD');
+
+    if (isNd) {
+      if (isDocUsd) {
+        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.total_documento || (Number(doc.totalAmountBob || 0) / rate)));
+        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (totalUsd * rate));
+        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (Number(doc.balanceBob || 0) / rate)));
+        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (balanceUsd * rate));
+      } else {
+        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.total_documento || 0));
+        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (totalBob / rate));
+        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : 0));
+        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (balanceBob / rate));
+      }
+    } else {
+      // NC Proveedor
+      if (isDocUsd) {
+        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
+        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (totalUsd * rate));
+        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (doc.balance !== undefined ? doc.balance : (doc.saldo_pendiente || 0)));
+        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (balanceUsd * rate));
+      } else {
+        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
+        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (totalBob / rate));
+        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (doc.balance !== undefined ? doc.balance : (doc.saldo_pendiente || 0)));
+        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (balanceBob / rate));
+      }
+    }
+
+    return {
+      totalBob: Math.max(0, totalBob),
+      totalUsd: Math.max(0, totalUsd),
+      balanceBob: Math.max(0, balanceBob),
+      balanceUsd: Math.max(0, balanceUsd)
+    };
+  },
+
+  // =========================================================================
   // MODAL TRANSACCIONAL: REGISTRO DE PAGO / AMORTIZACIÓN
   // =========================================================================
   openPaymentModal(docType, docId) {
@@ -81,20 +128,16 @@ window.cashRegisterModule = {
     document.getElementById('pay-doc-type').value = isNd ? 'ND' : 'NC';
     document.getElementById('pay-doc-id').value = doc.id;
 
-    const totalDocBob = isNd
-      ? Number(doc.totalAmountBob ?? doc.total_documento ?? 0)
-      : Number(doc.totalAmount ?? doc.total_documento ?? 0);
-    const balanceBob = isNd
-      ? Number(doc.saldo_pendiente ?? doc.balanceBob ?? 0)
-      : Number(doc.saldo_pendiente ?? doc.balance ?? 0);
+    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
+    const sellRate = doc.frozenExchangeRate || rates.sellRate || 6.96;
+    const tcInput = document.getElementById('pay-exchange-rate');
+    if (tcInput) tcInput.value = sellRate.toFixed(2);
 
     const docNumLabel = isNd ? `ND #${doc.ndNumber}` : `NC #${doc.ncNumber}`;
     const entityName = isNd ? (doc.accountName || 'Cliente General') : (doc.providerName || 'Proveedor');
 
     document.getElementById('pay-doc-label').textContent = docNumLabel;
     document.getElementById('pay-entity-name').textContent = entityName;
-    document.getElementById('pay-doc-total').textContent = `BOB ${totalDocBob.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    document.getElementById('pay-doc-balance').textContent = `BOB ${balanceBob.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const titleEl = document.getElementById('modal-pay-title');
     const subEl = document.getElementById('modal-pay-subtitle');
@@ -127,21 +170,15 @@ window.cashRegisterModule = {
       }
     }
 
-    const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
-    const sellRate = rates.sellRate || 6.96;
-    const tcInput = document.getElementById('pay-exchange-rate');
-    if (tcInput) tcInput.value = sellRate.toFixed(2);
+    const defaultCurr = doc.currency || 'BOB';
+    this.onPaymentCurrencyChange(defaultCurr);
 
-    this.onPaymentCurrencyChange('BOB');
-
-    const amtInput = document.getElementById('pay-amount-input');
-    if (amtInput) {
-      amtInput.value = balanceBob > 0 ? balanceBob.toFixed(2) : '0.00';
-    }
+    const { balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, sellRate);
+    const hasBalance = (balanceBob > 0.01 || balanceUsd > 0.01);
 
     const notesInput = document.getElementById('pay-notes-input');
     if (notesInput) {
-      notesInput.value = balanceBob > 0
+      notesInput.value = hasBalance
         ? `Abono a ${docNumLabel} - ${entityName}`
         : `Liquidación total de ${docNumLabel}`;
     }
@@ -158,10 +195,11 @@ window.cashRegisterModule = {
       }
     }
 
-    this.onPaymentAmountChange();
+    this.onModalPaymentAmountChange();
     window.app.openModal('modal-payment-transaction');
     if (window.lucide) window.lucide.createIcons();
 
+    const amtInput = document.getElementById('pay-amount-input');
     setTimeout(() => {
       if (amtInput) {
         amtInput.focus();
@@ -186,7 +224,34 @@ window.cashRegisterModule = {
       if (btnUsd) btnUsd.className = 'btn btn-xs btn-primary font-bold';
       if (label) label.textContent = 'USD';
     }
-    this.onPaymentAmountChange();
+
+    this.updatePaymentSummaryDisplay(curr);
+    this.setFullPaymentAmount();
+  },
+
+  updatePaymentSummaryDisplay(curr) {
+    const data = window.db.get();
+    const docType = document.getElementById('pay-doc-type')?.value;
+    const docId = document.getElementById('pay-doc-id')?.value;
+    const isNd = (docType === 'ND');
+    const doc = isNd
+      ? (data.debitNotes || []).find(n => n.id === docId)
+      : (data.creditNotes || []).find(c => c.id === docId);
+    if (!doc) return;
+
+    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || doc.frozenExchangeRate || 6.96;
+    const { totalBob, totalUsd, balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
+
+    const totalEl = document.getElementById('pay-doc-total');
+    const balEl = document.getElementById('pay-doc-balance');
+
+    if (curr === 'USD') {
+      if (totalEl) totalEl.textContent = `USD ${totalUsd.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (balEl) balEl.textContent = `USD ${balanceUsd.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      if (totalEl) totalEl.textContent = `BOB ${totalBob.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (balEl) balEl.textContent = `BOB ${balanceBob.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
   },
 
   setFullPaymentAmount() {
@@ -199,25 +264,22 @@ window.cashRegisterModule = {
       : (data.creditNotes || []).find(c => c.id === docId);
     if (!doc) return;
 
-    const balanceBob = isNd
-      ? Number(doc.saldo_pendiente ?? doc.balanceBob ?? 0)
-      : Number(doc.saldo_pendiente ?? doc.balance ?? 0);
-    const curr = document.getElementById('pay-currency')?.value || 'BOB';
-    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || 6.96;
+    const curr = document.getElementById('pay-currency')?.value || doc.currency || 'BOB';
+    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || doc.frozenExchangeRate || 6.96;
+    const { balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
 
     const amtInput = document.getElementById('pay-amount-input');
     if (amtInput) {
-      if (curr === 'BOB') {
-        amtInput.value = balanceBob.toFixed(2);
+      if (curr === 'USD') {
+        amtInput.value = balanceUsd.toFixed(2);
       } else {
-        const balUsd = tc > 0 ? (balanceBob / tc) : 0;
-        amtInput.value = balUsd.toFixed(2);
+        amtInput.value = balanceBob.toFixed(2);
       }
     }
-    this.onPaymentAmountChange();
+    this.onModalPaymentAmountChange();
   },
 
-  onPaymentAmountChange() {
+  onModalPaymentAmountChange() {
     const data = window.db.get();
     const docType = document.getElementById('pay-doc-type')?.value;
     const docId = document.getElementById('pay-doc-id')?.value;
@@ -227,13 +289,11 @@ window.cashRegisterModule = {
       : (data.creditNotes || []).find(c => c.id === docId);
     if (!doc) return;
 
-    const balanceBob = isNd
-      ? Number(doc.saldo_pendiente ?? doc.balanceBob ?? 0)
-      : Number(doc.saldo_pendiente ?? doc.balance ?? 0);
+    const curr = document.getElementById('pay-currency')?.value || 'BOB';
+    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || doc.frozenExchangeRate || 6.96;
+    const { balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
 
     const amtVal = parseFloat(document.getElementById('pay-amount-input')?.value) || 0;
-    const curr = document.getElementById('pay-currency')?.value || 'BOB';
-    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || 6.96;
 
     let amtBob = 0;
     let amtUsd = 0;
@@ -253,13 +313,18 @@ window.cashRegisterModule = {
     if (counterEl) counterEl.textContent = counterPreview;
 
     const remainingBob = Math.max(0, balanceBob - amtBob);
+    const remainingUsd = Math.max(0, balanceUsd - amtUsd);
     const remEl = document.getElementById('pay-remaining-balance-preview');
     if (remEl) {
-      if (remainingBob <= 0.01) {
-        remEl.innerHTML = `<span style="color:#047857; font-weight:800;">BOB 0.00 — LIQUIDACIÓN TOTAL (PAGADA)</span>`;
+      if (remainingBob <= 0.01 || remainingUsd <= 0.01) {
+        remEl.innerHTML = `<span style="color:#047857; font-weight:800;">${curr} 0.00 — LIQUIDACIÓN TOTAL (PAGADA)</span>`;
       } else {
         remEl.style.color = '#dc2626';
-        remEl.textContent = `BOB ${remainingBob.toFixed(2)} (${tc > 0 ? 'USD ' + (remainingBob / tc).toFixed(2) : ''})`;
+        if (curr === 'USD') {
+          remEl.textContent = `USD ${remainingUsd.toFixed(2)} (≈ BOB ${remainingBob.toFixed(2)})`;
+        } else {
+          remEl.textContent = `BOB ${remainingBob.toFixed(2)} (≈ USD ${remainingUsd.toFixed(2)})`;
+        }
       }
     }
   },
@@ -287,10 +352,12 @@ window.cashRegisterModule = {
     }
 
     const curr = document.getElementById('pay-currency').value || 'BOB';
-    const tc = parseFloat(document.getElementById('pay-exchange-rate').value) || 6.96;
+    const tc = parseFloat(document.getElementById('pay-exchange-rate').value) || doc.frozenExchangeRate || 6.96;
     const payMethod = document.getElementById('pay-method-select').value || 'TRANSFERENCIA';
     const finAccountId = document.getElementById('pay-account-select').value || 'CAJA_GENERAL';
     const userNotes = (document.getElementById('pay-notes-input').value || '').trim();
+
+    const { totalBob, totalUsd, balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
 
     let montoAbonadoBob = 0;
     let montoAbonadoUsd = 0;
@@ -303,53 +370,62 @@ window.cashRegisterModule = {
       montoAbonadoBob = inputAmount * tc;
     }
 
-    // 1. CÁLCULO DE SALDOS Y AMORTIZACIONES
-    const totalDocumento = isNd
-      ? Number(doc.total_documento ?? doc.totalAmountBob ?? 0)
-      : Number(doc.total_documento ?? doc.totalAmount ?? 0);
-
-    const saldoActualBob = isNd
-      ? Number(doc.saldo_pendiente ?? doc.balanceBob ?? 0)
-      : Number(doc.saldo_pendiente ?? doc.balance ?? 0);
-
-    if (montoAbonadoBob > (saldoActualBob + 0.05)) {
-      window.app.showToast(`El monto abonado (BOB ${montoAbonadoBob.toFixed(2)}) no puede exceder el saldo pendiente (BOB ${saldoActualBob.toFixed(2)}).`, 'warning');
-      return;
+    // Validación según moneda de pago
+    if (curr === 'USD') {
+      if (inputAmount > (balanceUsd + 0.05)) {
+        window.app.showToast(`El monto abonado (USD ${inputAmount.toFixed(2)}) no puede exceder el saldo pendiente (USD ${balanceUsd.toFixed(2)}).`, 'warning');
+        return;
+      }
+    } else {
+      if (inputAmount > (balanceBob + 0.05)) {
+        window.app.showToast(`El monto abonado (BOB ${inputAmount.toFixed(2)}) no puede exceder el saldo pendiente (BOB ${balanceBob.toFixed(2)}).`, 'warning');
+        return;
+      }
     }
 
-    const acumuladoPrevioBob = Number(doc.monto_acumulado_pagado ?? (isNd ? doc.paidAmountBob : doc.paidAmount) ?? 0);
-    const montoAcumuladoPagado = parseFloat((acumuladoPrevioBob + montoAbonadoBob).toFixed(2));
-    const saldoPendiente = Math.max(0, parseFloat((totalDocumento - montoAcumuladoPagado).toFixed(2)));
-    const saldoPendienteUsd = tc > 0 ? parseFloat((saldoPendiente / tc).toFixed(2)) : 0;
-    const montoAcumuladoUsd = tc > 0 ? parseFloat((montoAcumuladoPagado / tc).toFixed(2)) : 0;
+    // 1. CÁLCULO DE SALDOS Y AMORTIZACIONES
+    const nuevoSaldoBob = Math.max(0, parseFloat((balanceBob - montoAbonadoBob).toFixed(2)));
+    const nuevoSaldoUsd = Math.max(0, parseFloat((balanceUsd - montoAbonadoUsd).toFixed(2)));
+    const isFullyPaid = (nuevoSaldoBob <= 0.01 || nuevoSaldoUsd <= 0.01);
+
+    const prevPaidBob = Number(doc.paidAmountBob ?? (isNd ? (totalBob - balanceBob) : (doc.currency === 'USD' ? (doc.paidAmount * tc) : doc.paidAmount)) ?? 0);
+    const prevPaidUsd = Number(doc.paidAmountUsd ?? (isNd ? (totalUsd - balanceUsd) : (doc.currency === 'USD' ? doc.paidAmount : (doc.paidAmount / tc))) ?? 0);
+
+    const nuevoAcumuladoBob = parseFloat((prevPaidBob + montoAbonadoBob).toFixed(2));
+    const nuevoAcumuladoUsd = parseFloat((prevPaidUsd + montoAbonadoUsd).toFixed(2));
 
     // ACTUALIZACIÓN DE SALDOS EN EL DOCUMENTO
-    doc.total_documento = totalDocumento;
-    doc.saldo_pendiente = saldoPendiente;
-    doc.monto_acumulado_pagado = montoAcumuladoPagado;
+    doc.balanceBob = isFullyPaid ? 0 : nuevoSaldoBob;
+    doc.balanceUsd = isFullyPaid ? 0 : nuevoSaldoUsd;
+    doc.paidAmountBob = isFullyPaid ? totalBob : nuevoAcumuladoBob;
+    doc.paidAmountUsd = isFullyPaid ? totalUsd : nuevoAcumuladoUsd;
 
-    if (isNd) {
-      doc.balanceBob = saldoPendiente;
-      doc.balanceUsd = saldoPendienteUsd;
-      doc.paidAmountBob = montoAcumuladoPagado;
-      doc.paidAmountUsd = montoAcumuladoUsd;
-    } else {
-      doc.balance = saldoPendiente;
-      doc.paidAmount = montoAcumuladoPagado;
+    const isDocUsd = (doc.currency === 'USD');
+    doc.total_documento = isDocUsd ? totalUsd : totalBob;
+    doc.saldo_pendiente = isDocUsd ? doc.balanceUsd : doc.balanceBob;
+    doc.monto_acumulado_pagado = isDocUsd ? doc.paidAmountUsd : doc.paidAmountBob;
+
+    if (!isNd) {
+      doc.totalAmount = isDocUsd ? totalUsd : totalBob;
+      doc.totalAmountBob = totalBob;
+      doc.totalAmountUsd = totalUsd;
+      doc.balance = isDocUsd ? doc.balanceUsd : doc.balanceBob;
+      doc.paidAmount = isDocUsd ? doc.paidAmountUsd : doc.paidAmountBob;
     }
 
     // CONDICIÓN MATEMÁTICA ESTRICTA DE CANCELACIÓN Y GLOSA
     let nuevoEstado = 'IMPAGA';
     let reciboGlosa = '';
 
-    if (saldoPendiente <= 0.005) {
+    if (isFullyPaid) {
       nuevoEstado = 'PAGADA';
       reciboGlosa = isNd ? 'Cobro total ND' : 'Pago total NC';
-    } else if (saldoPendiente > 0.005 && montoAcumuladoPagado > 0) {
+    } else if (nuevoAcumuladoBob > 0) {
       nuevoEstado = 'PENDIENTE';
+      const saldoRemanenteMsg = curr === 'USD' ? `USD ${doc.balanceUsd.toFixed(2)}` : `BOB ${doc.balanceBob.toFixed(2)}`;
       reciboGlosa = isNd
-        ? `Abono parcial ND (Saldo pendiente: BOB ${saldoPendiente.toFixed(2)})`
-        : `Abono parcial NC (Saldo pendiente: BOB ${saldoPendiente.toFixed(2)})`;
+        ? `Abono parcial ND (Saldo pendiente: ${saldoRemanenteMsg})`
+        : `Abono parcial NC (Saldo pendiente: ${saldoRemanenteMsg})`;
     } else {
       nuevoEstado = 'IMPAGA';
       reciboGlosa = isNd ? 'Cobro ND' : 'Pago NC';
@@ -383,6 +459,11 @@ window.cashRegisterModule = {
     const docNumLabel = isNd ? `ND #${doc.ndNumber}` : `NC #${doc.ncNumber}`;
     const glosaFinal = userNotes ? `${userNotes} - ${reciboGlosa}` : reciboGlosa;
 
+    const saldoPendiente = doc.saldo_pendiente;
+    const totalDocumento = doc.total_documento;
+    const montoAcumuladoPagado = doc.monto_acumulado_pagado;
+    const saldoActualBob = balanceBob;
+
     // 4. INSERTAR RECIBO INDEPENDIENTE EN CAJA
     if (isNd) {
       const newReceipt = {
@@ -391,7 +472,7 @@ window.cashRegisterModule = {
         receiptCode: receiptCode,
         receiptDate: new Date().toISOString().split('T')[0],
         tipo: 'ND',
-        tipoTransaccion: (saldoPendiente <= 0.005) ? 'COBRO TOTAL ND' : 'ABONO PARCIAL ND',
+        tipoTransaccion: isFullyPaid ? 'COBRO TOTAL ND' : 'ABONO PARCIAL ND',
         documentoOrigen: docNumLabel,
         debitNoteId: doc.id,
         debitNoteNumber: doc.ndNumber,
@@ -446,7 +527,7 @@ window.cashRegisterModule = {
         receiptCode: receiptCode,
         paymentDate: new Date().toISOString().split('T')[0],
         tipo: 'NC',
-        tipoTransaccion: (saldoPendiente <= 0.005) ? 'PAGO TOTAL NC' : 'ABONO PARCIAL NC',
+        tipoTransaccion: isFullyPaid ? 'PAGO TOTAL NC' : 'ABONO PARCIAL NC',
         documentoOrigen: docNumLabel,
         creditNoteId: doc.id,
         creditNoteNumber: doc.ncNumber,
@@ -462,7 +543,7 @@ window.cashRegisterModule = {
         total_documento: totalDocumento,
         saldo_pendiente: saldoPendiente,
         monto_acumulado_pagado: montoAcumuladoPagado,
-        isPartial: (saldoPendiente > 0.005),
+        isPartial: !isFullyPaid,
         exchangeRateUsed: tc,
         status: 'VALIDO',
         estado: nuevoEstado,
@@ -491,7 +572,8 @@ window.cashRegisterModule = {
 
     window.db.save(data);
     window.app.closeModal('modal-payment-transaction');
-    window.app.showToast(`¡Transacción ${receiptCode} registrada con éxito! Monto: ${curr} ${inputAmount.toFixed(2)}. Saldo restante: BOB ${nuevoSaldoBob.toFixed(2)} (${doc.status})`, 'success');
+    const remToastMsg = curr === 'USD' ? `USD ${nuevoSaldoUsd.toFixed(2)}` : `BOB ${nuevoSaldoBob.toFixed(2)}`;
+    window.app.showToast(`¡Transacción ${receiptCode} registrada con éxito! Monto: ${curr} ${inputAmount.toFixed(2)}. Saldo restante: ${remToastMsg} (${doc.status})`, 'success');
 
     // 5. ACTUALIZAR VISTAS REACTIVAMENTE
     if (window.operationsHubModule) window.operationsHubModule.render();
@@ -727,7 +809,7 @@ window.cashRegisterModule = {
     }
 
     const data = window.db.get();
-    const pendingNds = data.debitNotes.filter(n => n.accountId === clientId && (n.status === 'PENDIENTE' || n.status === 'IMPAGA' || n.status === 'PARCIAL' || n.status === 'CERRADA') && n.balanceBob > 0);
+    const pendingNds = data.debitNotes.filter(n => n.accountId === clientId && (n.status === 'PENDIENTE' || n.status === 'IMPAGA' || n.status === 'PARCIAL' || n.status === 'CERRADA') && (Number(n.balanceBob || 0) > 0.01 || Number(n.balanceUsd || 0) > 0.01));
 
     if (pendingNds.length === 0) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #15803d; font-weight: 600;">Este cliente no tiene Notas de Débito pendientes de pago. ¡Al día!</td></tr>`;
@@ -735,23 +817,34 @@ window.cashRegisterModule = {
       return;
     }
 
-    tbody.innerHTML = pendingNds.map(nd => `
+    tbody.innerHTML = pendingNds.map(nd => {
+      const isUsd = (nd.currency === 'USD');
+      const totalDisplay = isUsd
+        ? `USD ${Number(nd.totalAmountUsd !== undefined && nd.totalAmountUsd !== null ? nd.totalAmountUsd : ((nd.totalAmountBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}`
+        : `BOB ${Number(nd.totalAmountBob || 0).toFixed(2)}`;
+      const balNum = isUsd
+        ? Number(nd.balanceUsd !== undefined && nd.balanceUsd !== null ? nd.balanceUsd : ((nd.balanceBob || 0) / (nd.frozenExchangeRate || 6.96)))
+        : Number(nd.balanceBob || 0);
+      const balDisplay = `${nd.currency || 'BOB'} ${balNum.toFixed(2)}`;
+
+      return `
       <tr>
         <td style="text-align: center;">
           <input type="checkbox" class="nd-collect-check" value="${nd.id}" onchange="window.cashRegisterModule.onPaymentAmountChange()" checked style="width: 16px; height: 16px; cursor: pointer;">
         </td>
         <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
         <td class="font-mono">${nd.issueDate}</td>
-        <td class="font-mono" style="text-align: right;">${nd.currency} ${Number(nd.totalAmountBob).toFixed(2)}</td>
+        <td class="font-mono" style="text-align: right;">${totalDisplay}</td>
         <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 700;" id="nd-bal-${nd.id}">
-          BOB ${Number(nd.balanceBob).toFixed(2)}
+          ${balDisplay}
         </td>
         <td>
-          <input type="number" step="0.01" min="0" max="${nd.balanceBob}" class="form-control nd-amount-to-pay" data-nd-id="${nd.id}" data-max-balance="${nd.balanceBob}" value="${nd.balanceBob}" oninput="window.cashRegisterModule.onNdAmountChange(this)" style="width: 130px; text-align: right; font-weight: 700;">
+          <input type="number" step="0.01" min="0" max="${balNum.toFixed(2)}" class="form-control nd-amount-to-pay" data-nd-id="${nd.id}" data-max-balance="${balNum.toFixed(2)}" value="${balNum.toFixed(2)}" oninput="window.cashRegisterModule.onNdAmountChange(this)" style="width: 130px; text-align: right; font-weight: 700;">
         </td>
         <td><span class="badge ${nd.status === 'PARCIAL' ? 'badge-blue' : 'badge-amber'}">${nd.status}</span></td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     this.updateCobranzaSummary();
   },

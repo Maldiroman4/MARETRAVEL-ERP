@@ -193,17 +193,21 @@ window.debitNotesModule = {
           </td>
           <td><span class="badge badge-slate">${nd.paymentTerm.replace(/_/g, ' ')}</span></td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
-            ${nd.currency} ${Number(nd.totalAmountBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD' 
+              ? `USD ${Number(nd.totalAmountUsd !== undefined && nd.totalAmountUsd !== null ? nd.totalAmountUsd : ((nd.totalAmountBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+              : `BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
           <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 600;">
-            ${nd.currency} ${Number(nd.balanceBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD' 
+              ? `USD ${Number(nd.balanceUsd !== undefined && nd.balanceUsd !== null ? nd.balanceUsd : ((nd.balanceBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+              : `BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
           <td>${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nd.status, (Number(nd.totalAmountBob || 0) - Number(nd.balanceBob || 0)), Number(nd.balanceBob || 0)) : `<span class="badge ${statusBadge}">${nd.status}</span>`}</td>
           <td style="font-size: 0.78rem;">${(nd.isCommissionNd || nd.serviceType === 'COMISION_PLATAFORMA') ? '<span class="badge badge-emerald">Comisión</span>' : ((nd.items?.length || 0) + ' serv.')}</td>
           <td>
             <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
               ${nd.status !== 'ANULADA' ? `
-                <button type="button" class="btn ${Number(nd.balanceBob || 0) > 0.01 ? 'btn-success' : 'btn-secondary'} btn-sm" onclick="window.cashRegisterModule.openPaymentModal('ND', '${nd.id}')" title="Cobrar / Amortizar" style="padding: 4px 8px; font-weight: 700; ${Number(nd.balanceBob || 0) > 0.01 ? 'background: #00a884; border-color: #008f70; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
+                <button type="button" class="btn ${(Number(nd.balanceBob || 0) > 0.01 || Number(nd.balanceUsd || 0) > 0.01) ? 'btn-success' : 'btn-secondary'} btn-sm" onclick="window.cashRegisterModule.openPaymentModal('ND', '${nd.id}')" title="Cobrar / Amortizar" style="padding: 4px 8px; font-weight: 700; ${(Number(nd.balanceBob || 0) > 0.01 || Number(nd.balanceUsd || 0) > 0.01) ? 'background: #00a884; border-color: #008f70; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
                   <i data-lucide="hand-coins" style="width: 14px; height: 14px;"></i> Cobrar
                 </button>
               ` : ''}
@@ -1983,24 +1987,32 @@ window.debitNotesModule = {
 
     // Totales y Mapeo de Transacción (Recibo de Caja / Pago)
     const currencyStr = doc.currency || 'BOB';
-    const totalDocVal = Number(doc.total_documento ?? (docType === 'ND' ? doc.totalAmountBob : doc.totalAmount) ?? 0);
+    const isDocUsd = (currencyStr === 'USD');
+
+    const totalDocBob = Number(doc.totalAmountBob ?? (isDocUsd ? ((doc.totalAmountUsd || doc.total_documento || 0) * tcUsed) : (doc.total_documento || 0)));
+    const totalDocUsd = Number(doc.totalAmountUsd ?? (tcUsed > 0 ? totalDocBob / tcUsed : 0));
+    const totalDocVal = isDocUsd ? totalDocUsd : totalDocBob;
 
     const montoTransaccionBob = isTransaction
       ? Number(tx.monto_transaccion ?? tx.totalPaidBob ?? tx.amountPaidBob ?? tx.amountBob ?? 0)
-      : totalDocVal;
+      : totalDocBob;
 
     const montoTransaccionUsd = isTransaction
-      ? Number(tx.monto_transaccion_usd ?? tx.totalPaidUsd ?? tx.amountPaidUsd ?? tx.amountUsd ?? (montoTransaccionBob / tcUsed))
-      : Number(doc.totalAmountUsd || (totalDocVal / tcUsed));
+      ? Number(tx.monto_transaccion_usd ?? tx.totalPaidUsd ?? tx.amountPaidUsd ?? tx.amountUsd ?? (tcUsed > 0 ? montoTransaccionBob / tcUsed : 0))
+      : totalDocUsd;
 
     const saldoRemanenteBob = isTransaction
-      ? Number(tx.saldo_pendiente ?? (tx.details && tx.details[0] && tx.details[0].remainingBalanceBob) ?? doc.saldo_pendiente ?? doc.balanceBob ?? doc.balance ?? 0)
-      : Number(doc.saldo_pendiente ?? doc.balanceBob ?? doc.balance ?? 0);
+      ? Number(tx.saldo_pendiente_bob ?? (tx.details && tx.details[0] && tx.details[0].remainingBalanceBob) ?? doc.balanceBob ?? (isDocUsd ? ((doc.balanceUsd || doc.saldo_pendiente || 0) * tcUsed) : (doc.saldo_pendiente || 0)))
+      : Number(doc.balanceBob ?? (isDocUsd ? ((doc.balanceUsd || doc.saldo_pendiente || 0) * tcUsed) : (doc.saldo_pendiente || 0)));
 
-    const isPartialPayment = isTransaction && (saldoRemanenteBob > 0.005 || tx.isPartial || tx.estado === 'PENDIENTE');
+    const saldoRemanenteUsd = isTransaction
+      ? Number(tx.saldo_pendiente_usd ?? (tcUsed > 0 ? saldoRemanenteBob / tcUsed : 0))
+      : Number(doc.balanceUsd ?? (tcUsed > 0 ? saldoRemanenteBob / tcUsed : 0));
 
-    const displayAmountBob = isTransaction ? montoTransaccionBob : totalDocVal;
-    const displayAmountUsd = isTransaction ? montoTransaccionUsd : Number(doc.totalAmountUsd || (totalDocVal / tcUsed));
+    const isPartialPayment = isTransaction && (saldoRemanenteBob > 0.005 || saldoRemanenteUsd > 0.005 || tx.isPartial || tx.estado === 'PENDIENTE');
+
+    const displayAmountBob = isTransaction ? montoTransaccionBob : totalDocBob;
+    const displayAmountUsd = isTransaction ? montoTransaccionUsd : totalDocUsd;
 
     const totalBobFormatted = Number(displayAmountBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const totalUsdFormatted = Number(displayAmountUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2101,9 +2113,9 @@ window.debitNotesModule = {
 
           ${isPartialPayment ? `
           <div class="nd-partial-summary" style="margin-top: 6px; margin-bottom: 8px; padding: 6px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #00a884; border-radius: 4px; font-size: 0.8rem; display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end;">
-            <div><span style="color: #64748b; font-weight: 600;">Total Servicio:</span> <strong class="font-mono" style="color: #0f172a;">BOB ${Number(totalDocVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
-            <div><span style="color: #64748b; font-weight: 600;">Monto Abonado en este Recibo:</span> <strong class="font-mono" style="color: #00a884;">BOB ${Number(montoTransaccionBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
-            <div><span style="color: #64748b; font-weight: 600;">Saldo Remanente:</span> <strong class="font-mono" style="color: #dc2626;">BOB ${Number(saldoRemanenteBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Total Servicio:</span> <strong class="font-mono" style="color: #0f172a;">${currencyStr} ${(isDocUsd ? totalDocUsd : totalDocBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Monto Abonado en este Recibo:</span> <strong class="font-mono" style="color: #00a884;">${currencyStr} ${(isDocUsd ? montoTransaccionUsd : montoTransaccionBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Saldo Remanente:</span> <strong class="font-mono" style="color: #dc2626;">${currencyStr} ${(isDocUsd ? saldoRemanenteUsd : saldoRemanenteBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
           </div>
           ` : ''}
 
@@ -2111,7 +2123,7 @@ window.debitNotesModule = {
             <span class="nd-obs-badge">Observaciones ${isTransaction ? 'Recibo' : docType}:</span>
             <span class="nd-obs-content font-bold">
               ${isTransaction && tx.glosa ? tx.glosa : obsText}
-              ${isPartialPayment ? ` | Total Servicio: BOB ${totalDocVal.toFixed(2)} | Monto Abonado en este Recibo: BOB ${montoTransaccionBob.toFixed(2)} | Saldo Remanente: BOB ${saldoRemanenteBob.toFixed(2)}` : ''}
+              ${isPartialPayment ? ` | Total: ${currencyStr} ${(isDocUsd ? totalDocUsd : totalDocBob).toFixed(2)} | Abonado: ${currencyStr} ${(isDocUsd ? montoTransaccionUsd : montoTransaccionBob).toFixed(2)} | Saldo: ${currencyStr} ${(isDocUsd ? saldoRemanenteUsd : saldoRemanenteBob).toFixed(2)}` : ''}
             </span>
           </div>
         </div>
