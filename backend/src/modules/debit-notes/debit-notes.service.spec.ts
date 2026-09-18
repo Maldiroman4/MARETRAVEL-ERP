@@ -284,7 +284,7 @@ describe('DebitNotesService', () => {
   });
 
   it('correct without motivo throws BadRequestException', async () => {
-    await expect(service.correct('nd1', '', {})).rejects.toBeInstanceOf(
+    await expect(service.correct('nd1', { motivo: '' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
