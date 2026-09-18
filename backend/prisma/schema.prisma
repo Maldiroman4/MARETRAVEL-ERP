@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RelationType {
+  CLIENTE
+  PROVEEDOR
+  AMBOS
+}
+enum AccountCategoryType {
+  EMPRESA
+  PERSONA
+  AEROLINEA
+  HOTEL
+  ONG
+  INSTITUCION
+  RENT_A_CAR
+}
+enum AccountRating {
+  NORMAL
+  IMPORTANTE
+  VIP
+  CRITICA
+}
+enum GeneralStatus {
+  ACTIVO
+  INACTIVO
+}
+enum Currency {
+  BOB
+  USD
+}
+enum PaymentTerm {
+  AL_CONTADO
+  CREDITO_7_DIAS
+  CREDITO_15_DIAS
+  CREDITO_30_DIAS
+}
+enum DebitNoteStatus {
+  BORRADOR
+  IMPAGA
+  PARCIAL
+  PAGADA
+  ANULADA
+}
+enum TicketStatus {
+  DISPONIBLE
+  ASIGNADO
+  ANULADO
+  REEMBOLSADO
+}
+enum ServiceType {
+  BOLETO_GDS
+  HOTEL
+  PAQUETE
+  SEGURO
+  TRANSFER
+  PENALIDAD
+}
+enum CashReceiptStatus {
+  VALIDO
+  REVERSADO
+}
+enum FinancialAccountType {
+  BANCO
+  BINANCE
+  EFECTIVO
+}
+
+model User {
+  id           String        @id @default(uuid())
+  username     String        @unique
+  passwordHash String        @map("password_hash")
+  name         String
+  role         String        @default("ADMIN")
+  email        String?
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  auditLogs    AuditLog[]
+  @@map("users")
+}
+
+model Account {
+  id           String              @id @default(uuid())
+  code         String              @unique
+  name         String
+  legalName    String?             @map("legal_name")
+  nit          String?
+  relationType RelationType        @map("relation_type")
+  accountType  AccountCategoryType @map("account_type")
+  rating       AccountRating       @default(NORMAL)
+  department   String?
+  city         String?
+  address      String?
+  phone        String?
+  cellphone    String?
+  email        String?
+  status       GeneralStatus       @default(ACTIVO)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  contacts     CompanyContact[]
+  debitNotes   DebitNote[]
+  creditNotes  CreditNote[]
+  tickets      Ticket[]
+  cashReceipts CashReceipt[]
+  @@index([nit])
+  @@index([relationType])
+  @@map("accounts")
+}
+
+model CompanyContact {
+  id         String   @id @default(uuid())
+  companyId  String   @map("company_id")
+  fullName   String   @map("full_name")
+  department String?
+  roleTitle  String?  @map("role_title")
+  email      String?
+  phone      String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  company    Account  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  @@index([companyId])
+  @@map("company_contacts")
+}
+
+model DebitNote {
+  id              String          @id @default(uuid())
+  ndNumber        Int             @unique @map("nd_number")
+  accountId       String          @map("account_id")
+  requesterText   String?         @map("requester_text")
+  passengerName   String?         @map("passenger_name")
+  issueDate       DateTime        @map("issue_date") @db.Date
+  dueDate         DateTime?       @map("due_date") @db.Date
+  paymentTerm     PaymentTerm     @default(AL_CONTADO) @map("payment_term")
+  currency        Currency
+  totalAmountBob  Decimal         @default(0) @map("total_amount_bob") @db.Decimal(14, 2)
+  totalAmountUsd  Decimal         @default(0) @map("total_amount_usd") @db.Decimal(14, 2)
+  paidAmountBob   Decimal         @default(0) @map("paid_amount_bob") @db.Decimal(14, 2)
+  paidAmountUsd   Decimal         @default(0) @map("paid_amount_usd") @db.Decimal(14, 2)
+  balanceBob      Decimal         @default(0) @map("balance_bob") @db.Decimal(14, 2)
+  balanceUsd      Decimal         @default(0) @map("balance_usd") @db.Decimal(14, 2)
+  status          DebitNoteStatus @default(BORRADOR)
+  observations    String?
+  createdById     String?         @map("created_by_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  client          Account         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  items           DebitNoteItem[]
+  creditNotes     CreditNote[]
+  paymentLines    PaymentLine[]
+  @@index([accountId])
+  @@index([status])
+  @@map("debit_notes")
+}
+
+model DebitNoteItem {
+  id                     String      @id @default(uuid())
+  debitNoteId            String      @map("debit_note_id")
+  serviceType            ServiceType
+  ticketId               String?     @map("ticket_id")
+  ticketNumber           String?     @map("ticket_number")
+  passengerName          String      @map("passenger_name")
+  operatorId             String?     @map("operator_id")
+  description            String
+  currency               Currency
+  totalAmount            Decimal     @map("total_amount") @db.Decimal(14, 2)
+  feeAmount              Decimal     @default(0) @map("fee_amount") @db.Decimal(14, 2)
+  providerCommissionRate Decimal     @default(0) @map("provider_commission_rate") @db.Decimal(6, 2)
+  providerCommissionAmount Decimal   @default(0) @map("provider_commission_amount") @db.Decimal(14, 2)
+  clientCommissionRate   Decimal     @default(0) @map("client_commission_rate") @db.Decimal(6, 2)
+  clientCommissionAmount Decimal     @default(0) @map("client_commission_amount") @db.Decimal(14, 2)
+  netCostToProvider      Decimal     @map("net_cost_to_provider") @db.Decimal(14, 2)
+  createdAt              DateTime    @default(now()) @map("created_at")
+  debitNote              DebitNote   @relation(fields: [debitNoteId], references: [id], onDelete: Cascade)
+  ticket                 Ticket?     @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  @@index([debitNoteId])
+  @@map("debit_note_items")
+}
+
+model CreditNote {
+  id               String          @id @default(uuid())
+  ncNumber         Int             @unique @map("nc_number")
+  debitNoteId      String?         @map("debit_note_id")
+  providerAccountId String          @map("provider_account_id")
+  isAutomatic      Boolean         @default(false) @map("is_automatic")
+  concept          String
+  currency         Currency
+  totalAmountBob   Decimal         @default(0) @map("total_amount_bob") @db.Decimal(14, 2)
+  totalAmountUsd   Decimal         @default(0) @map("total_amount_usd") @db.Decimal(14, 2)
+  paidAmountBob    Decimal         @default(0) @map("paid_amount_bob") @db.Decimal(14, 2)
+  paidAmountUsd    Decimal         @default(0) @map("paid_amount_usd") @db.Decimal(14, 2)
+  balanceBob       Decimal         @default(0) @map("balance_bob") @db.Decimal(14, 2)
+  balanceUsd       Decimal         @default(0) @map("balance_usd") @db.Decimal(14, 2)
+  status           String          @default("PENDIENTE")
+  voidReason       String?         @map("void_reason")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  provider         Account         @relation(fields: [providerAccountId], references: [id], onDelete: Restrict)
+  debitNote        DebitNote?      @relation(fields: [debitNoteId], references: [id], onDelete: SetNull)
+  @@index([providerAccountId])
+  @@map("credit_notes")
+}
+
+model Ticket {
+  id               String       @id @default(uuid())
+  ticketNumber     String       @unique @map("ticket_number")
+  gdsSource        String       @default("AMADEUS") @map("gds_source")
+  counterId        String?      @map("counter_id")
+  issueDate        DateTime     @map("issue_date") @db.Date
+  passengerName    String       @map("passenger_name")
+  route            String
+  airlineCode      String       @map("airline_code")
+  operatorId       String       @map("operator_id")
+  netAmount        Decimal      @map("net_amount") @db.Decimal(14, 2)
+  taxAmount        Decimal      @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount      Decimal      @map("total_amount") @db.Decimal(14, 2)
+  currency         Currency
+  commissionRate   Decimal      @default(0) @map("commission_rate") @db.Decimal(6, 2)
+  commissionAmount Decimal      @default(0) @map("commission_amount") @db.Decimal(14, 2)
+  feeAmount        Decimal      @default(0) @map("fee_amount") @db.Decimal(14, 2)
+  status           TicketStatus @default(DISPONIBLE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  operator         Account      @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  items            DebitNoteItem[]
+  @@index([operatorId])
+  @@index([status])
+  @@map("tickets")
+}
+
+model CashReceipt {
+  id             String            @id @default(uuid())
+  receiptNumber  Int               @unique @map("receipt_number")
+  clientAccountId String            @map("client_account_id")
+  issueDate      DateTime          @map("issue_date") @db.Date
+  status         CashReceiptStatus @default(VALIDO)
+  totalPaidBob   Decimal           @default(0) @map("total_paid_bob") @db.Decimal(14, 2)
+  totalPaidUsd   Decimal           @default(0) @map("total_paid_usd") @db.Decimal(14, 2)
+  exchangeRate   Decimal           @default(6.96) @map("exchange_rate") @db.Decimal(10, 4)
+  voidReason     String?           @map("void_reason")
+  createdById    String?           @map("created_by_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  client         Account           @relation(fields: [clientAccountId], references: [id], onDelete: Restrict)
+  lines          PaymentLine[]
+  @@index([clientAccountId])
+  @@map("cash_receipts")
+}
+
+model PaymentLine {
+  id              String          @id @default(uuid())
+  cashReceiptId   String          @map("cash_receipt_id")
+  debitNoteId     String          @map("debit_note_id")
+  amountPaidBob   Decimal         @default(0) @map("amount_paid_bob") @db.Decimal(14, 2)
+  amountPaidUsd   Decimal         @default(0) @map("amount_paid_usd") @db.Decimal(14, 2)
+  paymentMethodId String?         @map("payment_method_id")
+  cashReceipt     CashReceipt     @relation(fields: [cashReceiptId], references: [id], onDelete: Cascade)
+  debitNote       DebitNote       @relation(fields: [debitNoteId], references: [id], onDelete: Restrict)
+  @@index([cashReceiptId])
+  @@index([debitNoteId])
+  @@map("payment_lines")
+}
+
+model FinancialAccount {
+  id            String                @id @default(uuid())
+  type          FinancialAccountType
+  bankName      String?
+  accountNumber String?
+  currency      Currency
+  bankAccountId String?               @map("bank_account_id")
+  titularName   String?               @map("titular_name")
+  isActive      Boolean               @default(true) @map("is_active")
+  currentBalance Decimal              @default(0) @map("current_balance") @db.Decimal(14, 2)
+  createdAt     DateTime              @default(now()) @map("created_at")
+  @@index([type])
+  @@index([isActive])
+  @@map("financial_accounts")
+}
+
+model ServiceTypeCatalog {
+  id       String @id @default(uuid())
+  code     String @unique
+  name     String
+  category String
+  @@map("service_types")
+}
+
+model PaymentMethod {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  currency    Currency
+  type        String
+  bankAccount String?
+  status      String   @default("ACTIVO")
+  @@map("payment_methods")
+}
+
+model ExchangeRate {
+  id         String   @id @default(uuid())
+  date       DateTime @map("date") @db.Date
+  buyRate    Decimal  @map("buy_rate") @db.Decimal(10, 4)
+  sellRate   Decimal  @map("sell_rate") @db.Decimal(10, 4)
+  createdById String? @map("created_by_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  @@map("exchange_rates")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  oldValue   Json?
+  newValue   Json?
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@map("audit_logs")
+}
