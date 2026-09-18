@@ -5,10 +5,14 @@
 
 window.app = {
   currentView: 'operaciones',
+  servicioActivo: 'BOLETO_AEREO',
   AUTH_KEY: 'MARETRAVEL_AUTH_SESSION_V1',
   initialized: false,
 
   async start() {
+    window.state = window.state || {};
+    window.state.servicioActivo = 'BOLETO_AEREO';
+    window.currentServiceCategory = 'BOLETO_AEREO';
     this.bindAuthEvents();
     // 1. Carga inicial directa y obligatoria desde el almacenamiento permanente en disco
     if (window.db && typeof window.db.syncWithServerFile === 'function') {
@@ -272,6 +276,12 @@ window.app = {
       if (el) el.classList.add('active');
     }
 
+    // Estado global reactivo para el servicio activo
+    window.state = window.state || {};
+    window.state.servicioActivo = serviceCode || 'ALL';
+    window.currentServiceCategory = serviceCode || 'ALL';
+    this.servicioActivo = serviceCode || 'ALL';
+
     // C. Asegurar que el acordeón esté expandido
     const group = document.getElementById('sidebar-group-servicios');
     if (group && !group.classList.contains('open')) {
@@ -286,6 +296,11 @@ window.app = {
     // E. Filtrar dinámicamente la tabla central a esa categoría
     if (window.operationsHubModule && typeof window.operationsHubModule.filterByService === 'function') {
       window.operationsHubModule.filterByService(serviceCode);
+    }
+
+    // F. Sincronizar reactivamente el libro de Caja - Cobranzas
+    if (window.cashRegisterModule && typeof window.cashRegisterModule.renderReceiptsHistory === 'function') {
+      window.cashRegisterModule.renderReceiptsHistory();
     }
   },
 

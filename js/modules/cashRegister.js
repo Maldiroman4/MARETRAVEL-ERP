@@ -79,6 +79,9 @@ window.cashRegisterModule = {
     if (formRev) {
       formRev.addEventListener('submit', (e) => this.handleConfirmReversal(e));
     }
+
+    // Listener delegado y reactivo del botón Imprimir en Caja
+    this.bindPrintButtonListeners();
   },
 
   showTabContent(tab) {
@@ -666,23 +669,35 @@ window.cashRegisterModule = {
 
     // Aplicar amortizaciones a cada ND
     amortizations.forEach(item => {
-      const prevBalBob = Number(item.nd.balanceBob || 0);
-      const prevBalUsd = Number(item.nd.balanceUsd || 0);
-      const newBalBob = Math.max(0, prevBalBob - item.amountPaidBob);
-      const newBalUsd = Math.max(0, prevBalUsd - item.amountPaidUsd);
+      const totalDocBob = Number(item.nd.total_documento ?? item.nd.totalAmountBob ?? 0);
+      const prevPaidBob = Number(item.nd.monto_acumulado_pagado ?? item.nd.paidAmountBob ?? 0);
+      const newPaidBob = parseFloat((prevPaidBob + item.amountPaidBob).toFixed(2));
+      const newSaldoBob = parseFloat(Math.max(0, totalDocBob - newPaidBob).toFixed(2));
 
-      item.nd.paidAmountBob = parseFloat(((item.nd.paidAmountBob || 0) + item.amountPaidBob).toFixed(2));
+      // Control transaccional de estados y saldos requerido
+      item.nd.total_documento = totalDocBob;
+      item.nd.monto_acumulado_pagado = newPaidBob;
+      item.nd.saldo_pendiente = newSaldoBob;
+
+      // Retrocompatibilidad con campos base
+      item.nd.paidAmountBob = newPaidBob;
+      item.nd.balanceBob = newSaldoBob;
       item.nd.paidAmountUsd = parseFloat(((item.nd.paidAmountUsd || 0) + item.amountPaidUsd).toFixed(2));
-      item.nd.balanceBob = parseFloat(newBalBob.toFixed(2));
-      item.nd.balanceUsd = parseFloat(newBalUsd.toFixed(2));
+      item.nd.balanceUsd = parseFloat(Math.max(0, (item.nd.totalAmountUsd || 0) - item.nd.paidAmountUsd).toFixed(2));
 
-      // Actualización Dinámica del Estado: Si saldo <= 0.05 -> PAGADA / LIQUIDADA
-      if (item.nd.balanceBob <= 0.05) {
+      // Regla estricta de transición de estados:
+      // 1. monto_acumulado_pagado === 0 => 'IMPAGA'
+      // 2. monto_acumulado_pagado > 0 pero saldo_pendiente > 0 => 'PENDIENTE'
+      // 3. saldo_pendiente === 0 => 'PAGADA'
+      if (newPaidBob === 0) {
+        item.nd.status = 'IMPAGA';
+      } else if (newSaldoBob > 0.01) {
+        item.nd.status = 'PENDIENTE';
+      } else {
         item.nd.status = 'PAGADA';
+        item.nd.saldo_pendiente = 0;
         item.nd.balanceBob = 0;
         item.nd.balanceUsd = 0;
-      } else {
-        item.nd.status = 'PARCIAL';
       }
 
       if (!item.nd.paymentHistory) item.nd.paymentHistory = [];
@@ -1011,16 +1026,32 @@ window.cashRegisterModule = {
         return;
       }
 
-      const prevBal = Number(nc.balance || 0);
-      nc.paidAmount = parseFloat(((nc.paidAmount || 0) + amount).toFixed(2));
-      nc.balance = parseFloat(Math.max(0, prevBal - amount).toFixed(2));
+      const totalDoc = Number(nc.total_documento ?? nc.totalAmount ?? 0);
+      const prevPaid = Number(nc.monto_acumulado_pagado ?? nc.paidAmount ?? 0);
+      const newPaid = parseFloat((prevPaid + amount).toFixed(2));
+      const newSaldo = parseFloat(Math.max(0, totalDoc - newPaid).toFixed(2));
 
-      // Actualización Dinámica del Estado: Si saldo <= 0.01 -> PAGADA / LIQUIDADA
-      if (nc.balance <= 0.01) {
-        nc.status = 'PAGADA';
-        nc.balance = 0;
+      // Control transaccional de estados y saldos requerido
+      nc.total_documento = totalDoc;
+      nc.monto_acumulado_pagado = newPaid;
+      nc.saldo_pendiente = newSaldo;
+
+      // Retrocompatibilidad con campos base
+      nc.paidAmount = newPaid;
+      nc.balance = newSaldo;
+
+      // Regla estricta de transición de estados:
+      // 1. monto_acumulado_pagado === 0 => 'IMPAGA'
+      // 2. monto_acumulado_pagado > 0 pero saldo_pendiente > 0 => 'PENDIENTE'
+      // 3. saldo_pendiente === 0 => 'PAGADA'
+      if (newPaid === 0) {
+        nc.status = 'IMPAGA';
+      } else if (newSaldo > 0.01) {
+        nc.status = 'PENDIENTE';
       } else {
-        nc.status = 'PARCIAL';
+        nc.status = 'PAGADA';
+        nc.saldo_pendiente = 0;
+        nc.balance = 0;
       }
 
       totalPaid += amount;
@@ -1079,11 +1110,105 @@ window.cashRegisterModule = {
   // SUB-MÓDULO: HISTORIAL DE RECIBOS Y REVERSIÓN
   // ==========================================
 
+  // Helper para verificación y enlace contextual por servicio activo
+  matchesServiceCategory(item, targetService) {
+    if (!targetService || targetService === 'ALL') return true;
+    const fs = String(targetService).toUpperCase();
+    const data = window.db.get();
+
+    const typeMatches = (str, customTarget = fs) => {
+      if (!str) return false;
+      const s = String(str).toUpperCase();
+      const target = String(customTarget).toUpperCase();
+      if (target === 'BOLETO_AEREO') {
+        return s.includes('BOLETO') || s.includes('AEREO') || s.includes('AÉREO') || s.includes('GDS') || s.includes('VUELO') || s.includes('AVIACION') || s.includes('AVIACIÓN');
+      }
+      if (target === 'SEGURO_VIAJE') {
+        return s.includes('SEGURO') || s.includes('ASISTENCIA');
+      }
+      if (target === 'CERTIFICACION_FA') {
+        return s.includes('CERTIFIC') || s.includes('IFA') || /\bFA\b/.test(s);
+      }
+      if (target === 'ASESORAMIENTO_VISAS') {
+        return s.includes('VISA');
+      }
+      if (target === 'PAQUETES' || target === 'PAQUETE_TURISTICO') {
+        return s.includes('PAQUETE') || s.includes('CRUCERO') || s.includes('CONCIERTO');
+      }
+      if (target === 'HOTEL' || target === 'HOSPEDAJE') {
+        return s.includes('HOTEL') || s.includes('HOSPEDAJE');
+      }
+      if (target === 'RENT_A_CAR' || target === 'TRASLADO') {
+        return s.includes('RENT_A_CAR') || s.includes('RENT A CAR') || s.includes('RENTACAR') || s.includes('TRASLADO') || s.includes('TRANSFER') || s.includes('VEHICUL') || /\bAUTO\b/.test(s) || /\bAUTOS\b/.test(s) || /\bCAR\b/.test(s);
+      }
+      return s === target || s.includes(target);
+    };
+
+    const raw = item.raw || {};
+
+    if (item.tipo === 'NC') {
+      if (typeMatches(raw.serviceType) || typeMatches(raw.concept) || typeMatches(raw.providerName)) {
+        return true;
+      }
+      const allKnown = ['BOLETO_AEREO', 'HOTEL', 'SEGURO_VIAJE', 'CERTIFICACION_FA', 'ASESORAMIENTO_VISAS', 'PAQUETES', 'RENT_A_CAR'];
+      const otherMatched = allKnown.find(t => t !== fs && (typeMatches(raw.concept, t) || typeMatches(raw.providerName, t)));
+      if (otherMatched) return false;
+
+      if (raw.originDebitNoteId) {
+        const originNd = (data.debitNotes || []).find(n => n.id === raw.originDebitNoteId || String(n.ndNumber) === String(raw.originDebitNoteNumber));
+        if (originNd && originNd.items && originNd.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description))) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (raw.items && raw.items.length > 0) {
+      return raw.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description));
+    }
+    if (typeMatches(raw.serviceType) || typeMatches(raw.concept)) {
+      return true;
+    }
+
+    if (raw.details && raw.details.length > 0) {
+      const hasMatch = raw.details.some(d => {
+        const nd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+        return nd && nd.items && nd.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description));
+      });
+      if (hasMatch) return true;
+    }
+
+    if (item.tipo === 'ND' && raw.accountId) {
+      const clientNds = (data.debitNotes || []).filter(n => n.accountId === raw.accountId);
+      return clientNds.some(n => n.items && n.items.some(it => typeMatches(it.serviceType) || typeMatches(it.tipo_servicio) || typeMatches(it.description)));
+    }
+
+    return false;
+  },
+
+  // Vinculación reactiva y delegada del listener de impresión
+  bindPrintButtonListeners() {
+    if (this._printDelegationBound) return;
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-imprimir, .btn-imprimir-recibo');
+      if (!btn) return;
+      const tableBody = btn.closest('#receipts-history-table-body');
+      if (!tableBody) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const docId = btn.getAttribute('data-id') || btn.dataset.id;
+      const docType = btn.getAttribute('data-type') || btn.dataset.type || 'ND';
+      this.handlePrintOfficial(docId, docType);
+    });
+    this._printDelegationBound = true;
+  },
+
   renderReceiptsHistory() {
     const data = window.db.get();
     const search = (document.getElementById('cash-receipts-search')?.value || '').toLowerCase().trim();
-    const statusFilter = document.getElementById('cash-receipts-status')?.value || 'ALL';
     const filter = this.printablesFilter || 'ALL';
+    const activeService = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'ALL';
 
     const transaccionesCaja = [];
 
@@ -1102,7 +1227,6 @@ window.cashRegisterModule = {
         saldo_pendiente: Number(r.remainingBalanceBob || 0),
         user: r.createdByName || r.cajero || 'Luis (Admin)',
         reversalReason: r.reversalReason,
-        printHandler: 'printReceipt',
         raw: r
       });
     });
@@ -1111,20 +1235,21 @@ window.cashRegisterModule = {
     (data.debitNotes || []).forEach(nd => {
       const hasReceipt = transaccionesCaja.some(t => t.raw && (t.raw.id === nd.id || (t.raw.details && t.raw.details.some(d => d.debitNoteId === nd.id))));
       if (!hasReceipt) {
-        const balBob = Number(nd.balanceBob ?? (nd.balance ?? 0));
+        const balBob = Number(nd.saldo_pendiente ?? nd.balanceBob ?? nd.balance ?? 0);
+        const paidBob = Number(nd.monto_acumulado_pagado ?? nd.paidAmountBob ?? 0);
+        const totalBob = Number(nd.total_documento ?? nd.totalAmountBob ?? 0);
         transaccionesCaja.push({
           tipo: 'ND',
           id: nd.id,
           number: 'ND #' + (nd.ndNumber || nd.id),
           date: nd.issueDate || (nd.createdAt ? nd.createdAt.split(',')[0] : '-'),
           party: nd.accountName || 'Cliente General',
-          amountBob: Number(nd.totalAmountBob || 0),
+          amountBob: totalBob,
           amountUsd: Number(nd.totalAmountUsd || 0),
-          estado: String(nd.status || 'IMPAGA').toUpperCase(),
-          status: String(nd.status || 'IMPAGA').toUpperCase(),
+          estado: String(nd.status || (paidBob === 0 ? 'IMPAGA' : (balBob <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
+          status: String(nd.status || (paidBob === 0 ? 'IMPAGA' : (balBob <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
           saldo_pendiente: balBob,
           user: nd.solicitante || 'Administrador',
-          printHandler: 'printVoucherND',
           raw: nd
         });
       }
@@ -1147,7 +1272,6 @@ window.cashRegisterModule = {
         saldo_pendiente: 0,
         user: p.createdByName || 'Administrador',
         reversalReason: p.reversalReason,
-        printHandler: 'printProviderPayment',
         raw: p
       });
     });
@@ -1156,9 +1280,10 @@ window.cashRegisterModule = {
     (data.creditNotes || []).forEach(nc => {
       const hasPayment = transaccionesCaja.some(t => t.raw && (t.raw.id === nc.id || (t.raw.ncIds && t.raw.ncIds.includes(nc.id))));
       if (!hasPayment) {
-        const amtBob = Number(nc.totalAmount || 0);
+        const amtBob = Number(nc.total_documento ?? nc.totalAmount ?? 0);
         const tc = Number(nc.frozenExchangeRate || 6.96);
-        const bal = Number(nc.balance ?? 0);
+        const bal = Number(nc.saldo_pendiente ?? nc.balance ?? 0);
+        const paid = Number(nc.monto_acumulado_pagado ?? nc.paidAmount ?? 0);
         transaccionesCaja.push({
           tipo: 'NC',
           id: nc.id,
@@ -1167,11 +1292,10 @@ window.cashRegisterModule = {
           party: nc.providerName || 'Proveedor',
           amountBob: amtBob,
           amountUsd: amtBob / tc,
-          estado: String(nc.status || 'IMPAGA').toUpperCase(),
-          status: String(nc.status || 'IMPAGA').toUpperCase(),
+          estado: String(nc.status || (paid === 0 ? 'IMPAGA' : (bal <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
+          status: String(nc.status || (paid === 0 ? 'IMPAGA' : (bal <= 0.01 ? 'PAGADA' : 'PENDIENTE'))).toUpperCase(),
           saldo_pendiente: bal,
           user: 'Administrador',
-          printHandler: 'printVoucherNC',
           raw: nc
         });
       }
@@ -1179,27 +1303,34 @@ window.cashRegisterModule = {
 
     // =========================================================================
     // FILTRADO ESTRICTO EN CAJA - COBRANZAS:
-    // 1. Criterio de Inclusión: Únicamente documentos con estado estrictamente 'PAGADA' (o saldo_pendiente === 0).
-    // 2. Exclusión automática: 'IMPAGA', 'PENDIENTE', 'ANULADA' o saldo_pendiente > 0.
+    // 1. Aislamiento contextual por Servicio Activo.
+    // 2. Criterio de Inclusión: Únicamente documentos con estado 'PAGADA' (o saldo_pendiente === 0).
+    // 3. Exclusión automática: 'IMPAGA', 'PENDIENTE', 'ANULADA', 'REVERTIDO' o saldo_pendiente > 0.
+    // 4. Sub-filtro horizontal: "Todos", "Recibos (ND)", "Pagos (NC)".
     // =========================================================================
     const imprimiblesCaja = transaccionesCaja.filter(item => {
-      // Sub-pestañas: Todos, Recibos (ND), Pagos (NC)
-      if (filter === 'ND' && item.tipo !== 'ND') return false;
-      if (filter === 'NC' && item.tipo !== 'NC') return false;
-
-      // Excluir estados no pagados o revertidos
-      const st = String(item.estado || item.status || '').toUpperCase();
-      if (['IMPAGA', 'PENDIENTE', 'ANULADA', 'REVERTIDO'].includes(st)) {
+      // A. Aislamiento estricto por Servicio Activo en foco
+      if (!this.matchesServiceCategory(item, activeService)) {
         return false;
       }
 
-      // Excluir si saldo pendiente mayor a 0
+      // B. Sub-pestañas: Todos, Recibos (ND), Pagos (NC)
+      if (filter === 'ND' && item.tipo !== 'ND') return false;
+      if (filter === 'NC' && item.tipo !== 'NC') return false;
+
+      // C. Exclusión total de documentos no pagados o revertidos
+      const st = String(item.estado || item.status || '').toUpperCase();
+      if (['IMPAGA', 'PENDIENTE', 'ANULADA', 'REVERTIDO', 'PARCIAL'].includes(st)) {
+        return false;
+      }
+
+      // D. Exclusión terminante si posee saldo pendiente mayor a 0
       const saldoPendiente = Number(item.saldo_pendiente ?? 0);
       if (saldoPendiente > 0.01) {
         return false;
       }
 
-      // Inclusión: estado estrictamente 'PAGADA' o saldo cancelado en su totalidad
+      // E. Inclusión exclusiva: estado consolidado 'PAGADA'
       return st === 'PAGADA' || st === 'VALIDO' || (saldoPendiente <= 0.01 && (item.amountBob > 0 || item.amountUsd > 0));
     });
 
@@ -1220,11 +1351,15 @@ window.cashRegisterModule = {
     if (!tbody) return;
 
     if (filtered.length === 0) {
+      const srvName = (window.operationsHubModule && typeof window.operationsHubModule.formatServiceName === 'function' && activeService !== 'ALL')
+        ? window.operationsHubModule.formatServiceName(activeService)
+        : (activeService !== 'ALL' ? activeService : 'este servicio');
+
       tbody.innerHTML = `
         <tr>
           <td colspan="9" style="text-align:center; padding: 36px 20px; color: #64748b;">
             <i data-lucide="inbox" style="width: 36px; height: 36px; display: block; margin: 0 auto 8px; color: #94a3b8;"></i>
-            Sin comprobantes de caja pagados para mostrar.
+            Sin comprobantes de caja pagados para el servicio <strong>${srvName}</strong>.
           </td>
         </tr>
       `;
@@ -1238,10 +1373,6 @@ window.cashRegisterModule = {
         ? '<span class="badge badge-emerald" style="font-weight:700;"><i data-lucide="arrow-down-left" style="width:13px;height:13px;"></i> Recibo ND</span>'
         : '<span class="badge badge-purple" style="font-weight:700;"><i data-lucide="arrow-up-right" style="width:13px;height:13px;"></i> Pago NC</span>';
       const statusBadge = '<span class="badge badge-emerald">PAGADA</span>';
-
-      const printAction = isNd
-        ? `window.cashRegisterModule.printVoucherND('${it.id}')`
-        : `window.cashRegisterModule.printVoucherNC('${it.id}')`;
 
       return `
         <tr>
@@ -1259,11 +1390,11 @@ window.cashRegisterModule = {
           <td style="font-size: 0.8rem; color: #475569;">${it.user}</td>
           <td style="text-align: center;">
             <div style="display: inline-flex; align-items: center; gap: 6px; justify-content: center;">
-              <button class="btn btn-secondary btn-sm btn-imprimir-recibo" onclick="${printAction}" title="Imprimir Comprobante Oficial" style="padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <button type="button" class="btn btn-secondary btn-sm btn-imprimir btn-imprimir-recibo" data-id="${it.id}" data-type="${it.tipo}" onclick="window.cashRegisterModule.handlePrintOfficial('${it.id}', '${it.tipo}')" title="Imprimir Comprobante Oficial" style="padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                 <i data-lucide="printer" style="width:14px;height:14px;"></i> Imprimir
               </button>
               ${(isNd && it.raw && it.raw.receiptNumber && it.raw.status === 'VALIDO') ? `
-                <button class="btn btn-danger btn-sm" onclick="window.cashRegisterModule.openReversalModal('${it.id}')" title="Revertir Recibo" style="padding: 4px 8px;">
+                <button type="button" class="btn btn-danger btn-sm" onclick="window.cashRegisterModule.openReversalModal('${it.id}')" title="Revertir Recibo" style="padding: 4px 8px;">
                   <i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i>
                 </button>
               ` : ''}
@@ -1274,6 +1405,7 @@ window.cashRegisterModule = {
     }).join('');
 
     if (window.lucide) window.lucide.createIcons();
+    this.bindPrintButtonListeners();
   },
 
   openReversalModal(receiptId) {
@@ -1306,15 +1438,26 @@ window.cashRegisterModule = {
     receipt.details.forEach(item => {
       const nd = data.debitNotes.find(n => n.id === item.debitNoteId);
       if (nd) {
-        nd.paidAmountBob = Math.max(0, nd.paidAmountBob - item.amountPaidBob);
-        nd.paidAmountUsd = Math.max(0, nd.paidAmountUsd - item.amountPaidUsd);
+        const totalDocBob = Number(nd.total_documento ?? nd.totalAmountBob ?? 0);
+        const prevPaidBob = Number(nd.monto_acumulado_pagado ?? nd.paidAmountBob ?? 0);
+        const newPaidBob = Math.max(0, prevPaidBob - item.amountPaidBob);
+        const newSaldoBob = Math.max(0, totalDocBob - newPaidBob);
+
+        nd.total_documento = totalDocBob;
+        nd.monto_acumulado_pagado = parseFloat(newPaidBob.toFixed(2));
+        nd.saldo_pendiente = parseFloat(newSaldoBob.toFixed(2));
+
+        nd.paidAmountBob = parseFloat(newPaidBob.toFixed(2));
+        nd.paidAmountUsd = Math.max(0, (nd.paidAmountUsd || 0) - item.amountPaidUsd);
         nd.balanceBob = item.previousBalanceBob;
         nd.balanceUsd = item.previousBalanceUsd;
 
-        if (nd.balanceBob >= nd.totalAmountBob - 0.01) {
+        if (newPaidBob === 0) {
           nd.status = 'IMPAGA';
+        } else if (newSaldoBob > 0.01) {
+          nd.status = 'PENDIENTE';
         } else {
-          nd.status = 'PARCIAL';
+          nd.status = 'PAGADA';
         }
       }
     });
@@ -1336,17 +1479,75 @@ window.cashRegisterModule = {
   },
 
   /**
-   * Alias de impresión directa desde Caja para ND
+   * Manejador centralizado y reactivo de impresión de comprobantes oficiales desde Caja
    */
-  printVoucherND(docOrReceiptId) {
-    return this.printReceipt(docOrReceiptId);
+  handlePrintOfficial(docId, docType = 'ND') {
+    const data = window.db.get();
+
+    // 1. Obtención sincronizada en tiempo real para reflejar cualquier edición previa
+    let nd = (data.debitNotes || []).find(n => n.id === docId || ('ND #' + n.ndNumber) === docId || n.ndNumber == docId);
+    let nc = (data.creditNotes || []).find(c => c.id === docId || ('NC #' + c.ncNumber) === docId || c.ncNumber == docId);
+    let receipt = (data.cashReceipts || []).find(r => r.id === docId || r.receiptCode === docId);
+    let payment = (data.providerPayments || []).find(p => p.id === docId || p.receiptCode === docId);
+
+    // Si es recibo de caja, vincular a la ND originaria para renderizar la plantilla corporativa oficial completa
+    if (receipt && !nd) {
+      if (receipt.details && receipt.details.length > 0) {
+        const d = receipt.details[0];
+        nd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+      }
+      if (!nd && receipt.accountId) {
+        nd = (data.debitNotes || []).find(n => n.accountId === receipt.accountId);
+      }
+    }
+
+    // Si es pago a proveedor, vincular a la NC originaria
+    if (payment && !nc) {
+      if (payment.details && payment.details.length > 0) {
+        const d = payment.details[0];
+        nc = (data.creditNotes || []).find(c => c.id === d.creditNoteId || c.ncNumber === d.ncNumber);
+      }
+      if (!nc && payment.providerId) {
+        nc = (data.creditNotes || []).find(c => c.providerId === payment.providerId);
+      }
+    }
+
+    // 2. Impresión Oficial con la plantilla corporativa MARETRAVEL SRL
+    if (nd) {
+      if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
+        window.debitNotesModule.directPrint(nd.id, 'ND');
+        return;
+      }
+    }
+
+    if (nc) {
+      if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
+        window.debitNotesModule.directPrint(nc.id, 'NC');
+        return;
+      }
+      if (window.creditNotesModule && typeof window.creditNotesModule.directPrint === 'function') {
+        window.creditNotesModule.directPrint(nc.id);
+        return;
+      }
+    }
+
+    // 3. Fallbacks de impresión
+    if (receipt) {
+      this.printReceipt(receipt.id);
+      return;
+    }
+    if (payment) {
+      this.printProviderPayment(payment.id);
+      return;
+    }
   },
 
-  /**
-   * Alias de impresión directa desde Caja para NC
-   */
+  printVoucherND(docOrReceiptId) {
+    return this.handlePrintOfficial(docOrReceiptId, 'ND');
+  },
+
   printVoucherNC(docOrPaymentId) {
-    return this.printProviderPayment(docOrPaymentId);
+    return this.handlePrintOfficial(docOrPaymentId, 'NC');
   },
 
   /**

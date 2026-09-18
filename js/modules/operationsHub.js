@@ -218,6 +218,9 @@ class OperationsHubModule {
   }
 
   filterByService(serviceCode) {
+    window.state = window.state || {};
+    window.state.servicioActivo = serviceCode || 'ALL';
+    window.currentServiceCategory = serviceCode || 'ALL';
     this.currentTab = 'nds';
     this.filterService = serviceCode || 'ALL';
 
@@ -662,6 +665,7 @@ class OperationsHubModule {
     if (window.cashRegisterModule) {
       window.cashRegisterModule.init();
       window.cashRegisterModule.render();
+      window.cashRegisterModule.renderReceiptsHistory();
     }
   }
 
