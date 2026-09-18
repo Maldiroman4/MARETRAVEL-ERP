@@ -1442,3 +1442,14 @@ git commit -m "feat: servir estáticos desde NestJS y retirar server legacy"
 ## Execution Handoff
 
 **Plan complete and saved to `docs/superpowers/plans/2026-09-18-nestjs-backend-migration.md`.**
+
+---
+
+## Estado transicional (decisión de ejecución)
+
+- **`server.js` retirado** (→ `server.legacy.js`): NestJS sirve UI + API. Módulos del frontend aún no
+  migrados quedan en `localStorage`-solo hasta su fase. Ver spec §8bis.
+- **`POST /accounts/:id/contacts`** diferido (descopado en Fase 1).
+- **Numeración `max+1`** acotada por `@unique` (P2002, sin corrupción); secuencia atómica en fase posterior.
+- **`close` de ND exige `motivo`** obligatorio (regla transversal), registrado en auditoría.
+- **ND pagada en su propia moneda → `PAGADA`**; anular una ND con pagos está bloqueado (integridad).

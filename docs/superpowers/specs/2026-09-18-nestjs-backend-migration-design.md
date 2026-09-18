@@ -160,6 +160,25 @@ Sin reescribir la UI:
 6. Caja/Recibos + cuadre multimoneda.
 7. Retiro del `server.js` legacy y servir estáticos desde NestJS.
 
+## 8bis. Estado transicional y desviaciones registradas en ejecución
+
+Documenta las desviaciones del diseño acordadas durante la implementación de la Fase 1:
+
+- **Retiro del `server.js` legacy:** El spec original (§3/§7) decía conservarlo "hasta que todos los
+  módulos estén migrados". Se decidió retirarlo (renombrado a `server.legacy.js`): NestJS sirve la UI y
+  la API en un solo proceso. Los módulos del frontend aún no migrados (NDs, NCs, caja, boletos, reportes)
+  operan hoy en modo `localStorage`-solo (memoria del navegador) hasta que las fases siguientes los
+  conecten a la API. El login ya valida contra `POST /api/auth/login` con JWT.
+- **Endpoint de contactos (`POST /accounts/:id/contacts`) diferido:** El `CompanyContact` está en el
+  esquema y `findOne` incluye `contacts`, pero el endpoint de creación no se implementó en la Fase 1.
+  Se descopa explícitamente y se migrará en una fase posterior junto con la UI de cuentas.
+- **Numeración secuencial por secuencia diferida:** Los correlativos (`ndNumber`, `ncNumber`,
+  `receiptNumber`) se generan hoy con `max+1` acotado por `@unique` (una colisión concurrente falla con
+  P2002 sin corromper datos). Para el objetivo multi-usuario de la migración, en una fase posterior se
+  reemplazará por un esquema de secuencia atómica (tabla `Sequence`).
+- **Integración del frontend:** Solo el login y el adaptador `js/adapters/accounts.js` (aún no conectado
+  a la UI) consumen la API. El resto del frontend sigue sobre `js/db.js` + `localStorage`.
+
 ## 9. Fuera de alcance (Fase 1)
 
 - Migración del resto de módulos (reportes contables avanzados, otros ingresos, recordatorios
