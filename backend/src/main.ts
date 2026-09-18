@@ -12,16 +12,24 @@ const BLOCKED_PREFIXES = [
   '/.superpowers',
   '/dist',
   '/server.legacy.js',
-];
+].map((p) => p.toLowerCase());
 
 function isDotfilePath(path: string): boolean {
   return path.split('/').some((segment) => segment.startsWith('.') && segment !== '.');
 }
 
 function sensitivePathGuard(req: Request, res: Response, next: NextFunction) {
-  const path = req.path;
-  const blocked = BLOCKED_PREFIXES.some((prefix) => path.startsWith(prefix));
-  if (blocked || isDotfilePath(path)) {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(req.path);
+  } catch {
+    res.status(403).send('Forbidden');
+    return;
+  }
+
+  const lower = pathname.toLowerCase();
+  const blocked = BLOCKED_PREFIXES.some((prefix) => lower.startsWith(prefix));
+  if (blocked || isDotfilePath(pathname)) {
     res.status(403).send('Forbidden');
     return;
   }
