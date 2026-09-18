@@ -747,10 +747,14 @@ window.cashRegisterModule = {
           </td>
           <td><span class="badge badge-slate">${(nd.paymentTerm || 'CONTADO').replace(/_/g, ' ')}</span></td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
-            ${nd.currency || 'BOB'} ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD'
+              ? `USD ${Number(nd.totalAmountUsd !== undefined && nd.totalAmountUsd !== null ? nd.totalAmountUsd : ((nd.totalAmountBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}`
+              : `BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
           <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 700;">
-            ${nd.currency || 'BOB'} ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD'
+              ? `USD ${Number(nd.balanceUsd !== undefined && nd.balanceUsd !== null ? nd.balanceUsd : ((nd.balanceBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}`
+              : `BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
           <td><span class="badge ${statusBadge}">${nd.status}</span></td>
           <td style="font-size: 0.78rem;">${(nd.items?.length || 0)} serv.</td>

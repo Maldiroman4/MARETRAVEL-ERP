@@ -2657,7 +2657,7 @@
               1. Cabecera Corporativa de la Operación (Cliente y Términos)
             </div>
 
-            <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 12px;">
+            <div class="form-row" style="grid-template-columns: 2fr 1.1fr 1.2fr; gap: 12px; align-items: flex-end;">
               <div>
                 <label class="form-label" style="font-weight: 700;">Cliente / Empresa a Facturar (Cuentas por Cobrar):</label>
                 <select id="uni-client-select" class="form-control" required>
@@ -2667,6 +2667,17 @@
               <div>
                 <label class="form-label" id="lbl-uni-issue-date" style="font-weight: 700;">Fecha de Emisión:</label>
                 <input type="date" id="uni-issue-date" class="form-control font-mono" required>
+              </div>
+              <div>
+                <label class="form-label" style="font-weight: 700; color: #0f172a;">Moneda de Operación:</label>
+                <div class="btn-group" role="group" style="display: flex; width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1;">
+                  <button type="button" id="uni-btn-currency-bob" class="btn btn-sm btn-primary font-bold" onclick="window.operationsHubModule.setGlobalCurrency('BOB')" style="flex: 1; padding: 7px 10px;">
+                    BOB (Bs)
+                  </button>
+                  <button type="button" id="uni-btn-currency-usd" class="btn btn-sm btn-secondary font-bold" onclick="window.operationsHubModule.setGlobalCurrency('USD')" style="flex: 1; padding: 7px 10px;">
+                    USD ($us)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2964,20 +2975,20 @@
   <div id="print-area"></div>
 
   <!-- Scripts del Sistema ERP -->
-  <script src="js/db.js?v=20260918_v12"></script>
-  <script src="js/modules/financialGuard.js?v=20260918_v12"></script>
-  <script src="js/modules/bankAccounts.js?v=20260918_v12"></script>
-  <script src="js/modules/accounts.js?v=20260918_v12"></script>
-  <script src="js/modules/gds.js?v=20260918_v12"></script>
-  <script src="js/modules/debitNotes.js?v=20260918_v12"></script>
-  <script src="js/modules/creditNotes.js?v=20260918_v12"></script>
-  <script src="js/modules/cashRegister.js?v=20260918_v12"></script>
-  <script src="js/modules/otherIncomes.js?v=20260918_v12"></script>
-  <script src="js/modules/reports.js?v=20260918_v12"></script>
-  <script src="js/modules/calendar.js?v=20260918_v12"></script>
-  <script src="js/modules/settings.js?v=20260918_v12"></script>
-  <script src="js/modules/operationsHub.js?v=20260918_v12"></script>
-  <script src="js/app.js?v=20260918_v12"></script>
+  <script src="js/db.js?v=20260918_v13"></script>
+  <script src="js/modules/financialGuard.js?v=20260918_v13"></script>
+  <script src="js/modules/bankAccounts.js?v=20260918_v13"></script>
+  <script src="js/modules/accounts.js?v=20260918_v13"></script>
+  <script src="js/modules/gds.js?v=20260918_v13"></script>
+  <script src="js/modules/debitNotes.js?v=20260918_v13"></script>
+  <script src="js/modules/creditNotes.js?v=20260918_v13"></script>
+  <script src="js/modules/cashRegister.js?v=20260918_v13"></script>
+  <script src="js/modules/otherIncomes.js?v=20260918_v13"></script>
+  <script src="js/modules/reports.js?v=20260918_v13"></script>
+  <script src="js/modules/calendar.js?v=20260918_v13"></script>
+  <script src="js/modules/settings.js?v=20260918_v13"></script>
+  <script src="js/modules/operationsHub.js?v=20260918_v13"></script>
+  <script src="js/app.js?v=20260918_v13"></script>
 
 
 

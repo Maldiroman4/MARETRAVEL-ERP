@@ -152,6 +152,69 @@ class LocalDatabase {
     return null;
   }
 
+  healMultiCurrencyData(data) {
+    if (!data || !Array.isArray(data.debitNotes)) return false;
+    let changed = false;
+    data.debitNotes.forEach(nd => {
+      const tc = nd.frozenExchangeRate || nd.exchangeRateUsed || 6.96;
+      const hasUsdItem = (nd.items || []).some(it => it.currency === 'USD');
+      const isLikelyUsd = (nd.totalAmountUsd > 0 && Math.abs((nd.totalAmountBob || 0) - ((nd.totalAmountUsd || 0) * tc)) < 0.1);
+      const itemMatchesUsd = (nd.items || []).some(it => Math.abs((it.fareAmount || it.totalAmount || 0) - (nd.totalAmountUsd || 0)) < 0.1 && (it.fareAmount || it.totalAmount || 0) > 0);
+
+      if (hasUsdItem || (isLikelyUsd && itemMatchesUsd)) {
+        if (nd.currency !== 'USD') {
+          nd.currency = 'USD';
+          changed = true;
+        }
+        if (!nd.totalAmountUsd || nd.totalAmountUsd === 0) {
+          nd.totalAmountUsd = Number(((nd.totalAmountBob || 0) / tc).toFixed(2));
+          changed = true;
+        }
+        if (nd.balanceUsd === undefined || nd.balanceUsd === null) {
+          nd.balanceUsd = Number(((nd.balanceBob || 0) / tc).toFixed(2));
+          changed = true;
+        }
+        if (nd.total_documento !== nd.totalAmountUsd) {
+          nd.total_documento = nd.totalAmountUsd;
+          changed = true;
+        }
+        if (nd.saldo_pendiente !== nd.balanceUsd) {
+          nd.saldo_pendiente = nd.balanceUsd;
+          changed = true;
+        }
+        (nd.items || []).forEach(it => {
+          if (it.currency !== 'USD') {
+            it.currency = 'USD';
+            changed = true;
+          }
+        });
+
+        // Sincronizar NCs vinculadas
+        (data.creditNotes || []).forEach(nc => {
+          if (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) {
+            if (nc.currency !== 'USD') {
+              nc.currency = 'USD';
+              const ncTc = nc.frozenExchangeRate || tc;
+              const provUsd = (nc.totalAmountUsd !== undefined && nc.totalAmountUsd !== null && nc.totalAmountUsd > 0)
+                ? nc.totalAmountUsd
+                : Number(((nc.totalAmount || nc.totalAmountBob || 0) / ncTc).toFixed(2));
+              nc.totalAmountUsd = provUsd;
+              nc.totalAmount = provUsd;
+              nc.balanceUsd = (nc.balanceUsd !== undefined && nc.balanceUsd !== null)
+                ? nc.balanceUsd
+                : Number(((nc.balance || nc.balanceBob || 0) / ncTc).toFixed(2));
+              nc.balance = nc.balanceUsd;
+              nc.total_documento = nc.totalAmount;
+              nc.saldo_pendiente = nc.balance;
+              changed = true;
+            }
+          }
+        });
+      }
+    });
+    return changed;
+  }
+
   get() {
     try {
       if (this.cachedData) {
@@ -162,11 +225,15 @@ class LocalDatabase {
         const data = localStorage.getItem(DB_KEY);
         if (data) {
           this.cachedData = JSON.parse(data);
+          if (this.healMultiCurrencyData(this.cachedData)) {
+            localStorage.setItem(DB_KEY, JSON.stringify(this.cachedData));
+          }
           return this.cachedData;
         }
       }
 
       this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
+      this.healMultiCurrencyData(this.cachedData);
       return this.cachedData;
     } catch (e) {
       console.error('Error leyendo base de datos:', e);
