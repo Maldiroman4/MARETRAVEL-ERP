@@ -288,4 +288,113 @@ describe('DebitNotesService', () => {
       BadRequestException,
     );
   });
+
+  it('close forwards the received userId to auditLog.create', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'BORRADOR',
+      currency: 'BOB',
+      totalAmountBob: 0,
+      totalAmountUsd: 0,
+      items: [],
+    });
+    prisma.creditNote.findFirst.mockResolvedValue(null);
+    prisma.creditNote.create.mockResolvedValue({});
+    prisma.ticket.update.mockResolvedValue({});
+    prisma.auditLog.create.mockResolvedValue({});
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+
+    await service.close('nd1', 'u1');
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CLOSE',
+          userId: 'u1',
+        }),
+      }),
+    );
+  });
+
+  it('reopen forwards the received userId to auditLog.create', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'IMPAGA',
+      currency: 'BOB',
+      totalAmountBob: 0,
+      totalAmountUsd: 0,
+      paidAmountBob: 0,
+      paidAmountUsd: 0,
+      items: [],
+      paymentLines: [],
+      creditNotes: [],
+    });
+    prisma.creditNote.updateMany.mockResolvedValue({ count: 0 });
+    prisma.ticket.update.mockResolvedValue({});
+    prisma.auditLog.create.mockResolvedValue({});
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+
+    await service.reopen('nd1', 'u1');
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'REOPEN',
+          userId: 'u1',
+        }),
+      }),
+    );
+  });
+
+  it('void forwards the received userId to auditLog.create', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'BORRADOR',
+      observations: '',
+      items: [],
+    });
+    prisma.creditNote.updateMany.mockResolvedValue({ count: 0 });
+    prisma.ticket.update.mockResolvedValue({});
+    prisma.auditLog.create.mockResolvedValue({});
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+
+    await service.void('nd1', 'duplicado', 'u1');
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'VOID',
+          userId: 'u1',
+        }),
+      }),
+    );
+  });
+
+  it('correct forwards the received userId to auditLog.create', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      accountId: 'acc1',
+      client: { nit: '123', legalName: 'ACME' },
+    });
+    prisma.account.update.mockResolvedValue({});
+    prisma.debitNote.update.mockResolvedValue({});
+    prisma.auditLog.create.mockResolvedValue({});
+
+    await service.correct('nd1', { motivo: 'corrección' }, 'u1');
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CORRECT',
+          userId: 'u1',
+        }),
+      }),
+    );
+  });
 });
