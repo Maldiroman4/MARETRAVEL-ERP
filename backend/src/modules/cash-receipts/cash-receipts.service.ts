@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CashReceiptStatus, DebitNoteStatus, Prisma } from '@prisma/client';
+import {
+  CashReceiptStatus,
+  Currency,
+  DebitNoteStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCashReceiptDto } from './dto/create-cash-receipt.dto';
 
@@ -115,19 +120,30 @@ export class CashReceiptsService {
         const newBalanceUsd = round2(Number(nd.balanceUsd) - paidUsd);
         const newPaidBob = round2(Number(nd.paidAmountBob) + paidBob);
         const newPaidUsd = round2(Number(nd.paidAmountUsd) + paidUsd);
-        const newStatus =
-          newBalanceBob <= 0 && newBalanceUsd <= 0
-            ? DebitNoteStatus.PAGADA
-            : DebitNoteStatus.PARCIAL;
+
+        const denominatedBalance =
+          nd.currency === Currency.USD ? newBalanceUsd : newBalanceBob;
+        const fullyPaid = denominatedBalance <= 0;
+        const status = fullyPaid
+          ? DebitNoteStatus.PAGADA
+          : DebitNoteStatus.PARCIAL;
+        const balanceBob = fullyPaid ? 0 : newBalanceBob;
+        const balanceUsd = fullyPaid ? 0 : newBalanceUsd;
+        const paidAmountBob = fullyPaid
+          ? Number(nd.totalAmountBob)
+          : newPaidBob;
+        const paidAmountUsd = fullyPaid
+          ? Number(nd.totalAmountUsd)
+          : newPaidUsd;
 
         await tx.debitNote.update({
           where: { id: line.debitNoteId },
           data: {
-            balanceBob: newBalanceBob,
-            balanceUsd: newBalanceUsd,
-            paidAmountBob: newPaidBob,
-            paidAmountUsd: newPaidUsd,
-            status: newStatus,
+            balanceBob,
+            balanceUsd,
+            paidAmountBob,
+            paidAmountUsd,
+            status,
           },
         });
       }

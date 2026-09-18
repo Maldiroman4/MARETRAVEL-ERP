@@ -179,7 +179,7 @@ describe('DebitNotesService', () => {
       Promise.resolve({ id: 'nd1', ...data }),
     );
 
-    const result = await service.close('nd1');
+    const result = await service.close('nd1', { motivo: 'cierre' });
 
     expect(prisma.ticket.update).toHaveBeenCalledTimes(3);
     expect(prisma.ticket.update).toHaveBeenCalledWith({
@@ -222,7 +222,7 @@ describe('DebitNotesService', () => {
       totalAmountUsd: 0,
     });
     prisma.debitNote.updateMany.mockResolvedValue({ count: 0 });
-    await expect(service.close('nd1')).rejects.toBeInstanceOf(
+    await expect(service.close('nd1', { motivo: 'cierre' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -256,7 +256,7 @@ describe('DebitNotesService', () => {
       Promise.resolve({ id: 'nd1', ...data }),
     );
 
-    await service.close('nd1');
+    await service.close('nd1', { motivo: 'cierre' });
 
     const nc = prisma.creditNote.create.mock.calls[0]?.[0].data;
     expect(nc.totalAmountUsd).toBe(100);
@@ -289,6 +289,30 @@ describe('DebitNotesService', () => {
     );
   });
 
+  it('close without motivo throws BadRequestException before touching the DB', async () => {
+    await expect(service.close('nd1', { motivo: '' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.debitNote.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('void on a partially-paid ND (has payments) throws BadRequestException', async () => {
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'PARCIAL',
+      observations: '',
+      paidAmountBob: 50,
+      paidAmountUsd: 0,
+      paymentLines: [{ id: 'pl1' }],
+      creditNotes: [],
+      items: [],
+    });
+    await expect(service.void('nd1', 'anular')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.debitNote.updateMany).not.toHaveBeenCalled();
+  });
+
   it('close forwards the received userId to auditLog.create', async () => {
     prisma.debitNote.findUnique.mockResolvedValue({
       id: 'nd1',
@@ -306,13 +330,14 @@ describe('DebitNotesService', () => {
       Promise.resolve({ id: 'nd1', ...data }),
     );
 
-    await service.close('nd1', 'u1');
+    await service.close('nd1', { motivo: 'cierre' }, 'u1');
 
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           action: 'CLOSE',
           userId: 'u1',
+          reason: 'cierre',
         }),
       }),
     );

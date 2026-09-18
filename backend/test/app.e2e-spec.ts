@@ -107,7 +107,7 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/debit-notes/${ndId}/close`)
       .set('Authorization', `Bearer ${token}`)
-      .send({})
+      .send({ motivo: 'cierre e2e' })
       .expect(201);
 
     const closed = await request(app.getHttpServer())

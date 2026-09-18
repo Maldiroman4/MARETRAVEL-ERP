@@ -12,6 +12,9 @@ const BLOCKED_PREFIXES = [
   '/.superpowers',
   '/dist',
   '/server.legacy.js',
+  '/docker-compose.yml',
+  '/package.json',
+  '/package-lock.json',
 ].map((p) => p.toLowerCase());
 
 function isDotfilePath(path: string): boolean {

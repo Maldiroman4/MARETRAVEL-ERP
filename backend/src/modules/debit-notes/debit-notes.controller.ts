@@ -14,6 +14,7 @@ import { CreateDebitNoteDto } from './dto/create-debit-note.dto';
 import { UpdateDebitNoteDto } from './dto/update-debit-note.dto';
 import { VoidDebitNoteDto } from './dto/void-debit-note.dto';
 import { CorrectDebitNoteDto } from './dto/correct-debit-note.dto';
+import { CloseDebitNoteDto } from './dto/close-debit-note.dto';
 
 @Controller('debit-notes')
 export class DebitNotesController {
@@ -43,8 +44,12 @@ export class DebitNotesController {
   }
 
   @Post(':id/close')
-  close(@Param('id') id: string, @Req() req: { user: { id: string } }) {
-    return this.service.close(id, req.user.id);
+  close(
+    @Param('id') id: string,
+    @Body() dto: CloseDebitNoteDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.service.close(id, dto, req.user.id);
   }
 
   @Post(':id/reopen')

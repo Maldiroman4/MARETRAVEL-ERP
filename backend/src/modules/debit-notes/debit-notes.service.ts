@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDebitNoteDto } from './dto/create-debit-note.dto';
 import { UpdateDebitNoteDto } from './dto/update-debit-note.dto';
 import { CorrectDebitNoteDto } from './dto/correct-debit-note.dto';
+import { CloseDebitNoteDto } from './dto/close-debit-note.dto';
 
 const DEFAULT_RATE = 6.96;
 
@@ -130,7 +131,8 @@ export class DebitNotesService {
     });
   }
 
-  async close(id: string, userId?: string) {
+  async close(id: string, dto: CloseDebitNoteDto, userId?: string) {
+    this.assertMotivo(dto?.motivo);
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
       include: { items: true },
@@ -207,6 +209,7 @@ export class DebitNotesService {
           entityType: 'DEBIT_NOTE',
           entityId: nd.id,
           userId,
+          reason: dto?.motivo,
           newValue: { status: 'IMPAGA' },
         },
       });
@@ -285,9 +288,23 @@ export class DebitNotesService {
     this.assertMotivo(motivo);
     const nd = await this.prisma.debitNote.findUnique({
       where: { id },
-      include: { items: true },
+      include: {
+        items: true,
+        paymentLines: true,
+        creditNotes: true,
+      },
     });
     if (!nd) throw new NotFoundException('Nota de débito no encontrada');
+
+    const hasPayments =
+      (nd.paymentLines?.length ?? 0) > 0 ||
+      Number(nd.paidAmountBob ?? 0) > 0 ||
+      Number(nd.paidAmountUsd ?? 0) > 0;
+    if (hasPayments) {
+      throw new BadRequestException(
+        'No se puede anular una nota de débito con pagos registrados',
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const guard = await tx.debitNote.updateMany({
@@ -297,7 +314,6 @@ export class DebitNotesService {
             in: [
               DebitNoteStatus.BORRADOR,
               DebitNoteStatus.IMPAGA,
-              DebitNoteStatus.PARCIAL,
             ],
           },
         },

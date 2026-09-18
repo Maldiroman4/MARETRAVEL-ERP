@@ -64,6 +64,9 @@ describe('CashReceiptsService', () => {
       id: 'nd1',
       status: 'IMPAGA',
       accountId: 'acc1',
+      currency: 'BOB',
+      totalAmountBob: 100,
+      totalAmountUsd: 0,
       balanceBob: 100,
       balanceUsd: 0,
       paidAmountBob: 0,
@@ -141,6 +144,9 @@ describe('CashReceiptsService', () => {
       id: 'nd1',
       status: 'IMPAGA',
       accountId: 'acc1',
+      currency: 'BOB',
+      totalAmountBob: 500,
+      totalAmountUsd: 0,
       balanceBob: 500,
       balanceUsd: 0,
       paidAmountBob: 0,
@@ -177,6 +183,92 @@ describe('CashReceiptsService', () => {
       data: expect.objectContaining({
         balanceBob: 300,
         paidAmountBob: 200,
+        status: 'PARCIAL',
+      }),
+    });
+  });
+
+  it('create marks a BOB note PAGADA when its full BOB balance is paid, zeroing the derived USD balance', async () => {
+    prisma.account.findUnique.mockResolvedValue({ id: 'acc1' });
+    prisma.cashReceipt.findFirst.mockResolvedValue(null);
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'IMPAGA',
+      accountId: 'acc1',
+      currency: 'BOB',
+      totalAmountBob: 100,
+      totalAmountUsd: 14.37,
+      balanceBob: 100,
+      balanceUsd: 14.37,
+      paidAmountBob: 0,
+      paidAmountUsd: 0,
+    });
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+    prisma.cashReceipt.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'cr1', ...data, lines: data.lines.create }),
+    );
+    prisma.auditLog.create.mockResolvedValue({});
+
+    const dto = {
+      clientAccountId: 'acc1',
+      issueDate: '2026-09-18',
+      lines: [{ debitNoteId: 'nd1', amountPaidBob: 100 }],
+    } as unknown as CreateCashReceiptDto;
+
+    await service.create(dto, 'u1');
+
+    expect(prisma.debitNote.update).toHaveBeenCalledWith({
+      where: { id: 'nd1' },
+      data: expect.objectContaining({
+        balanceBob: 0,
+        balanceUsd: 0,
+        paidAmountBob: 100,
+        paidAmountUsd: 14.37,
+        status: 'PAGADA',
+      }),
+    });
+  });
+
+  it('create marks a BOB note PARCIAL for a partial BOB payment', async () => {
+    prisma.account.findUnique.mockResolvedValue({ id: 'acc1' });
+    prisma.cashReceipt.findFirst.mockResolvedValue(null);
+    prisma.debitNote.findUnique.mockResolvedValue({
+      id: 'nd1',
+      status: 'IMPAGA',
+      accountId: 'acc1',
+      currency: 'BOB',
+      totalAmountBob: 100,
+      totalAmountUsd: 14.37,
+      balanceBob: 100,
+      balanceUsd: 14.37,
+      paidAmountBob: 0,
+      paidAmountUsd: 0,
+    });
+    prisma.debitNote.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'nd1', ...data }),
+    );
+    prisma.cashReceipt.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'cr1', ...data, lines: data.lines.create }),
+    );
+    prisma.auditLog.create.mockResolvedValue({});
+
+    const dto = {
+      clientAccountId: 'acc1',
+      issueDate: '2026-09-18',
+      lines: [{ debitNoteId: 'nd1', amountPaidBob: 40 }],
+    } as unknown as CreateCashReceiptDto;
+
+    await service.create(dto, 'u1');
+
+    expect(prisma.debitNote.update).toHaveBeenCalledWith({
+      where: { id: 'nd1' },
+      data: expect.objectContaining({
+        balanceBob: 60,
+        balanceUsd: 14.37,
+        paidAmountBob: 40,
+        paidAmountUsd: 0,
         status: 'PARCIAL',
       }),
     });
