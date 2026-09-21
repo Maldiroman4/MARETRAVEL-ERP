@@ -855,6 +855,238 @@ class OperationsHubModule {
     } catch(e) {}
   }
 
+  getSubServicesList(item, prov) {
+    const data = window.db ? window.db.get() : {};
+    const serviceType = item?.serviceType || 'BOLETO_AEREO';
+    const list = [];
+    const seen = new Set();
+
+    const add = (name, extra = '', rate = null) => {
+      if (!name || typeof name !== 'string') return;
+      const clean = name.trim();
+      if (!clean) return;
+      const key = clean.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({ name: clean, extra, rate });
+      }
+    };
+
+    // 1. Prestadores configurados en la ficha del proveedor seleccionado
+    if (prov && Array.isArray(prov.providerServices)) {
+      prov.providerServices.forEach(s => {
+        const rateTxt = (s.defaultCommissionRate !== undefined && s.defaultCommissionRate !== null && s.defaultCommissionRate !== '') 
+          ? `${s.defaultCommissionRate}% Com.` 
+          : '';
+        add(s.serviceName, rateTxt, s.defaultCommissionRate);
+      });
+    }
+
+    // 2. Si es SEGURO_VIAJE, incluir los planes de seguro del catálogo
+    if (serviceType === 'SEGURO_VIAJE') {
+      const plans = this.getInsurancePlans();
+      plans.forEach(p => add(p, 'Plan de Seguro'));
+    }
+
+    // 3. Pool global de subservicios guardados en el ERP
+    const pool = (data.savedSubServices && Array.isArray(data.savedSubServices)) ? data.savedSubServices : [];
+    pool.forEach(entry => {
+      if (typeof entry === 'string') {
+        add(entry, 'Guardado');
+      } else if (entry && entry.name) {
+        if (!entry.serviceType || entry.serviceType === serviceType) {
+          add(entry.name, entry.extra || 'Guardado', entry.rate);
+        }
+      }
+    });
+
+    // 4. Subservicios registrados en emisiones históricas
+    if (data.debitNotes && Array.isArray(data.debitNotes)) {
+      data.debitNotes.forEach(nd => {
+        if (nd.items && Array.isArray(nd.items)) {
+          nd.items.forEach(it => {
+            if (it.serviceType === serviceType || !serviceType) {
+              if (it.subServiceName) add(it.subServiceName, 'Historial');
+              else if (it.description && it.description.length < 50) add(it.description, 'Historial');
+            }
+          });
+        }
+      });
+    }
+
+    // 5. Presets estándar amigables de la industria si el proveedor está vacío
+    if (serviceType === 'BOLETO_AEREO') {
+      ['EMISIÓN BOLETO AÉREO', 'REEMISIÓN / PENALIDAD', 'SOBRE EQUIPAJE (BAG)', 'SELECCIÓN DE ASIENTO'].forEach(p => add(p, 'Frecuente'));
+    } else if (serviceType === 'SEGURO_VIAJE') {
+      ['PLAN INTERNACIONAL / GLOBAL', 'PLAN SCHENGEN', 'PLAN MULTIVIAJES ANUAL', 'PLAN FAMILIAR', 'ASISTENCIA MÉDICA TOTAL'].forEach(p => add(p, 'Frecuente'));
+    } else if (serviceType === 'HOTEL') {
+      ['HABITACIÓN SIMPLE', 'HABITACIÓN DOBLE', 'SUITE', 'ALL INCLUSIVE'].forEach(p => add(p, 'Frecuente'));
+    }
+
+    return list;
+  }
+
+  saveSubServiceToPool(subServiceName, serviceType, provId) {
+    if (!subServiceName || typeof subServiceName !== 'string') return;
+    const clean = subServiceName.trim();
+    if (!clean) return;
+
+    const data = window.db ? window.db.get() : {};
+    if (!data.savedSubServices) data.savedSubServices = [];
+    
+    // Guardar en pool global si no existe
+    const existsInPool = data.savedSubServices.some(s => (typeof s === 'string' ? s : s.name).toLowerCase() === clean.toLowerCase());
+    if (!existsInPool) {
+      data.savedSubServices.push({
+        id: 'SS-' + Date.now() + Math.random().toString(36).substr(2, 4),
+        name: clean,
+        serviceType: serviceType,
+        createdAt: new Date().toLocaleString()
+      });
+    }
+
+    // Si el proveedor seleccionado no tiene este subservicio en su ficha, añadirlo a su ficha técnica
+    if (provId && data.accounts) {
+      const prov = data.accounts.find(a => a.id === provId);
+      if (prov) {
+        if (!prov.providerServices) prov.providerServices = [];
+        const hasService = prov.providerServices.some(s => (s.serviceName || '').toLowerCase() === clean.toLowerCase());
+        if (!hasService) {
+          prov.providerServices.push({
+            id: 'PS-' + Date.now() + Math.random().toString(36).substr(2, 4),
+            serviceCode: clean.slice(0, 4).toUpperCase().replace(/\s+/g, ''),
+            serviceName: clean,
+            defaultCommissionRate: 0,
+            status: 'ACTIVO'
+          });
+        }
+      }
+    }
+
+    if (serviceType === 'SEGURO_VIAJE') {
+      this.saveInsurancePlan(clean);
+    }
+
+    window.db.save(data);
+  }
+
+  renderSubServiceControl(idx, item, subServicesList, isInsurance) {
+    const currentValue = item.subServiceName || item.description || (isInsurance ? item.serviceDetails?.insurancePlan : '') || '';
+    const label = isInsurance ? 'Sub-servicio (Plan / Cobertura):' : 'Sub-servicio (Ficha / Modificable):';
+    const placeholder = isInsurance ? 'Escribir o elegir plan de seguro...' : 'Escribir o elegir sub-servicio...';
+
+    return `
+      <div style="position: relative;" class="subservice-control-wrapper">
+        <label class="form-label font-bold" style="font-size: 0.75rem; color: #0284c7; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span>${label}</span>
+          <span style="font-size: 0.68rem; color: #64748b; font-weight: normal;">Libre o sugerido</span>
+        </label>
+        <div style="display: flex; position: relative;">
+          <input type="text" 
+                 class="form-control font-bold" 
+                 id="item-subservice-${idx}"
+                 list="subservice-datalist-${idx}" 
+                 placeholder="${placeholder}" 
+                 value="${currentValue.replace(/"/g, '&quot;')}"
+                 oninput="window.operationsHubModule.onItemSubServiceInput(${idx}, this.value)"
+                 onchange="window.operationsHubModule.onItemSubServiceSelect(${idx}, this.value)"
+                 autocomplete="off"
+                 style="border-top-right-radius: 0; border-bottom-right-radius: 0; color: #0369a1; font-size: 0.85rem;">
+          <button type="button" class="btn btn-secondary btn-sm" 
+                  title="Ver y seleccionar sub-servicios guardados (${subServicesList.length})"
+                  onclick="window.operationsHubModule.toggleSubServicesDropdown(${idx})"
+                  style="border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 0 10px; background: #e0f2fe; color: #0284c7; border-color: #bae6fd; flex-shrink: 0;">
+            <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+        </div>
+        <datalist id="subservice-datalist-${idx}">
+          ${subServicesList.map(s => `<option value="${s.name}">${s.extra ? `${s.name} (${s.extra})` : s.name}</option>`).join('')}
+        </datalist>
+        <!-- Menú desplegable interactivo para seleccionar directamente -->
+        <div id="subservice-dropdown-${idx}" class="subservice-floating-menu" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1050; background: #ffffff; border: 1px solid #93c5fd; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); max-height: 230px; overflow-y: auto; margin-top: 3px;">
+          <div style="padding: 6px 10px; font-size: 0.68rem; font-weight: 700; color: #475569; background: #f0f9ff; border-bottom: 1px solid #bae6fd; display: flex; justify-content: space-between; align-items: center;">
+            <span>SUGERENCIAS GUARDADAS (${subServicesList.length})</span>
+            <span style="font-size: 0.65rem; color: #0284c7;">Clic para elegir</span>
+          </div>
+          ${subServicesList.length > 0 ? subServicesList.map(s => `
+            <div class="subservice-option-item" 
+                 onclick="window.operationsHubModule.chooseSubServiceOption(${idx}, '${s.name.replace(/'/g, "\\'")}', ${s.rate !== null && s.rate !== undefined && !isNaN(s.rate) ? s.rate : 'null'})"
+                 style="padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s;"
+                 onmouseover="this.style.background='#e0f2fe'" 
+                 onmouseout="this.style.background='#fff'">
+              <span style="font-weight: 600; color: #0f172a;">${s.name}</span>
+              ${s.extra ? `<span class="badge ${s.extra.includes('Com') ? 'badge-emerald' : 'badge-slate'}" style="font-size: 0.65rem; margin-left: 6px;">${s.extra}</span>` : ''}
+            </div>
+          `).join('') : `
+            <div style="padding: 12px 10px; text-align: center; color: #64748b; font-size: 0.78rem;">
+              Escribe libremente cualquier sub-servicio. Se guardará para futuras sugerencias.
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  toggleSubServicesDropdown(idx) {
+    const el = document.getElementById(`subservice-dropdown-${idx}`);
+    if (!el) return;
+    const isCurrentlyOpen = el.style.display === 'block';
+    document.querySelectorAll('.subservice-floating-menu').forEach(menu => {
+      menu.style.display = 'none';
+    });
+    if (!isCurrentlyOpen) {
+      el.style.display = 'block';
+      const closeHandler = (e) => {
+        if (!e.target.closest(`.subservice-control-wrapper`)) {
+          el.style.display = 'none';
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeHandler), 10);
+    }
+  }
+
+  chooseSubServiceOption(idx, name, rate) {
+    if (!this.activeNdItems[idx]) return;
+    const item = this.activeNdItems[idx];
+    item.subServiceName = name;
+    item.description = name;
+    if (item.serviceType === 'SEGURO_VIAJE') {
+      if (!item.serviceDetails) item.serviceDetails = {};
+      item.serviceDetails.insurancePlan = name;
+    }
+    if (rate !== null && rate !== undefined && !isNaN(rate)) {
+      item.providerCommissionRate = parseFloat(rate) || 0;
+    }
+    const input = document.getElementById(`item-subservice-${idx}`);
+    if (input) input.value = name;
+
+    const dropdown = document.getElementById(`subservice-dropdown-${idx}`);
+    if (dropdown) dropdown.style.display = 'none';
+
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
+  }
+
+  onItemSubServiceInput(idx, val) {
+    if (!this.activeNdItems[idx]) return;
+    const item = this.activeNdItems[idx];
+    item.subServiceName = val;
+    item.description = val;
+    if (item.serviceType === 'SEGURO_VIAJE') {
+      if (!item.serviceDetails) item.serviceDetails = {};
+      item.serviceDetails.insurancePlan = val;
+    }
+    const data = window.db.get();
+    const prov = (data.accounts || []).find(a => a.id === item.providerId);
+    if (prov && prov.providerServices) {
+      const match = prov.providerServices.find(s => (s.serviceName || '').toLowerCase() === val.trim().toLowerCase());
+      if (match && match.defaultCommissionRate !== undefined && match.defaultCommissionRate !== null) {
+        item.providerCommissionRate = parseFloat(match.defaultCommissionRate) || 0;
+      }
+    }
+  }
+
   openNewUnifiedModal() {
     this.editingOperationId = null;
     this.activeCurrency = 'BOB';
@@ -1038,6 +1270,7 @@ class OperationsHubModule {
 
       const currentProv = providers.find(p => p.id === item.providerId);
       const provSubServices = (currentProv && currentProv.providerServices) ? currentProv.providerServices : [];
+      const subServicesList = this.getSubServicesList(item, currentProv);
       const fare = parseFloat(item.fareAmount) || 0;
       const fee = parseFloat(item.feeAmount) || 0;
       const rate = parseFloat(item.providerCommissionRate) || 0;
@@ -1061,10 +1294,7 @@ class OperationsHubModule {
 
       if (isInsurance) {
         // -------------------------------------------------------------
-        // 2 & 3. PLANTILLA EXCLUSIVA: SEGURO DE VIAJE (Surgical Refactoring)
-        // Eliminados: Sub-servicio, Doc. Identidad, Destino Cobertura.
-        // Conservados: Proveedor, Modelo Liq, Pasajero, Voucher, Fechas Cobertura.
-        // Fila 5 columnas reactivas y toggle multi-moneda [ BOB | USD ].
+        // 2 & 3. PLANTILLA EXCLUSIVA: SEGURO DE VIAJE (Con Sub-servicio / Plan)
         // -------------------------------------------------------------
         return `
           <div class="item-card" style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -1085,13 +1315,16 @@ class OperationsHubModule {
               ` : ''}
             </div>
 
-            <!-- Fila 1: Proveedor / Operador y Modelo de Liquidación -->
-            <div class="form-row" style="grid-template-columns: 1.6fr 1.2fr; gap: 10px; margin-bottom: 10px;">
+            <!-- Fila 1: Proveedor / Operador, Sub-servicio (Plan) y Modelo de Liquidación -->
+            <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr 1.1fr; gap: 8px; margin-bottom: 10px;">
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
                 <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
                   ${providers.map(p => `<option value="${p.id}" ${p.id === item.providerId ? 'selected' : ''}>${p.name} (${p.docNumber || p.code})</option>`).join('')}
                 </select>
+              </div>
+              <div>
+                ${this.renderSubServiceControl(idx, item, subServicesList, true)}
               </div>
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
@@ -1229,7 +1462,7 @@ class OperationsHubModule {
           </div>
 
           <!-- Fila 1: Proveedor, Sub-servicio y Modelo de Liquidación (Sin dropdown de Tipo de Servicio) -->
-          <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1.2fr; gap: 8px;">
+          <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr 1.1fr; gap: 8px;">
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
               <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
@@ -1237,15 +1470,7 @@ class OperationsHubModule {
               </select>
             </div>
             <div>
-              <label class="form-label font-bold" style="font-size: 0.75rem; color: #0284c7;">Sub-servicio (Ficha Prov.):</label>
-              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSubServiceSelect(${idx}, this.value)">
-                <option value="">${provSubServices.length > 0 ? '-- Seleccionar Sub-servicio --' : '(Sin sub-servicios en ficha)'}</option>
-                ${provSubServices.map(sub => `
-                  <option value="${sub.serviceName}" data-code="${sub.serviceCode || ''}" data-rate="${sub.defaultCommissionRate ?? ''}" ${(item.description === sub.serviceName || item.subServiceName === sub.serviceName) ? 'selected' : ''}>
-                    ${sub.serviceName} ${sub.defaultCommissionRate !== undefined ? `(${sub.defaultCommissionRate}% Com.)` : ''}
-                  </option>
-                `).join('')}
-              </select>
+              ${this.renderSubServiceControl(idx, item, subServicesList, false)}
             </div>
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
@@ -2617,10 +2842,20 @@ class OperationsHubModule {
       // 4. Tipo de Cambio Oficial Único Congelado (Single Source of Truth)
       const { sellRate } = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
 
-      // Persistir planes de seguros nuevos en el catálogo dinámico
+      // Persistir sub-servicios y planes en el catálogo dinámico y pool persistente
       this.activeNdItems.forEach(it => {
-        if (it.serviceType === 'SEGURO_VIAJE' && it.serviceDetails?.insurancePlan) {
-          this.saveInsurancePlan(it.serviceDetails.insurancePlan);
+        const subName = it.subServiceName || it.description;
+        if (subName) {
+          this.saveSubServiceToPool(subName, it.serviceType, it.providerId);
+        }
+        if (it.serviceType === 'SEGURO_VIAJE') {
+          if (it.serviceDetails?.insurancePlan) {
+            this.saveInsurancePlan(it.serviceDetails.insurancePlan);
+          } else if (subName) {
+            if (!it.serviceDetails) it.serviceDetails = {};
+            it.serviceDetails.insurancePlan = subName;
+            this.saveInsurancePlan(subName);
+          }
         }
       });
 
@@ -2699,6 +2934,7 @@ class OperationsHubModule {
               passengerDocId: it.passengerDoc,
               operatorId: it.providerId,
               operatorName: prov.name,
+              subServiceName: it.subServiceName || it.description || '',
               description: it.description || it.subServiceName || (it.serviceDetails?.insurancePlan) || `${it.serviceType} - ${it.passengerName}`,
               serviceDetails: it.serviceDetails || {},
               settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
@@ -2827,6 +3063,7 @@ class OperationsHubModule {
           passengerDocId: it.passengerDoc,
           operatorId: it.providerId,
           operatorName: prov.name,
+          subServiceName: it.subServiceName || it.description || '',
           description: it.description || it.subServiceName || (it.serviceDetails?.insurancePlan) || `${it.serviceType} - ${it.passengerName}`,
           serviceDetails: it.serviceDetails || {},
           settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
@@ -3056,12 +3293,12 @@ class OperationsHubModule {
         serviceType: it.serviceType || 'BOLETO_AEREO',
         providerId: it.operatorId || it.providerId || '',
         providerName: it.operatorName || it.providerName || '',
-        subServiceName: it.subServiceName || it.description || '',
+        subServiceName: it.subServiceName || it.description || (it.serviceDetails?.insurancePlan) || '',
         settlementModel: it.settlementModel || 'DEDUCCION_DIRECTA',
         passengerName: it.passengerName || nd.passengerName || '',
         passengerDoc: it.passengerDocId || it.passengerDoc || '',
         voucherNumber: it.ticketNumber || it.voucherNumber || '',
-        description: it.description || '',
+        description: it.description || it.subServiceName || (it.serviceDetails?.insurancePlan) || '',
         currency: it.currency || opCurr || 'BOB',
         fareAmount: it.fareAmount !== undefined ? parseFloat(it.fareAmount) : (parseFloat(it.totalAmount) || 0),
         grossCost: it.grossCost !== undefined ? parseFloat(it.grossCost) : (it.fareAmount !== undefined ? parseFloat(it.fareAmount) : 0),
