@@ -2751,16 +2751,12 @@ window.cashRegisterModule = {
 
     printArea.innerHTML = `
       <div class="print-page" style="padding: 20px; font-family: sans-serif;">
-        <div class="print-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid #0f2742; padding-bottom: 12px; margin-bottom: 16px;">
-          <div>
-            <h2 style="margin: 0; color: #0f2742;">${settings.agencyCommercialName || settings.agencyName}</h2>
-            <div>NIT: ${settings.agencyNit} | Telf: ${settings.agencyPhone}</div>
-            <div>${settings.agencyAddress}</div>
-          </div>
+        <div class="print-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #00aeef; padding-bottom: 12px; margin-bottom: 16px;">
+          <img src="${window.maretravelLogoBase64 || (settings && settings.logoBase64) || 'assets/logo.png'}" class="print-logo" alt="MARETRAVEL Logo">
           <div style="text-align: right;">
-            <h3 style="margin: 0; color: #00aeef;">ARQUEO DIARIO DE CAJA</h3>
-            <div style="font-size: 0.9rem; font-weight: 600;">Período: ${fromDate} al ${toDate}</div>
-            <div style="font-size: 0.8rem; color: #64748b;">Emisión: ${new Date().toLocaleString()}</div>
+            <div class="print-agency-title" style="font-size: 1.05rem; font-weight: 800; color: #0f2742;">${settings.agencyCommercialName || settings.agencyName || 'MARETRAVEL S.R.L.'}</div>
+            <div style="font-size: 0.8rem; color: #334155;">NIT: ${settings.agencyNit || '1028374021'} | Telf: ${settings.agencyPhone || '+591 2 244-1234'}</div>
+            <div style="font-size: 0.78rem; color: #475569;">${settings.agencyAddress || 'La Paz - Bolivia'}</div>
           </div>
         </div>
 

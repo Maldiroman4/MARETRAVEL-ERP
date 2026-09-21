@@ -109,9 +109,9 @@ function renderOfficialPrintDocument(doc, docType = 'ND', logoBase64 = '') {
     }
     .nd-official-container { width: 100%; max-width: 800px; margin: 0 auto; padding: 10px; }
     .nd-official-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 10px; }
-    .nd-header-brand { width: 25%; text-align: left; }
-    .nd-official-logo { max-width: 165px !important; height: 65px !important; object-fit: contain !important; display: block !important; }
-    .nd-header-title-box { width: 48%; text-align: center; }
+    .nd-header-brand { width: 27%; text-align: left; }
+    .nd-official-logo { max-width: 195px !important; height: auto !important; max-height: 62px !important; object-fit: contain !important; display: block !important; }
+    .nd-header-title-box { width: 46%; text-align: center; }
     .nd-title-main { font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0 0 2px 0; }
     .nd-number-line { font-size: 0.95rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
     .nd-meta-table { margin: 0 auto; border-collapse: collapse; text-align: left; font-size: 0.76rem; width: 100%; }

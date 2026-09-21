@@ -2252,19 +2252,20 @@ window.debitNotesModule = {
               gap: 10px !important;
             }
             .nd-header-brand {
-              width: 25% !important;
-              flex: 0 0 25% !important;
+              width: 27% !important;
+              flex: 0 0 27% !important;
               text-align: left !important;
             }
             .nd-official-logo {
-              max-width: 165px !important;
-              height: 65px !important;
+              max-width: 195px !important;
+              height: auto !important;
+              max-height: 62px !important;
               object-fit: contain !important;
               display: block !important;
             }
             .nd-header-title-box {
-              width: 48% !important;
-              flex: 0 0 48% !important;
+              width: 46% !important;
+              flex: 0 0 46% !important;
               text-align: center !important;
             }
             .nd-title-main {
