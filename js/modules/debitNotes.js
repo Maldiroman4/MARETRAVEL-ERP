@@ -1322,7 +1322,7 @@ window.debitNotesModule = {
                       <div class="nd-srv-line" style="color: #0284c7;">BOLETO AÉREO / GDS</div>
                       <div class="nd-srv-line">RUTA: ${srvRoute}</div>
                       ${srvDates !== '-' ? `<div class="nd-srv-line">FECHAS: ${srvDates}</div>` : ''}
-                      <div class="nd-srv-line">LOCALIZADOR: ${pnrCode} | CABINA: ${cabinClass}</div>
+                      <div class="nd-srv-line">LOCALIZADOR: ${pnrCode}</div>
                     </div>
                   </div>
                 </div>

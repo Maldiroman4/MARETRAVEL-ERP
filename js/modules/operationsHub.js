@@ -2638,7 +2638,7 @@ class OperationsHubModule {
       const cabin = sd.cabinClass || 'ECONÓMICA';
       const dep = sd.flightDepDate || '';
       const ret = sd.flightRetDate || '';
-      return `Boleto Aéreo ${route ? `Ruta: ${route}` : ''} ${dep ? `Salida: ${dep}` : ''} ${ret ? `Retorno: ${ret}` : ''} [${cabin}] ${pnr ? `(PNR: ${pnr})` : ''}`.trim();
+      return `Boleto Aéreo ${route ? `Ruta: ${route}` : ''} ${dep ? `Salida: ${dep}` : ''} ${ret ? `Retorno: ${ret}` : ''} ${pnr ? `(PNR: ${pnr})` : ''}`.trim();
     } else if (srv === 'HOTEL' || srv === 'HOTEL_HOSPEDAJE') {
       const hotel = sd.hotelName || '';
       const city = sd.hotelCity || '';
