@@ -563,7 +563,7 @@
                     <th>Calificación</th>
                     <th>Ciudad</th>
                     <th>Servicios</th>
-                    <th>Acciones</th>
+                    <th style="min-width: 250px;">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="accounts-table-body">
@@ -1269,9 +1269,14 @@
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close-modal="modal-account">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-danger" id="btn-delete-account" style="display: none;" onclick="window.accountsModule.deleteAccount(window.accountsModule.editingAccountId)">
+            <i data-lucide="trash-2"></i> Eliminar Cuenta
+          </button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" data-close-modal="modal-account">Cancelar</button>
+            <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+          </div>
         </div>
       </form>
     </div>

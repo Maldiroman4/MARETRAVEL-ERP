@@ -143,6 +143,9 @@ window.accountsModule = {
               <button class="btn btn-secondary btn-sm" onclick="window.accountsModule.showAuditHistory('${acc.id}')" title="Auditoría de cambios">
                 <i data-lucide="history"></i>
               </button>
+              <button class="btn btn-danger btn-sm" onclick="window.accountsModule.deleteAccount('${acc.id}')" title="Eliminar cuenta">
+                <i data-lucide="trash-2"></i> Eliminar
+              </button>
             </div>
           </td>
         </tr>
@@ -170,6 +173,11 @@ window.accountsModule = {
     const modalTitle = document.getElementById('account-modal-title');
     const servicesContainer = document.getElementById('provider-services-list');
     if (servicesContainer) servicesContainer.innerHTML = '';
+
+    const btnDelete = document.getElementById('btn-delete-account');
+    if (btnDelete) {
+      btnDelete.style.display = accountId ? 'inline-flex' : 'none';
+    }
 
     if (accountId) {
       modalTitle.textContent = 'Editar Cuenta';
@@ -348,6 +356,104 @@ window.accountsModule = {
       window.operationsHubModule.render();
     }
     if (window.app && window.app.updateDashboardKpis) {
+      window.app.updateDashboardKpis();
+    }
+  },
+
+  deleteAccount(accountId) {
+    if (!accountId) return;
+    const data = window.db.get();
+    const acc = (data.accounts || []).find(a => a.id === accountId);
+    if (!acc) {
+      window.app.showToast('Cuenta no encontrada.', 'error');
+      return;
+    }
+
+    // 1. Detección de documentos y operaciones comerciales vinculadas
+    const linkedNds = (data.debitNotes || []).filter(nd => nd.accountId === accountId || nd.accountName === acc.name);
+    const linkedNcs = (data.creditNotes || []).filter(nc => nc.providerId === accountId || nc.accountId === accountId || nc.providerName === acc.name || nc.accountName === acc.name);
+    const linkedReceipts = (data.cashReceipts || []).filter(r => r.accountId === accountId || r.accountName === acc.name);
+    const linkedPayments = (data.providerPayments || []).filter(p => p.providerId === accountId || p.providerName === acc.name);
+    const linkedTickets = (data.gdsTickets || []).filter(t => t.operatorId === accountId);
+
+    const totalMovements = linkedNds.length + linkedNcs.length + linkedReceipts.length + linkedPayments.length + linkedTickets.length;
+
+    // 2. Diálogo de confirmación seguro
+    if (totalMovements > 0) {
+      const details = [];
+      if (linkedNds.length > 0) details.push(`${linkedNds.length} Nota(s) de Débito`);
+      if (linkedNcs.length > 0) details.push(`${linkedNcs.length} Nota(s) de Crédito / Liquidación`);
+      if (linkedReceipts.length > 0) details.push(`${linkedReceipts.length} Recibo(s) de Caja`);
+      if (linkedPayments.length > 0) details.push(`${linkedPayments.length} Comprobante(s) de Pago`);
+      if (linkedTickets.length > 0) details.push(`${linkedTickets.length} Boleto(s) GDS`);
+
+      const msg = `⚠️ ADVERTENCIA CONTABLE Y OPERATIVA:\n\n` +
+        `La cuenta "${acc.name}" (${acc.code}) tiene ${totalMovements} registro(s) vinculado(s):\n` +
+        `• ${details.join('\n• ')}\n\n` +
+        `Si elimina esta cuenta, sus documentos históricos conservarán el nombre pero la cuenta desaparecerá del directorio comercial.\n\n` +
+        `¿Está absolutamente seguro de ELIMINAR definitivamente la cuenta "${acc.name}"?`;
+
+      if (!confirm(msg)) {
+        return;
+      }
+    } else {
+      const msg = `¿Confirma que desea eliminar la cuenta "${acc.name}" (${acc.code}) del directorio?`;
+      if (!confirm(msg)) {
+        return;
+      }
+    }
+
+    // 3. Auditoría de eliminación
+    if (!data.accountHistory) data.accountHistory = [];
+    data.accountHistory.unshift({
+      id: 'AH-' + Date.now(),
+      accountId: acc.id,
+      accountName: acc.name,
+      changeType: 'DELETE',
+      fieldChanged: 'Eliminación de Cuenta',
+      oldValue: `${acc.code} - ${acc.name} (${acc.relationType || 'CUENTA'})`,
+      newValue: 'ELIMINADA',
+      userId: data.currentUser ? data.currentUser.id : 'USR-001',
+      userName: data.currentUser ? data.currentUser.name : 'Administrador',
+      createdAt: new Date().toLocaleString()
+    });
+
+    // 4. Limpiar contactos de empresa asociados
+    if (data.companyContacts && Array.isArray(data.companyContacts)) {
+      data.companyContacts = data.companyContacts.filter(c => c.companyId !== accountId);
+    }
+
+    // 5. Eliminar la cuenta del arreglo principal
+    data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
+
+    // 6. Guardar cambios en la base de datos física / localStorage
+    window.db.save(data);
+
+    // Cerrar modal si estaba abierto
+    window.app.closeModal('modal-account');
+    window.app.showToast(`Cuenta "${acc.name}" eliminada exitosamente.`, 'success');
+
+    // 7. Refrescar vistas reactivamente
+    this.render();
+    if (window.operationsHubModule && typeof window.operationsHubModule.render === 'function') {
+      window.operationsHubModule.render();
+    }
+    if (window.debitNotesModule && typeof window.debitNotesModule.render === 'function') {
+      window.debitNotesModule.render();
+    }
+    if (window.creditNotesModule && typeof window.creditNotesModule.render === 'function') {
+      window.creditNotesModule.render();
+    }
+    if (window.cashRegisterModule && typeof window.cashRegisterModule.render === 'function') {
+      window.cashRegisterModule.render();
+    }
+    if (window.gdsModule && typeof window.gdsModule.render === 'function') {
+      window.gdsModule.render();
+    }
+    if (window.otherIncomesModule && typeof window.otherIncomesModule.render === 'function') {
+      window.otherIncomesModule.render();
+    }
+    if (window.app && typeof window.app.updateDashboardKpis === 'function') {
       window.app.updateDashboardKpis();
     }
   },
