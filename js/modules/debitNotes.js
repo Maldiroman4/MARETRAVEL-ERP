@@ -1126,10 +1126,14 @@ window.debitNotesModule = {
     const tx = transactionContext || (doc && (doc.receiptCode || doc.receiptNumber) ? doc : null);
     const isTransaction = Boolean(tx);
 
-    const isNc = explicitDocType === 'NC' || doc.ncNumber !== undefined || doc.docType === 'NC' || doc.type === 'NC';
+    const isNc = explicitDocType === 'NC' 
+      || (tx && (tx.tipo === 'NC' || tx.creditNoteId || tx.creditNoteNumber || tx.providerId))
+      || doc.ncNumber !== undefined 
+      || doc.docType === 'NC' 
+      || doc.type === 'NC';
     const docType = isNc ? 'NC' : 'ND';
     const docTitle = isTransaction
-      ? 'RECIBO DE PAGO'
+      ? (isNc ? 'PAGO A PROVEEDOR' : 'RECIBO DE PAGO')
       : (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
     const docNumber = isTransaction
       ? (tx.receiptCode || ('RCP-' + String(tx.receiptNumber).padStart(5, '0')))
@@ -2392,9 +2396,21 @@ window.debitNotesModule = {
       doc = (data.creditNotes || []).find(n => n.id === docId);
       if (doc) docType = 'NC';
     }
-    if (!doc) return;
+    if (!doc) {
+      if (tx && (tx.tipo === 'NC' || docType === 'NC') && window.cashRegisterModule && typeof window.cashRegisterModule.printProviderPayment === 'function') {
+        window.cashRegisterModule.printProviderPayment(tx.id || docId);
+        return;
+      }
+      if (tx && window.cashRegisterModule && typeof window.cashRegisterModule.printReceipt === 'function') {
+        window.cashRegisterModule.printReceipt(tx.id || docId);
+        return;
+      }
+      return;
+    }
     const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType, tx);
-    const resolvedTitle = tx ? 'RECIBO DE PAGO' : (docType === 'NC' ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
+    const resolvedTitle = tx 
+      ? (docType === 'NC' ? 'PAGO A PROVEEDOR' : 'RECIBO DE PAGO') 
+      : (docType === 'NC' ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
     this.executePrint(voucherHtml, docType, resolvedTitle);
   }
 };

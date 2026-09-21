@@ -528,7 +528,7 @@ window.cashRegisterModule = {
         receiptCode: receiptCode,
         paymentDate: new Date().toISOString().split('T')[0],
         tipo: 'NC',
-        tipoTransaccion: 'RECIBO DE PAGO',
+        tipoTransaccion: 'PAGO A PROVEEDOR',
         subTipoTransaccion: isFullyPaid ? 'PAGO TOTAL NC' : 'ABONO PARCIAL NC',
         documentoOrigen: docNumLabel,
         creditNoteId: doc.id,
@@ -1946,7 +1946,7 @@ window.cashRegisterModule = {
         date: p.paymentDate || (p.createdAt ? p.createdAt.split(',')[0] : '-'),
         party: linkedNc.providerName || p.providerName || 'Proveedor',
         documentoOrigen: p.documentoOrigen || (linkedNc ? `NC #${linkedNc.ncNumber}` : ''),
-        tipoTransaccion: 'RECIBO DE PAGO',
+        tipoTransaccion: 'PAGO A PROVEEDOR',
         isInitialDocument: false,
         servicio: p.serviceCategory || linkedNc.serviceCategory || 'GENERAL',
         serviceCategory: p.serviceCategory || linkedNc.serviceCategory || 'GENERAL',
@@ -2079,7 +2079,9 @@ window.cashRegisterModule = {
         ? (isNd 
             ? `<span class="badge badge-emerald" style="font-weight:700;"><i data-lucide="file-text" style="width:13px;height:13px;"></i> NOTA DE DÉBITO</span>`
             : `<span class="badge badge-amber" style="font-weight:700; color:#78350f; background:#fef08a; border-color:#fde047;"><i data-lucide="file-text" style="width:13px;height:13px;"></i> NOTA DE CRÉDITO</span>`)
-        : `<span class="badge" style="font-weight:700; background:#e0f2fe; color:#0369a1; border-color:#bae6fd;"><i data-lucide="receipt" style="width:13px;height:13px;"></i> RECIBO DE PAGO</span>`;
+        : (isNd
+            ? `<span class="badge" style="font-weight:700; background:#e0f2fe; color:#0369a1; border-color:#bae6fd;"><i data-lucide="receipt" style="width:13px;height:13px;"></i> RECIBO DE PAGO</span>`
+            : `<span class="badge" style="font-weight:700; background:#fef3c7; color:#92400e; border-color:#fcd34d;"><i data-lucide="arrow-up-right" style="width:13px;height:13px;"></i> PAGO A PROVEEDOR</span>`);
 
       const statusBadge = window.cashRegisterModule.renderStatusBadge(
         it.estado,
@@ -2467,7 +2469,7 @@ window.cashRegisterModule = {
         </div>
 
         <div class="print-doc-title">
-          <h2>RECIBO DE PAGO</h2>
+          <h2>PAGO A PROVEEDOR</h2>
           <div class="print-doc-number">${p.receiptCode || ('OP-' + String(p.receiptNumber).padStart(5, '0'))}</div>
           ${p.status === 'REVERTIDO' ? '<div style="color:red; font-weight:800; font-size:12pt; margin-top:4px;">*** ANULADO / REVERTIDO ***</div>' : ''}
         </div>

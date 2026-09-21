@@ -22,9 +22,9 @@ function formatDate(dateStr) {
 }
 
 function renderOfficialPrintDocument(doc, docType = 'ND', logoBase64 = '') {
-  const isNc = docType === 'NC' || String(doc.id || '').startsWith('NC');
+  const isNc = docType === 'NC' || String(doc.id || '').startsWith('NC') || Boolean(doc.creditNoteId || doc.creditNoteNumber);
   const isTransaction = Boolean(doc.receiptNumber || doc.receiptCode || doc.isReceipt);
-  const docTitle = isTransaction ? 'RECIBO DE PAGO' : (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
+  const docTitle = isTransaction ? (isNc ? 'PAGO A PROVEEDOR' : 'RECIBO DE PAGO') : (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
   const docNumber = escapeHtml(doc.ndNumber || doc.ncNumber || doc.number || doc.id || '4001');
   const emissionDate = formatDate(doc.issueDate);
   const emissionTime = doc.issueTime || '10:30';
