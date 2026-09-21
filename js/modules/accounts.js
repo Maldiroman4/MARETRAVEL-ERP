@@ -117,8 +117,8 @@ window.accountsModule = {
         <tr>
           <td class="font-mono" style="font-weight: 700; color: var(--navy);">${acc.code}</td>
           <td>
-            <div style="font-weight: 600;">${acc.name}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${acc.legalName || 'Sin Razón Social'}</div>
+            <div style="font-weight: 600; color: var(--navy);">${acc.name || acc.legalName || '-'}</div>
+            ${(acc.legalName && acc.name && acc.legalName !== acc.name) ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${acc.legalName}</div>` : ''}
           </td>
           <td class="font-mono">${acc.nit || '-'}</td>
           <td><span class="badge ${relationBadge}">${acc.relationType}</span></td>
@@ -185,8 +185,10 @@ window.accountsModule = {
       const acc = data.accounts.find(a => a.id === accountId);
       if (acc) {
         document.getElementById('acc-code').value = acc.code;
-        document.getElementById('acc-name').value = acc.name;
-        document.getElementById('acc-legal-name').value = acc.legalName || '';
+        const legalNameEl = document.getElementById('acc-legal-name');
+        if (legalNameEl) legalNameEl.value = acc.legalName || acc.name || '';
+        const nameEl = document.getElementById('acc-name');
+        if (nameEl) nameEl.value = acc.name || acc.legalName || '';
         document.getElementById('acc-nit').value = acc.nit || '';
         document.getElementById('acc-relation-type').value = acc.relationType;
         document.getElementById('acc-type').value = acc.accountType;
@@ -197,7 +199,8 @@ window.accountsModule = {
         document.getElementById('acc-phone').value = acc.phone || '';
         document.getElementById('acc-cellphone').value = acc.cellphone || '';
         document.getElementById('acc-email').value = acc.email || '';
-        document.getElementById('acc-web').value = acc.webPage || '';
+        const webEl = document.getElementById('acc-web');
+        if (webEl) webEl.value = acc.webPage || '';
 
         // Cargar prestadores de servicios si aplica
         if (acc.providerServices && acc.providerServices.length > 0) {
@@ -277,10 +280,17 @@ window.accountsModule = {
       }
     });
 
+    const legalNameEl = document.getElementById('acc-legal-name');
+    const nameEl = document.getElementById('acc-name');
+    const primaryName = (legalNameEl ? legalNameEl.value.trim() : '') || (nameEl ? nameEl.value.trim() : '');
+
+    const webEl = document.getElementById('acc-web');
+    const webVal = webEl ? webEl.value.trim() : '';
+
     const accountData = {
       code: document.getElementById('acc-code').value.trim(),
-      name: document.getElementById('acc-name').value.trim(),
-      legalName: document.getElementById('acc-legal-name').value.trim(),
+      name: primaryName,
+      legalName: primaryName,
       nit: document.getElementById('acc-nit').value.trim(),
       relationType: document.getElementById('acc-relation-type').value,
       accountType: document.getElementById('acc-type').value,
@@ -291,7 +301,7 @@ window.accountsModule = {
       phone: document.getElementById('acc-phone').value.trim(),
       cellphone: document.getElementById('acc-cellphone').value.trim(),
       email: document.getElementById('acc-email').value.trim(),
-      webPage: document.getElementById('acc-web').value.trim(),
+      webPage: webVal,
       providerServices: services,
       status: 'ACTIVO'
     };

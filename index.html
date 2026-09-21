@@ -1165,21 +1165,14 @@
       </div>
       <form id="account-form">
         <div class="modal-content">
-          <div class="form-row">
+          <div class="form-row" style="grid-template-columns: 140px 1fr 180px;">
             <div>
               <label class="form-label">Código Cuenta:</label>
               <input type="text" id="acc-code" class="form-control font-mono" required>
             </div>
-            <div style="grid-column: span 2;">
-              <label class="form-label">Nombre Comercial / Titular:</label>
-              <input type="text" id="acc-name" class="form-control" required>
-            </div>
-          </div>
-
-          <div class="form-row" style="margin-top: 10px;">
-            <div style="grid-column: span 2;">
+            <div>
               <label class="form-label">Razón Social (Facturación):</label>
-              <input type="text" id="acc-legal-name" class="form-control">
+              <input type="text" id="acc-legal-name" class="form-control" required placeholder="Nombre o Razón Social">
             </div>
             <div>
               <label class="form-label">NIT / CI:</label>
@@ -1219,7 +1212,7 @@
             </div>
           </div>
 
-          <div class="form-row" style="margin-top: 10px;">
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: repeat(4, 1fr);">
             <div>
               <label class="form-label">Departamento:</label>
               <input type="text" id="acc-department" class="form-control" value="La Paz">
@@ -1238,18 +1231,14 @@
             </div>
           </div>
 
-          <div class="form-row" style="margin-top: 10px;">
-            <div style="grid-column: span 2;">
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: 2fr 1fr;">
+            <div>
               <label class="form-label">Dirección:</label>
               <input type="text" id="acc-address" class="form-control">
             </div>
             <div>
               <label class="form-label">Email de Contacto:</label>
               <input type="email" id="acc-email" class="form-control">
-            </div>
-            <div>
-              <label class="form-label">Página Web:</label>
-              <input type="text" id="acc-web" class="form-control">
             </div>
           </div>
 
