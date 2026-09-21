@@ -2170,19 +2170,31 @@ window.debitNotesModule = {
     }
 
     try {
+      // 2. Limpiar iframe anterior si existe para evitar acumulaciones o contextos congelados
       let printFrame = document.getElementById('maretravel-print-frame');
-      if (!printFrame) {
-        printFrame = document.createElement('iframe');
-        printFrame.id = 'maretravel-print-frame';
-        printFrame.style.position = 'fixed';
-        printFrame.style.right = '0';
-        printFrame.style.bottom = '0';
-        printFrame.style.width = '0';
-        printFrame.style.height = '0';
-        printFrame.style.border = '0';
-        printFrame.style.opacity = '0';
-        printFrame.style.pointerEvents = 'none';
-        document.body.appendChild(printFrame);
+      if (printFrame) {
+        try { printFrame.remove(); } catch(e) {}
+      }
+
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'maretravel-print-frame';
+      // Posición fuera de pantalla pero con dimensiones reales de página (800x1100)
+      // para que el motor de renderizado de Chrome compute de inmediato las flexboxes, anchos y tablas
+      printFrame.style.position = 'fixed';
+      printFrame.style.left = '-9999px';
+      printFrame.style.top = '-9999px';
+      printFrame.style.width = '800px';
+      printFrame.style.height = '1100px';
+      printFrame.style.border = '0';
+      printFrame.style.opacity = '0.01';
+      printFrame.style.pointerEvents = 'none';
+      printFrame.style.zIndex = '-9999';
+      document.body.appendChild(printFrame);
+
+      const logo = this.cachedLogoBase64 || window.maretravelLogoBase64 || (window.db && window.db.get()?.systemSettings?.logoBase64);
+      let resolvedVoucherHtml = voucherHtml;
+      if (logo) {
+        resolvedVoucherHtml = resolvedVoucherHtml.replace(/src=["']assets\/logo\.(?:jpg|png|jpeg)["']/gi, `src="${logo}"`);
       }
 
       const frameDoc = printFrame.contentWindow.document;
@@ -2192,15 +2204,16 @@ window.debitNotesModule = {
         <html lang="es">
         <head>
           <meta charset="UTF-8">
+          <base href="${window.location.origin}/">
           <title>${docTitle} - MARETRAVEL SRL</title>
-          <link rel="stylesheet" href="css/style.css">
           <style>
+            /* 1. Configuración Global de Impresión */
             @page {
               size: letter portrait;
               margin: 8mm 10mm;
             }
             * {
-              box-sizing: border-box;
+              box-sizing: border-box !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -2212,30 +2225,36 @@ window.debitNotesModule = {
               display: block !important;
               height: auto !important;
               overflow: visible !important;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+              font-size: 11px !important;
+              line-height: 1.3 !important;
             }
             .nd-official-container {
               width: 100% !important;
-              max-width: 100% !important;
-              padding: 5px 10px !important;
+              max-width: 800px !important;
               margin: 0 auto !important;
+              background: #ffffff !important;
+              padding: 10px 15px !important;
+              box-sizing: border-box !important;
+              color: #1e293b !important;
+              line-height: 1.25 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
-            .nd-green-badge {
-              background-color: #00a884 !important;
-              color: #ffffff !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+
+            /* 2. Encabezado de 3 Columnas */
+            .nd-official-header {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: flex-start !important;
+              margin-bottom: 12px !important;
+              width: 100% !important;
+              gap: 10px !important;
             }
-            .nd-green-line {
-              background-color: #00a884 !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .nd-th-currency {
-              background-color: #00a884 !important;
-              color: #ffffff !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+            .nd-header-brand {
+              width: 25% !important;
+              flex: 0 0 25% !important;
+              text-align: left !important;
             }
             .nd-official-logo {
               max-width: 165px !important;
@@ -2243,23 +2262,262 @@ window.debitNotesModule = {
               object-fit: contain !important;
               display: block !important;
             }
+            .nd-header-title-box {
+              width: 48% !important;
+              flex: 0 0 48% !important;
+              text-align: center !important;
+            }
+            .nd-title-main {
+              font-size: 1.35rem !important;
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              margin: 0 0 2px 0 !important;
+              letter-spacing: 0.2px !important;
+            }
+            .nd-number-line {
+              font-size: 0.95rem !important;
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              margin-bottom: 6px !important;
+            }
+            .nd-meta-table {
+              margin: 0 auto !important;
+              border-collapse: collapse !important;
+              text-align: left !important;
+              font-size: 0.76rem !important;
+              width: 100% !important;
+            }
+            .nd-meta-table td {
+              padding: 1.5px 5px !important;
+              vertical-align: top !important;
+            }
+            .nd-lbl-cell {
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              white-space: nowrap !important;
+              width: 115px !important;
+            }
+            .nd-val-cell {
+              color: #1e293b !important;
+            }
+            .nd-header-agency-info {
+              width: 27% !important;
+              flex: 0 0 27% !important;
+              text-align: left !important;
+              font-size: 0.72rem !important;
+              color: #334155 !important;
+              line-height: 1.25 !important;
+            }
+            .nd-agency-bold {
+              font-weight: 800 !important;
+              font-size: 0.82rem !important;
+              color: #0f172a !important;
+              margin-bottom: 2px !important;
+            }
+            .nd-agency-line {
+              margin-bottom: 1px !important;
+            }
+
+            /* 3. Sección Detalle */
+            .nd-detail-section {
+              margin-top: 6px !important;
+              width: 100% !important;
+            }
+            .nd-green-badge {
+              background-color: #00a884 !important;
+              color: #ffffff !important;
+              display: inline-block !important;
+              padding: 4px 18px !important;
+              font-weight: 800 !important;
+              font-size: 0.8rem !important;
+              border-radius: 2px 2px 0 0 !important;
+              letter-spacing: 0.3px !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .nd-green-line {
+              height: 3.5px !important;
+              background-color: #00a884 !important;
+              width: 100% !important;
+              margin: 0 0 12px 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .nd-items-wrapper {
+              width: 100% !important;
+            }
+            .nd-item-block {
+              display: flex !important;
+              justify-content: space-between !important;
+              font-size: 0.76rem !important;
+              padding: 2px 0 !important;
+              width: 100% !important;
+            }
+            .nd-col-left {
+              width: 38% !important;
+              flex: 0 0 38% !important;
+            }
+            .nd-col-center {
+              width: 32% !important;
+              flex: 0 0 32% !important;
+            }
+            .nd-col-right {
+              width: 30% !important;
+              flex: 0 0 30% !important;
+            }
+            .nd-kv-row {
+              display: flex !important;
+              margin-bottom: 3px !important;
+              align-items: baseline !important;
+            }
+            .nd-k {
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              display: inline-block !important;
+              flex-shrink: 0 !important;
+              white-space: nowrap !important;
+            }
+            .nd-v {
+              color: #1e293b !important;
+              margin-left: 6px !important;
+              flex-grow: 1 !important;
+            }
+            .nd-service-details {
+              line-height: 1.35 !important;
+            }
+            .nd-srv-line {
+              margin-bottom: 1px !important;
+            }
+            .nd-item-subdivider {
+              border-top: 1px dashed #cbd5e1 !important;
+              margin: 8px 0 !important;
+            }
+
+            /* 4. Totales y Observaciones */
+            .nd-footer-section {
+              margin-top: 4px !important;
+              width: 100% !important;
+            }
+            .nd-totals-outer {
+              display: flex !important;
+              justify-content: flex-end !important;
+              margin-bottom: 8px !important;
+              width: 100% !important;
+            }
+            .nd-totals-grid {
+              border-collapse: collapse !important;
+            }
+            .nd-th-currency {
+              background-color: #00a884 !important;
+              color: #ffffff !important;
+              font-weight: 800 !important;
+              font-size: 0.75rem !important;
+              text-align: center !important;
+              padding: 4px 18px !important;
+              min-width: 80px !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .nd-td-total-label {
+              font-weight: 800 !important;
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+              text-align: right !important;
+              padding-right: 14px !important;
+            }
+            .nd-td-total-val {
+              font-weight: 800 !important;
+              font-size: 0.85rem !important;
+              text-align: right !important;
+              padding: 4px 10px !important;
+              border: 1px solid #e2e8f0 !important;
+              color: #0f172a !important;
+            }
+            .nd-partial-summary {
+              display: flex !important;
+              gap: 18px !important;
+              flex-wrap: wrap !important;
+              justify-content: flex-end !important;
+              margin-top: 6px !important;
+              margin-bottom: 8px !important;
+              padding: 6px 14px !important;
+              background: #f8fafc !important;
+              border: 1px solid #e2e8f0 !important;
+              border-left: 4px solid #00a884 !important;
+              border-radius: 4px !important;
+              font-size: 0.8rem !important;
+            }
+            .nd-obs-row {
+              display: flex !important;
+              align-items: center !important;
+              gap: 10px !important;
+              margin-top: 4px !important;
+              width: 100% !important;
+            }
+            .nd-obs-badge {
+              background-color: #00a884 !important;
+              color: #ffffff !important;
+              font-weight: 800 !important;
+              font-size: 0.72rem !important;
+              padding: 3px 12px !important;
+              border-radius: 2px !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              flex-shrink: 0 !important;
+            }
+            .nd-obs-content {
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+            }
+
+            /* 5. Firmas */
+            .nd-signatures-container {
+              display: flex !important;
+              justify-content: space-around !important;
+              margin-top: 45px !important;
+              margin-bottom: 20px !important;
+              width: 100% !important;
+            }
+            .nd-signature-box {
+              width: 250px !important;
+              text-align: center !important;
+            }
+            .nd-signature-line {
+              border-top: 1.5px solid #334155 !important;
+              margin-bottom: 6px !important;
+            }
+            .nd-signature-text {
+              font-weight: 800 !important;
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+            }
+
+            /* 6. Cláusula Legal */
+            .nd-legal-text {
+              text-align: center !important;
+              font-size: 0.68rem !important;
+              font-weight: 700 !important;
+              color: #1e293b !important;
+              line-height: 1.35 !important;
+              margin-top: 8px !important;
+            }
+            .font-mono {
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+            }
+            .font-bold {
+              font-weight: 700 !important;
+            }
           </style>
         </head>
         <body>
-          ${(() => {
-            const logo = this.cachedLogoBase64 || window.maretravelLogoBase64;
-            if (logo) {
-              return voucherHtml.replace(/src=["']assets\/logo\.(?:jpg|png|jpeg)["']/gi, `src="${logo}"`);
-            }
-            return voucherHtml;
-          })()}
+          ${resolvedVoucherHtml}
         </body>
         </html>
       `);
       frameDoc.close();
 
-      // Esperar a que cargue el CSS e imágenes antes de invocar print()
-      setTimeout(() => {
+      // 3. Esperar confirmación de renderizado e imágenes listas antes de invocar print()
+      const triggerPrint = () => {
         try {
           printFrame.contentWindow.focus();
           printFrame.contentWindow.print();
@@ -2267,7 +2525,25 @@ window.debitNotesModule = {
           console.warn('Iframe print error, fallback a window.print():', frameErr);
           window.print();
         }
-      }, 350);
+      };
+
+      const imgs = Array.from(frameDoc.images || []);
+      const unreadyImgs = imgs.filter(img => !img.complete);
+
+      if (unreadyImgs.length > 0) {
+        let remaining = unreadyImgs.length;
+        const onDone = () => {
+          remaining--;
+          if (remaining <= 0) setTimeout(triggerPrint, 80);
+        };
+        unreadyImgs.forEach(img => {
+          img.onload = onDone;
+          img.onerror = onDone;
+        });
+        setTimeout(triggerPrint, 350);
+      } else {
+        setTimeout(triggerPrint, 80);
+      }
     } catch (e) {
       console.warn('Fallback a window.print():', e);
       window.print();
