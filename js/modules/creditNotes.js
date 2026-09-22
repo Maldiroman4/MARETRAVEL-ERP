@@ -6,19 +6,8 @@
 window.creditNotesModule = {
   currentStatusFilter: 'TODOS',
 
-  async init() {
+  init() {
     this.bindEvents();
-    await this.loadFromApi();
-  },
-
-  async loadFromApi() {
-    try {
-      if (typeof CreditNotesAdapter !== 'undefined' && typeof CreditNotesAdapter.syncMirror === 'function') {
-        await CreditNotesAdapter.syncMirror();
-      }
-    } catch (e) {
-      console.warn('No se pudo sincronizar Notas de Crédito con el backend:', e);
-    }
     this.render();
   },
 
@@ -161,7 +150,7 @@ window.creditNotesModule = {
     window.app.openModal('modal-nc-manual');
   },
 
-  async handleSaveManualNc(e) {
+  handleSaveManualNc(e) {
     e.preventDefault();
     const data = window.db.get();
     const providerId = document.getElementById('nc-provider-select').value;
@@ -178,7 +167,6 @@ window.creditNotesModule = {
     }
 
     const nextNc = (data.creditNotes.length > 0) ? Math.max(...data.creditNotes.map(c => c.ncNumber)) + 1 : 501;
-    const currency = document.getElementById('nc-currency').value;
     const newNc = {
       id: 'NC-' + Date.now(),
       ncNumber: nextNc,
@@ -189,7 +177,7 @@ window.creditNotesModule = {
       originDebitNoteNumber: null,
       issueDate: document.getElementById('nc-issue-date').value,
       concept: document.getElementById('nc-concept').value.trim(),
-      currency: currency,
+      currency: document.getElementById('nc-currency').value,
       totalAmount: total,
       paidAmount: 0.00,
       balance: total,
@@ -200,26 +188,6 @@ window.creditNotesModule = {
     };
 
     data.creditNotes.unshift(newNc);
-
-    // Persistir en el backend (dual-source)
-    try {
-      if (provider.backendId && typeof CreditNotesAdapter !== 'undefined' && typeof CreditNotesAdapter.create === 'function') {
-        const apiPayload = {
-          providerAccountId: provider.backendId,
-          concept: newNc.concept,
-          currency: currency,
-          totalAmountBob: currency === 'BOB' ? total : 0,
-          totalAmountUsd: currency === 'USD' ? total : 0,
-        };
-        await CreditNotesAdapter.create(apiPayload);
-        if (typeof CreditNotesAdapter.syncMirror === 'function') {
-          await CreditNotesAdapter.syncMirror();
-        }
-      }
-    } catch (err) {
-      console.warn('NC guardada localmente; no se pudo persistir en el backend:', err.message);
-    }
-
     window.db.save(data);
     window.app.closeModal('modal-nc-manual');
     window.app.showToast(`Nota de Crédito NC #${newNc.ncNumber} registrada correctamente`, 'success');

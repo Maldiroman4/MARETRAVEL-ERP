@@ -7,19 +7,8 @@ window.gdsModule = {
   currentStatusFilter: 'TODOS',
   editingTicketId: null,
 
-  async init() {
+  init() {
     this.bindEvents();
-    await this.loadFromApi();
-  },
-
-  async loadFromApi() {
-    try {
-      if (GdsAdapter && typeof GdsAdapter.syncMirror === 'function') {
-        await GdsAdapter.syncMirror();
-      }
-    } catch (e) {
-      console.warn('No se pudo sincronizar boletos con el backend:', e);
-    }
     this.render();
   },
 
@@ -238,12 +227,9 @@ window.gdsModule = {
     window.app.openModal('modal-simulate-gds');
   },
 
-  async handleSaveSimulate(e) {
+  handleSaveSimulate(e) {
     e.preventDefault();
     const data = window.db.get();
-    const isEdit = !!this.editingTicketId;
-    let savedTicket = null;
-    let savedBackendId = null;
 
     const currency = document.getElementById('sim-currency').value;
     const fare = parseFloat(document.getElementById('sim-fare-amount').value) || 0;
@@ -255,7 +241,6 @@ window.gdsModule = {
     const fee = parseFloat(document.getElementById('sim-fee-amount').value) || 0;
     const airlineId = document.getElementById('sim-airline-select').value;
     const airline = data.accounts.find(a => a.id === airlineId);
-    const airlineBackendId = airline ? (airline.backendId || null) : null;
     const gdsSelect = document.getElementById('sim-gds-source');
 
     if (this.editingTicketId) {
@@ -285,9 +270,6 @@ window.gdsModule = {
           totalWithFee: parseFloat((price + fee).toFixed(2)),
           updatedAt: new Date().toLocaleString()
         };
-
-        savedTicket = data.gdsTickets[idx];
-        savedBackendId = data.gdsTickets[idx].backendId || null;
 
         // Sincronizar en Otros Ingresos Operativos
         data.otherIncomes = data.otherIncomes || [];
@@ -361,8 +343,6 @@ window.gdsModule = {
         createdAt: new Date().toLocaleString()
       };
 
-      savedTicket = newTicket;
-
       data.gdsTickets.unshift(newTicket);
 
       // Generar automáticamente el registro en Otros Ingresos Operativos (inicia IMPAGA)
@@ -392,41 +372,6 @@ window.gdsModule = {
       window.app.showToast(`Boleto ${newTicket.ticketNumber} registrado correctamente (Comisión agregada a Otros Ingresos)`, 'success');
     }
 
-    // Persistir en el backend (dual-source) y refrescar el espejo local
-    if (savedTicket) {
-      try {
-        if (GdsAdapter && typeof GdsAdapter.create === 'function') {
-          const apiPayload = {
-            ticketNumber: savedTicket.ticketNumber,
-            gdsSource: savedTicket.gdsSource || 'AMADEUS',
-            issueDate: savedTicket.issueDate,
-            passengerName: savedTicket.passengerName,
-            route: savedTicket.route,
-            airlineCode: savedTicket.airlineCode,
-            operatorId: airlineBackendId || savedTicket.operatorBackendId,
-            netAmount: savedTicket.netAmount,
-            taxAmount: savedTicket.taxAmount || 0,
-            totalAmount: savedTicket.totalAmount,
-            currency: savedTicket.currency,
-            commissionRate: savedTicket.commissionRate || 0,
-            commissionAmount: savedTicket.commissionAmount || 0,
-            feeAmount: savedTicket.feeAmount || 0,
-            status: savedTicket.status || 'DISPONIBLE'
-          };
-          if (savedBackendId) {
-            await GdsAdapter.update(savedBackendId, apiPayload);
-          } else {
-            await GdsAdapter.create(apiPayload);
-          }
-          if (typeof GdsAdapter.syncMirror === 'function') {
-            await GdsAdapter.syncMirror();
-          }
-        }
-      } catch (err) {
-        window.app.showToast('Boleto guardado localmente, pero hubo un error en el servidor: ' + err.message, 'error');
-      }
-    }
-
     window.app.closeModal('modal-simulate-gds');
     this.render();
     if (window.operationsHubModule) window.operationsHubModule.render();
@@ -438,7 +383,7 @@ window.gdsModule = {
     return this.openSimulateModal(ticketId);
   },
 
-  async deleteTicket(ticketId) {
+  deleteTicket(ticketId) {
     const data = window.db.get();
     const tkt = (data.gdsTickets || []).find(t => t.id === ticketId);
     if (!tkt) return;
@@ -452,19 +397,6 @@ window.gdsModule = {
       data.gdsTickets = data.gdsTickets.filter(t => t.id !== ticketId);
       data.otherIncomes = (data.otherIncomes || []).filter(i => i.ticketId !== ticketId);
       window.db.save(data);
-
-      // Persistir el borrado en el backend (dual-source)
-      try {
-        if (GdsAdapter && tkt.backendId && typeof GdsAdapter.remove === 'function') {
-          await GdsAdapter.remove(tkt.backendId);
-          if (typeof GdsAdapter.syncMirror === 'function') {
-            await GdsAdapter.syncMirror();
-          }
-        }
-      } catch (err) {
-        window.app.showToast('El boleto se eliminó localmente, pero hubo un error en el servidor: ' + err.message, 'error');
-      }
-
       window.app.showToast(`Boleto ${tkt.ticketNumber} eliminado correctamente`, 'success');
       this.render();
       if (window.operationsHubModule) window.operationsHubModule.render();
