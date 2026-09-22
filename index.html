@@ -1309,7 +1309,10 @@
 
           <div class="form-group" style="margin-top: 10px;">
             <label class="form-label">Nombre del Pasajero (APELLIDO/NOMBRE):</label>
-            <input type="text" id="sim-passenger-name" class="form-control font-mono" placeholder="MENDOZA/CARLOS LIC" required>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <input type="text" id="sim-passenger-name" class="form-control font-mono" list="datalist-passengers" placeholder="MENDOZA/CARLOS LIC" required>
+              <button type="button" class="btn btn-secondary btn-sm" title="Buscar en el directorio de pasajeros" onclick="window.operationsHubModule.openPassengerSearch('input', 'sim-passenger-name')">🔍</button>
+            </div>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
@@ -1420,7 +1423,10 @@
             </div>
             <div>
               <label class="form-label">Pasajero(s) del Viaje:</label>
-              <input type="text" id="nd-passenger-name" class="form-control" placeholder="Ej: QUISPE/JUAN o Juan Pérez">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="text" id="nd-passenger-name" class="form-control" list="datalist-passengers" placeholder="Ej: QUISPE/JUAN o Juan Pérez">
+                <button type="button" class="btn btn-secondary btn-sm" title="Buscar en el directorio de pasajeros" onclick="window.operationsHubModule.openPassengerSearch('input', 'nd-passenger-name')">🔍</button>
+              </div>
             </div>
           </div>
 
@@ -1582,7 +1588,10 @@
           <div class="form-row" style="margin-top: 10px;">
             <div>
               <label class="form-label">Nombre del Pasajero / Titular:</label>
-              <input type="text" id="man-passenger-name" class="form-control font-mono" required>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="text" id="man-passenger-name" class="form-control font-mono" list="datalist-passengers" required>
+                <button type="button" class="btn btn-secondary btn-sm" title="Buscar en el directorio de pasajeros" onclick="window.operationsHubModule.openPassengerSearch('input', 'man-passenger-name')">🔍</button>
+              </div>
             </div>
             <div>
               <label class="form-label">Doc. Identidad:</label>
@@ -2969,22 +2978,40 @@
   <div id="print-area"></div>
 
   <!-- Scripts del Sistema ERP -->
-  <script src="js/db.js?v=20260922_v19"></script>
-  <script src="js/modules/financialGuard.js?v=20260922_v19"></script>
-  <script src="js/modules/bankAccounts.js?v=20260922_v19"></script>
-  <script src="js/modules/accounts.js?v=20260922_v19"></script>
-  <script src="js/modules/gds.js?v=20260922_v19"></script>
-  <script src="js/modules/debitNotes.js?v=20260922_v19"></script>
-  <script src="js/modules/creditNotes.js?v=20260922_v19"></script>
-  <script src="js/modules/cashRegister.js?v=20260922_v19"></script>
-  <script src="js/modules/otherIncomes.js?v=20260922_v19"></script>
-  <script src="js/modules/reports.js?v=20260922_v19"></script>
-  <script src="js/modules/calendar.js?v=20260922_v19"></script>
-  <script src="js/modules/settings.js?v=20260922_v19"></script>
-  <script src="js/modules/operationsHub.js?v=20260922_v19"></script>
-  <script src="js/app.js?v=20260922_v19"></script>
+  <script src="js/db.js?v=20260922_v20"></script>
+  <script src="js/modules/financialGuard.js?v=20260922_v20"></script>
+  <script src="js/modules/bankAccounts.js?v=20260922_v20"></script>
+  <script src="js/modules/accounts.js?v=20260922_v20"></script>
+  <script src="js/modules/gds.js?v=20260922_v20"></script>
+  <script src="js/modules/debitNotes.js?v=20260922_v20"></script>
+  <script src="js/modules/creditNotes.js?v=20260922_v20"></script>
+  <script src="js/modules/cashRegister.js?v=20260922_v20"></script>
+  <script src="js/modules/otherIncomes.js?v=20260922_v20"></script>
+  <script src="js/modules/reports.js?v=20260922_v20"></script>
+  <script src="js/modules/calendar.js?v=20260922_v20"></script>
+  <script src="js/modules/settings.js?v=20260922_v20"></script>
+  <script src="js/modules/operationsHub.js?v=20260922_v20"></script>
+  <script src="js/app.js?v=20260922_v20"></script>
 
 
 
+<!-- TAREA 6: Directorio de pasajeros (autocompletado nativo + mini-modal de búsqueda) -->
+  <datalist id="datalist-passengers"></datalist>
+
+  <div class="modal-overlay" id="modal-passenger-search">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="search"></i> Buscar Pasajero / Titular del Servicio</h3>
+        <button class="modal-close" data-close-modal="modal-passenger-search">&times;</button>
+      </div>
+      <div class="modal-content">
+        <input type="text" id="pax-search-input" class="form-control" placeholder="Escriba Apellido / Nombre o Documento... (directorio de pasajeros)" oninput="window.operationsHubModule.handlePassengerSearchInput()">
+        <div id="pax-search-results" style="margin-top: 10px; max-height: 340px; overflow-y: auto;"></div>
+        <div id="pax-search-empty" style="display: none; color: #64748b; font-size: 0.82rem; padding: 12px; text-align: center;">
+          Sin coincidencias en el directorio.<br>El pasajero se registrará automáticamente al guardar la operación.
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -169,6 +169,7 @@ class OperationsHubModule {
     this.bindEvents();
     this.updateHubKpis();
     this.populateServiceTypeSelects();
+    this.refreshPassengerDatalist();
     this.renderActiveTabContent();
     if (window.lucide) window.lucide.createIcons();
   }
@@ -1329,7 +1330,10 @@ class OperationsHubModule {
             <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
-                <input type="text" class="form-control font-mono font-bold" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+                  <button type="button" class="btn btn-secondary btn-xs" title="Buscar en el directorio de pasajeros" style="padding: 6px 8px; flex-shrink: 0;" onclick="window.operationsHubModule.openPassengerSearch('hub', ${idx})">🔍</button>
+                </div>
               </div>
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Nro Voucher / Boleto / Reserva:</label>
@@ -1465,7 +1469,10 @@ class OperationsHubModule {
           <div class="form-row" style="grid-template-columns: 1.8fr 1fr 1.2fr; gap: 10px; margin-top: 10px;">
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
-              <input type="text" class="form-control font-mono font-bold" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+                <button type="button" class="btn btn-secondary btn-xs" title="Buscar en el directorio de pasajeros" style="padding: 6px 8px; flex-shrink: 0;" onclick="window.operationsHubModule.openPassengerSearch('hub', ${idx})">🔍</button>
+              </div>
             </div>
             <div>
               <label class="form-label" style="font-size: 0.75rem;">Doc. Identidad / Pasaporte:</label>
@@ -3278,7 +3285,63 @@ class OperationsHubModule {
     } catch (e) {
       console.warn('Error sincronizando vuelos al calendario:', e);
     }
-  },
+  }
+
+  // TAREA 6: Directorio de pasajeros (autocompletado + lupa)
+  refreshPassengerDatalist() {
+    const dl = document.getElementById('datalist-passengers');
+    if (!dl) return;
+    const data = window.db ? window.db.get() : {};
+    dl.innerHTML = (data.passengers || [])
+      .map(p => `<option value="${(p.name || '').replace(/"/g, '&quot;')}">${(p.doc || '').replace(/"/g, '&quot;')}</option>`)
+      .join('');
+  }
+
+  openPassengerSearch(targetType, targetIdxOrId) {
+    window.__paxTarget = { type: targetType, idx: targetType === 'hub' ? targetIdxOrId : null, id: targetType === 'input' ? targetIdxOrId : null };
+    const modal = document.getElementById('modal-passenger-search');
+    if (!modal) { window.app.showToast('Modal de búsqueda no encontrado', 'warning'); return; }
+    const inp = document.getElementById('pax-search-input');
+    if (inp) inp.value = '';
+    this.handlePassengerSearchInput();
+    window.app.openModal('modal-passenger-search');
+    if (inp) setTimeout(() => inp.focus(), 60);
+  }
+
+  handlePassengerSearchInput() {
+    const q = (document.getElementById('pax-search-input')?.value || '').toLowerCase().trim();
+    const data = window.db ? window.db.get() : {};
+    const results = (data.passengers || []).filter(p =>
+      !q || (p.name || '').toLowerCase().includes(q) || (p.doc || '').toLowerCase().includes(q)
+    );
+    const box = document.getElementById('pax-search-results');
+    const empty = document.getElementById('pax-search-empty');
+    if (!box) return;
+    if (results.length === 0) {
+      box.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    box.innerHTML = results.slice(0, 60).map(p => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 6px; cursor: pointer; background: #fff;" onclick="window.operationsHubModule.selectPassengerResult('${(p.name || '').replace(/'/g, "\\'")}', '${(p.doc || '').replace(/'/g, "\\'")}')" onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='#fff'">
+        <span style="font-weight: 700; font-family: monospace; font-size: 0.85rem; color: #0f172a;">${p.name || '-'}</span>
+        <span style="font-size: 0.75rem; color: #64748b; font-family: monospace;">${p.doc || ''}</span>
+      </div>`).join('');
+  }
+
+  selectPassengerResult(name, doc) {
+    const t = window.__paxTarget || {};
+    if (t.type === 'hub') {
+      this.onItemFieldChange(t.idx, 'passengerName', String(name).toUpperCase());
+      if (doc) this.onItemFieldChange(t.idx, 'passengerDoc', String(doc).toUpperCase());
+    } else if (t.type === 'input') {
+      const el = document.getElementById(t.id);
+      if (el) el.value = String(name).toUpperCase();
+    }
+    this.refreshPassengerDatalist();
+    if (window.app && window.app.closeModal) window.app.closeModal('modal-passenger-search');
+  }
 
   openEditOperationModal(id) {
     const data = window.db.get();

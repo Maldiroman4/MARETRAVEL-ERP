@@ -312,6 +312,7 @@ window.gdsModule = {
           });
         }
 
+        if (window.maretravelCodes) window.maretravelCodes.registerPassenger(data, data.gdsTickets[idx].passengerName, data.gdsTickets[idx].passengerDocId);
         window.db.save(data);
         window.app.showToast(`Boleto ${data.gdsTickets[idx].ticketNumber} actualizado correctamente`, 'success');
       }
@@ -368,6 +369,7 @@ window.gdsModule = {
       data.otherIncomes = data.otherIncomes || [];
       data.otherIncomes.unshift(newIncome);
 
+      if (window.maretravelCodes) window.maretravelCodes.registerPassenger(data, newTicket.passengerName, newTicket.passengerDocId);
       window.db.save(data);
       window.app.showToast(`Boleto ${newTicket.ticketNumber} registrado correctamente (Comisión agregada a Otros Ingresos)`, 'success');
     }
