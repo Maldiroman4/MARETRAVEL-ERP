@@ -38,20 +38,9 @@ window.debitNotesModule = {
     return 'assets/logo.png';
   },
 
-  async init() {
+  init() {
     this.cargarLogoBase64();
     this.bindEvents();
-    await this.loadFromApi();
-  },
-
-  async loadFromApi() {
-    try {
-      if (typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.syncMirror === 'function') {
-        await DebitNotesAdapter.syncMirror();
-      }
-    } catch (e) {
-      console.warn('No se pudo sincronizar Notas de Débito con el backend:', e);
-    }
     this.render();
   },
 
@@ -793,7 +782,7 @@ window.debitNotesModule = {
     window.app.showToast('Servicio manual agregado a la ND', 'success');
   },
 
-  async handleSaveNd(e) {
+  handleSaveNd(e) {
     e.preventDefault();
     if (this.activeItems.length === 0) {
       window.app.showToast('Debes agregar al menos un boleto o servicio a la Nota de Débito', 'warning');
@@ -899,45 +888,6 @@ window.debitNotesModule = {
       window.app.showToast(`Nota de Débito ND #${newNd.ndNumber} guardada en Borrador`, 'success');
     }
 
-    // Persistir en el backend (dual-source) — best-effort: si falla, la ND queda local
-    try {
-      const backendClientId = client.backendId;
-      if (backendClientId && typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.create === 'function') {
-        const apiItems = (this.activeItems || []).map(item => {
-          const ticket = (data.gdsTickets || []).find(t => t.id === (item.ticketId || item.gdsTicketId));
-          const operatorAcc = (data.accounts || []).find(a => a.id === item.operatorId);
-          return {
-            serviceType: item.serviceType || 'BOLETO_GDS',
-            passengerName: item.passengerName || passengerName || '',
-            description: item.description || item.serviceName || 'Servicio',
-            currency: item.currency,
-            totalAmount: item.totalAmount,
-            feeAmount: item.feeAmount || 0,
-            providerCommissionRate: item.providerCommissionRate || 0,
-            providerCommissionAmount: item.providerCommissionAmount || 0,
-            clientCommissionRate: item.clientCommissionRate || 0,
-            clientCommissionAmount: item.clientCommissionAmount || 0,
-            netCostToProvider: item.netCostToProvider || item.totalAmount,
-            ticketId: ticket ? ticket.backendId : undefined,
-            operatorId: operatorAcc ? operatorAcc.backendId : undefined,
-          };
-        });
-        const apiPayload = {
-          accountId: backendClientId,
-          issueDate: document.getElementById('nd-issue-date').value,
-          paymentTerm: document.getElementById('nd-payment-term').value,
-          currency: document.getElementById('nd-currency').value,
-          items: apiItems,
-        };
-        await DebitNotesAdapter.create(apiPayload);
-        if (typeof DebitNotesAdapter.syncMirror === 'function') {
-          await DebitNotesAdapter.syncMirror();
-        }
-      }
-    } catch (err) {
-      console.warn('ND guardada localmente; no se pudo persistir en el backend:', err.message);
-    }
-
     window.db.save(data);
     window.app.closeModal('modal-nd');
     this.render();
@@ -951,7 +901,7 @@ window.debitNotesModule = {
    * 2. Marca los boletos GDS como ASIGNADOS.
    * 3. Genera automáticamente las Notas de Crédito (NC) a favor de cada proveedor involucrado.
    */
-  async closeNd(ndId) {
+  closeNd(ndId) {
     if (!confirm('¿Confirma el CIERRE DEFINITIVO de esta Nota de Débito?\n\nAl cerrar, la ND quedará bloqueada y se GENERARÁN AUTOMÁTICAMENTE las Notas de Crédito a favor de los proveedores por el costo neto.')) {
       return;
     }
@@ -959,29 +909,6 @@ window.debitNotesModule = {
     const data = window.db.get();
     const nd = data.debitNotes.find(n => n.id === ndId);
     if (!nd) return;
-
-    // Si la ND existe en el backend, delegar el cierre a la API (lógica atómica)
-    if (nd.backendId && typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.close === 'function') {
-      const motivo = prompt('Motivo / justificación del cierre de la Nota de Débito:') || '';
-      if (!motivo.trim()) {
-        window.app.showToast('El motivo es obligatorio para cerrar la ND.', 'warning');
-        return;
-      }
-      try {
-        await DebitNotesAdapter.close(nd.backendId, motivo.trim());
-        await DebitNotesAdapter.syncMirror();
-        if (typeof GdsAdapter !== 'undefined' && typeof GdsAdapter.syncMirror === 'function') await GdsAdapter.syncMirror();
-        this.render();
-        if (window.creditNotesModule) window.creditNotesModule.render();
-        if (window.operationsHubModule) window.operationsHubModule.render();
-        if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
-        window.app.showToast(`ND #${nd.ndNumber} CERRADA en el servidor. NCs generadas automáticamente.`, 'success');
-        return;
-      } catch (err) {
-        window.app.showToast('Error al cerrar la ND en el servidor: ' + err.message, 'error');
-        return;
-      }
-    }
 
     // 1. Cambiar estado de la ND
     nd.status = 'IMPAGA';
@@ -1053,7 +980,7 @@ window.debitNotesModule = {
     window.app.showToast(`ND #${nd.ndNumber} CERRADA. Se generaron ${ncGeneratedCount} Nota(s) de Crédito a proveedores`, 'success');
   },
 
-  async reopenNd(ndId) {
+  reopenNd(ndId) {
     const data = window.db.get();
     const nd = data.debitNotes.find(n => n.id === ndId);
     if (!nd) return;
@@ -1065,29 +992,6 @@ window.debitNotesModule = {
 
     if (!confirm(`¿Desea REABRIR la Nota de Débito ND #${nd.ndNumber}?\n\nAl reabrir, se anularán las Notas de Crédito generadas automáticamente para los proveedores y volverá al estado BORRADOR.`)) {
       return;
-    }
-
-    // Si la ND existe en el backend, delegar la reapertura a la API
-    if (nd.backendId && typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.reopen === 'function') {
-      const motivo = prompt('Motivo de la reapertura de la Nota de Débito:') || '';
-      if (!motivo.trim()) {
-        window.app.showToast('El motivo es obligatorio para reabrir la ND.', 'warning');
-        return;
-      }
-      try {
-        await DebitNotesAdapter.reopen(nd.backendId, motivo.trim());
-        await DebitNotesAdapter.syncMirror();
-        if (typeof GdsAdapter !== 'undefined' && typeof GdsAdapter.syncMirror === 'function') await GdsAdapter.syncMirror();
-        this.render();
-        if (window.creditNotesModule) window.creditNotesModule.render();
-        if (window.operationsHubModule) window.operationsHubModule.render();
-        if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
-        window.app.showToast(`ND #${nd.ndNumber} reabierta exitosamente en estado BORRADOR`, 'info');
-        return;
-      } catch (err) {
-        window.app.showToast('Error al reabrir la ND en el servidor: ' + err.message, 'error');
-        return;
-      }
     }
 
     nd.status = 'BORRADOR';

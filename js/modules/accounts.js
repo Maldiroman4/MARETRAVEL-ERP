@@ -7,19 +7,8 @@ window.accountsModule = {
   currentFilterRelation: 'TODOS',
   editingAccountId: null,
 
-  async init() {
+  init() {
     this.bindEvents();
-    await this.loadFromApi();
-  },
-
-  async loadFromApi() {
-    try {
-      if (AccountsAdapter && typeof AccountsAdapter.syncMirror === 'function') {
-        await AccountsAdapter.syncMirror();
-      }
-    } catch (e) {
-      console.warn('No se pudo sincronizar cuentas con el backend:', e);
-    }
     this.render();
   },
 
@@ -268,7 +257,7 @@ window.accountsModule = {
     if (window.lucide) window.lucide.createIcons();
   },
 
-  async handleSave(e) {
+  handleSave(e) {
     e.preventDefault();
     const data = window.db.get();
     const isEdit = !!this.editingAccountId;
@@ -316,26 +305,6 @@ window.accountsModule = {
       providerServices: services,
       status: 'ACTIVO'
     };
-
-    // Payload hacia la API del backend (sin campos locales que el backend no modela)
-    const apiPayload = {
-      code: accountData.code,
-      name: accountData.name,
-      legalName: accountData.legalName,
-      nit: accountData.nit,
-      relationType: accountData.relationType,
-      accountType: accountData.accountType,
-      rating: accountData.rating,
-      department: accountData.department,
-      city: accountData.city,
-      address: accountData.address,
-      phone: accountData.phone,
-      cellphone: accountData.cellphone,
-      email: accountData.email,
-      status: 'ACTIVO'
-    };
-
-    const existingAccount = isEdit ? (data.accounts || []).find(a => a.id === this.editingAccountId) : null;
 
     if (isEdit) {
       const index = data.accounts.findIndex(a => a.id === this.editingAccountId);
@@ -390,26 +359,7 @@ window.accountsModule = {
       window.app.showToast('Cuenta creada exitosamente', 'success');
     }
 
-    // Persistencia local del espejo (accountHistory + cuenta)
-    if (window.db && typeof window.db.save === 'function') window.db.save(data);
-
-    // Persistir en el backend (dual-source) y refrescar el espejo local
-    try {
-      if (AccountsAdapter && typeof AccountsAdapter.create === 'function') {
-        if (isEdit && existingAccount && existingAccount.backendId) {
-          await AccountsAdapter.update(existingAccount.backendId, apiPayload);
-        } else if (!isEdit) {
-          await AccountsAdapter.create(apiPayload);
-        }
-        if (typeof AccountsAdapter.syncMirror === 'function') {
-          await AccountsAdapter.syncMirror();
-        }
-      }
-    } catch (err) {
-      window.app.showToast('Error al guardar la cuenta en el servidor: ' + err.message, 'error');
-      return;
-    }
-
+    window.db.save(data);
     window.app.closeModal('modal-account');
     this.render();
     if (window.operationsHubModule) {
@@ -420,7 +370,7 @@ window.accountsModule = {
     }
   },
 
-  async deleteAccount(accountId) {
+  deleteAccount(accountId) {
     if (!accountId) return;
     const data = window.db.get();
     const acc = (data.accounts || []).find(a => a.id === accountId);
@@ -487,19 +437,7 @@ window.accountsModule = {
     data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
 
     // 6. Guardar cambios en la base de datos física / localStorage
-    if (window.db && typeof window.db.save === 'function') window.db.save(data);
-
-    // Persistir el borrado en el backend (dual-source)
-    try {
-      if (AccountsAdapter && acc.backendId && typeof AccountsAdapter.remove === 'function') {
-        await AccountsAdapter.remove(acc.backendId);
-        if (typeof AccountsAdapter.syncMirror === 'function') {
-          await AccountsAdapter.syncMirror();
-        }
-      }
-    } catch (err) {
-      window.app.showToast('La cuenta se eliminó localmente, pero hubo un error en el servidor: ' + err.message, 'error');
-    }
+    window.db.save(data);
 
     // Cerrar modal si estaba abierto
     window.app.closeModal('modal-account');
