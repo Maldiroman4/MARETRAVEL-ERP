@@ -1304,9 +1304,6 @@ class OperationsHubModule {
                 <span class="badge badge-blue font-bold" style="font-size: 0.8rem;">Servicio #${idx + 1}</span>
                 <strong style="color: #0f2742; font-size: 0.95rem;">SEGURO DE VIAJE</strong>
                 <span class="badge badge-slate" style="font-size: 0.72rem;">SEGUROS</span>
-                <span class="badge ${isGross ? 'badge-amber' : 'badge-emerald'}" style="font-size: 0.72rem;">
-                  ${isGross ? 'Consolidador Bruto (Comisión Diferida)' : 'Deducción Directa (Neto a Pagar)'}
-                </span>
               </div>
               ${this.activeNdItems.length > 1 ? `
                 <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.removeItemFromNd(${idx})" title="Quitar este servicio de la ND" style="display: flex; align-items: center; gap: 4px;">
@@ -1443,9 +1440,6 @@ class OperationsHubModule {
               <span class="badge badge-blue font-bold" style="font-size: 0.8rem;">Servicio #${idx + 1}</span>
               <strong style="color: #0f2742; font-size: 0.95rem;">${srvObj.name}</strong>
               <span class="badge badge-slate" style="font-size: 0.72rem;">${srvObj.category || 'SERVICIO'}</span>
-              <span class="badge ${isGross ? 'badge-amber' : 'badge-emerald'}" style="font-size: 0.72rem;">
-                ${isGross ? 'Consolidador Bruto (Comisión Diferida)' : 'Deducción Directa (Neto a Pagar)'}
-              </span>
             </div>
             ${this.activeNdItems.length > 1 ? `
               <button type="button" class="btn btn-danger btn-xs" onclick="window.operationsHubModule.removeItemFromNd(${idx})" title="Quitar este servicio de la ND" style="display: flex; align-items: center; gap: 4px;">
@@ -1637,19 +1631,16 @@ class OperationsHubModule {
         </div>
       `;
     } else if (srv === 'CERTIFICACION_FA') {
+      // TAREA 5: campos innecesarios eliminados (Certificación/Tipo, Entidad Emisora, Fecha Certificación)
       return `
-        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr; gap: 8px;">
+        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Certificación / Curso:</label>
-            <input type="text" class="form-control font-bold" placeholder="Ej: CERTIFICACIÓN INTERNACIONAL FA" value="${d.certCourse || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certCourse', this.value)">
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Carga Horaria Académica:</label>
+            <input type="text" class="form-control" placeholder="Ej: 120 Horas Académicas" value="${d.certHours || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certHours', this.value)">
           </div>
           <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Entidad Emisora:</label>
-            <input type="text" class="form-control" placeholder="Ej: SEDES / MINISTERIO DE SALUD" value="${d.certInstitution || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certInstitution', this.value)">
-          </div>
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Certificación:</label>
-            <input type="date" class="form-control font-mono" value="${d.certDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certDate', this.value)">
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Vigencia / Vencimiento:</label>
+            <input type="text" class="form-control" placeholder="Ej: Vigencia 2 Años" value="${d.certValidity || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certValidity', this.value)">
           </div>
         </div>
       `;
@@ -2355,7 +2346,7 @@ class OperationsHubModule {
         <div class="form-row" style="grid-template-columns: 1.5fr 1fr 0.8fr; gap: 8px; margin-top: 8px;">
           <div>
             <label class="form-label">Consulado / Embajada Responsable:</label>
-            <input type="text" id="uni-visa-consulate" class="form-control" placeholder="Ej: Sección Consular Embajada EE.UU. La Paz" value="${data.consulate || 'EMBAJADA DE EE.UU. EN LA PAZ'}">
+            <input type="text" id="uni-visa-consulate" class="form-control" placeholder="Ej: Sección Consular de la Embajada correspondiente" value="${data.consulate || 'EMBAJADA DE EE.UU. EN LA PAZ'}">
           </div>
           <div>
             <label class="form-label">Fecha de Cita Consular:</label>
@@ -2395,21 +2386,7 @@ class OperationsHubModule {
           <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="award"></i> Formato de Certificación Internacional FA</span>
           <span class="badge badge-purple">Certificación</span>
         </div>
-        <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 8px;">
-          <div>
-            <label class="form-label">Nombre del Curso / Certificación:</label>
-            <input type="text" id="uni-fa-name" class="form-control font-bold" placeholder="Ej: Formador de Tripulantes de Cabina (FA)" value="${data.certCourse || ''}">
-          </div>
-          <div>
-            <label class="form-label">Entidad Certificadora:</label>
-            <input type="text" id="uni-fa-entity" class="form-control" placeholder="Ej: Federación Aeronáutica Internacional" value="${data.certInstitution || 'FEDERACIÓN AERONÁUTICA INTERNACIONAL'}">
-          </div>
-        </div>
-        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px;">
-          <div>
-            <label class="form-label">Fecha Acreditación / Examen:</label>
-            <input type="date" id="uni-fa-date" class="form-control font-mono" value="${data.certDate || ''}">
-          </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
           <div>
             <label class="form-label">Carga Horaria Académica:</label>
             <input type="text" id="uni-fa-hours" class="form-control" placeholder="Ej: 120 Horas Académicas" value="${data.certHours || '120 Horas Académicas'}">
