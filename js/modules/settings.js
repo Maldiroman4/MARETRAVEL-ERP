@@ -111,7 +111,7 @@ window.settingsModule = {
     if (window.lucide) window.lucide.createIcons();
   },
 
-  handleSaveExchangeRate(e) {
+  async handleSaveExchangeRate(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const data = window.db.get();
     
@@ -141,6 +141,15 @@ window.settingsModule = {
     if (!data.exchangeRates) data.exchangeRates = [];
     data.exchangeRates.unshift(newRate);
 
+    // Persistir el T/C en el backend (dual-source)
+    try {
+      if (typeof API !== 'undefined' && typeof API.post === 'function') {
+        await API.post('/exchange-rate', { buyRate: buy, sellRate: sell });
+      }
+    } catch (err) {
+      console.warn('T/C guardado localmente; no se pudo persistir en el backend:', err.message);
+    }
+
     window.db.save(data);
     window.app.updateExchangeRateWidget();
     window.app.showToast(`¡Tipo de Cambio actualizado exitosamente! Compra: ${buy.toFixed(2)} | Venta: ${sell.toFixed(2)}`, 'success');
@@ -148,7 +157,7 @@ window.settingsModule = {
     return false;
   },
 
-  handleSaveGeneralSettings(e) {
+  async handleSaveGeneralSettings(e) {
     e.preventDefault();
     const data = window.db.get();
 
@@ -159,6 +168,23 @@ window.settingsModule = {
     data.systemSettings.agencyPhone = document.getElementById('set-phone').value.trim();
     data.systemSettings.vatRate = parseFloat(document.getElementById('set-vat-rate').value) || 14.94;
     data.systemSettings.gdsLookbackDays = parseInt(document.getElementById('set-gds-days').value) || 30;
+
+    // Persistir los parámetros generales en el backend (dual-source)
+    try {
+      if (typeof API !== 'undefined' && typeof API.patch === 'function') {
+        await API.patch('/settings', {
+          agencyName: data.systemSettings.agencyName,
+          agencyCommercialName: data.systemSettings.agencyCommercialName,
+          agencyNit: data.systemSettings.agencyNit,
+          agencyAddress: data.systemSettings.agencyAddress,
+          agencyPhone: data.systemSettings.agencyPhone,
+          vatRate: data.systemSettings.vatRate,
+          gdsLookbackDays: data.systemSettings.gdsLookbackDays,
+        });
+      }
+    } catch (err) {
+      console.warn('Configuración guardada localmente; no se pudo persistir en el backend:', err.message);
+    }
 
     window.db.save(data);
     window.app.showToast('Configuración general guardada', 'success');
