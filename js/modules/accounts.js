@@ -14,7 +14,7 @@ window.accountsModule = {
 
   async loadFromApi() {
     try {
-      if (window.AccountsAdapter && typeof AccountsAdapter.syncMirror === 'function') {
+      if (AccountsAdapter && typeof AccountsAdapter.syncMirror === 'function') {
         await AccountsAdapter.syncMirror();
       }
     } catch (e) {
@@ -395,7 +395,7 @@ window.accountsModule = {
 
     // Persistir en el backend (dual-source) y refrescar el espejo local
     try {
-      if (window.AccountsAdapter && typeof AccountsAdapter.create === 'function') {
+      if (AccountsAdapter && typeof AccountsAdapter.create === 'function') {
         if (isEdit && existingAccount && existingAccount.backendId) {
           await AccountsAdapter.update(existingAccount.backendId, apiPayload);
         } else if (!isEdit) {
@@ -491,7 +491,7 @@ window.accountsModule = {
 
     // Persistir el borrado en el backend (dual-source)
     try {
-      if (window.AccountsAdapter && acc.backendId && typeof AccountsAdapter.remove === 'function') {
+      if (AccountsAdapter && acc.backendId && typeof AccountsAdapter.remove === 'function') {
         await AccountsAdapter.remove(acc.backendId);
         if (typeof AccountsAdapter.syncMirror === 'function') {
           await AccountsAdapter.syncMirror();

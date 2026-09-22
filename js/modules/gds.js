@@ -14,7 +14,7 @@ window.gdsModule = {
 
   async loadFromApi() {
     try {
-      if (window.GdsAdapter && typeof GdsAdapter.syncMirror === 'function') {
+      if (GdsAdapter && typeof GdsAdapter.syncMirror === 'function') {
         await GdsAdapter.syncMirror();
       }
     } catch (e) {
@@ -395,7 +395,7 @@ window.gdsModule = {
     // Persistir en el backend (dual-source) y refrescar el espejo local
     if (savedTicket) {
       try {
-        if (window.GdsAdapter && typeof GdsAdapter.create === 'function') {
+        if (GdsAdapter && typeof GdsAdapter.create === 'function') {
           const apiPayload = {
             ticketNumber: savedTicket.ticketNumber,
             gdsSource: savedTicket.gdsSource || 'AMADEUS',
@@ -455,7 +455,7 @@ window.gdsModule = {
 
       // Persistir el borrado en el backend (dual-source)
       try {
-        if (window.GdsAdapter && tkt.backendId && typeof GdsAdapter.remove === 'function') {
+        if (GdsAdapter && tkt.backendId && typeof GdsAdapter.remove === 'function') {
           await GdsAdapter.remove(tkt.backendId);
           if (typeof GdsAdapter.syncMirror === 'function') {
             await GdsAdapter.syncMirror();
