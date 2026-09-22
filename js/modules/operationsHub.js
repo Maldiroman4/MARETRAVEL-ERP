@@ -1577,7 +1577,7 @@ class OperationsHubModule {
         </div>
         <div class="form-row" style="grid-template-columns: 1fr; gap: 8px; margin-top: 6px;">
           <label style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem; cursor: pointer; color: var(--text-muted);">
-            <input type="checkbox" ${d.soloIda ? 'checked' : ''} onchange="const retInp=this.closest('.form-row').previousElementSibling.querySelector('input[type=date]:last-of-type'); if(retInp){ retInp.disabled=this.checked; if(this.checked){ retInp.value=''; window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', ''); } } window.operationsHubModule.onItemDetailChange(${idx}, 'soloIda', this.checked);">
+            <input type="checkbox" ${d.soloIda ? 'checked' : ''} onchange="const retRow=this.closest('.form-row').previousElementSibling; const dts=retRow?retRow.querySelectorAll('input[type=date]'):[]; const retInp=dts[1]||null; if(retInp){ retInp.disabled=this.checked; if(this.checked){ retInp.value=''; window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', ''); } } window.operationsHubModule.onItemDetailChange(${idx}, 'soloIda', this.checked);">
             Solo Ida (sin fecha de retorno)
           </label>
         </div>

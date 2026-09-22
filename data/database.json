@@ -238,6 +238,36 @@
   ],
   "accounts": [
     {
+      "id": "ACC-1790107094973",
+      "code": "CTA-0007",
+      "name": "EMBAJADA USA",
+      "legalName": "EMBAJADA USA",
+      "nit": "626165165",
+      "relationType": "PROVEEDOR",
+      "accountType": "INSTITUCION",
+      "rating": "NORMAL",
+      "department": "",
+      "city": "",
+      "address": "SDÑLFSDLÑ,GSDG6110250",
+      "phone": "8151215",
+      "cellphone": "48181",
+      "email": "",
+      "webPage": "",
+      "providerServices": [
+        {
+          "id": "PS-q2oxic",
+          "serviceCode": "VA",
+          "serviceName": "VISA AMERICANA",
+          "defaultCommissionRate": 0,
+          "status": "ACTIVO"
+        }
+      ],
+      "status": "ACTIVO",
+      "accountManager": "Luis",
+      "createdAt": "22/9/2026, 15:58:14",
+      "updatedAt": "22/9/2026, 16:00:39"
+    },
+    {
       "id": "ACC-001",
       "code": "CLI-001",
       "name": "MINERA SAN CRISTOBAL S.A.",
@@ -347,7 +377,20 @@
       "createdAt": "17/9/2026, 08:00:00"
     }
   ],
-  "accountHistory": [],
+  "accountHistory": [
+    {
+      "id": "AH-1790107094973",
+      "accountId": "ACC-1790107094973",
+      "accountName": "EMBAJADA USA",
+      "changeType": "CREATE",
+      "fieldChanged": "Creación de Cuenta",
+      "oldValue": "-",
+      "newValue": "PROVEEDOR / INSTITUCION",
+      "userId": "USR-001",
+      "userName": "Luis",
+      "createdAt": "22/9/2026, 15:58:14"
+    }
+  ],
   "companyContacts": [],
   "gdsTickets": [
     {
@@ -446,6 +489,73 @@
         }
       ],
       "createdAt": "22/9/2026, 14:45:35"
+    },
+    {
+      "id": "ND-1790107172318",
+      "ndNumber": 1002,
+      "ndCode": "#ndVI001",
+      "accountId": "ACC-001",
+      "accountName": "MINERA SAN CRISTOBAL S.A.",
+      "accountNit": "1029384021",
+      "requesterId": null,
+      "solicitante": "MINERA SAN CRISTOBAL S.A.",
+      "passengerName": "SFGDSFHDHDGHDFGH",
+      "issueDate": "2026-09-22",
+      "paymentTerm": "PENDIENTE",
+      "currency": "BOB",
+      "frozenExchangeRate": 6.96,
+      "exchangeRateUsed": 6.96,
+      "totalAmountBob": 2430,
+      "totalAmountUsd": 349.14,
+      "paidAmountBob": 1500,
+      "paidAmountUsd": 130.43,
+      "balanceBob": 930,
+      "balanceUsd": 218.71,
+      "total_documento": 2430,
+      "saldo_pendiente": 930,
+      "monto_acumulado_pagado": 1500,
+      "status": "PENDIENTE",
+      "depositAccountId": null,
+      "financialAccountId": null,
+      "observations": "ND Consolidada (1 servicios)",
+      "createdById": "USR-001",
+      "createdByName": "Luis",
+      "items": [
+        {
+          "id": "NDI-1790107172318-0",
+          "serviceType": "ASESORAMIENTO_VISAS",
+          "ticketNumber": "DFGDSFHDH5646",
+          "voucherNumber": "DFGDSFHDH5646",
+          "passengerName": "SFGDSFHDHDGHDFGH",
+          "passengerDocId": "DDRDRFY",
+          "operatorId": "ACC-1790107094973",
+          "operatorName": "EMBAJADA USA",
+          "subServiceName": "VISA AMERICANA",
+          "description": "VISA AMERICANA",
+          "serviceDetails": {
+            "visaCountry": "USA",
+            "visaType": "TURISMO",
+            "appointmentDate": "2026-10-03"
+          },
+          "settlementModel": "DEDUCCION_DIRECTA",
+          "currency": "BOB",
+          "fareAmount": 2000,
+          "grossCost": 2280,
+          "feeAmount": 150,
+          "totalAmount": 2430,
+          "fareAmountBob": 2000,
+          "grossCostBob": 2280,
+          "feeAmountBob": 150,
+          "totalAmountBob": 2430,
+          "providerCommissionRate": 20,
+          "providerCommissionAmount": 400,
+          "providerCommissionAmountBob": 400,
+          "netCostToProvider": 1880,
+          "netCostToProviderBob": 1880
+        }
+      ],
+      "createdAt": "22/9/2026, 15:59:32",
+      "estado": "PENDIENTE"
     }
   ],
   "creditNotes": [
@@ -521,9 +631,140 @@
       "accountId": "ACC-003",
       "createdById": "USR-001",
       "createdAt": "22/9/2026, 14:45:35"
+    },
+    {
+      "id": "NC-1790107172318-0",
+      "ncNumber": 2002,
+      "ncCode": "#ncVI001",
+      "providerId": "ACC-1790107094973",
+      "providerName": "EMBAJADA USA",
+      "providerNit": "",
+      "originDebitNoteId": "ND-1790107172318",
+      "originDebitNoteNumber": 1002,
+      "issueDate": "2026-09-22",
+      "concept": "Liquidación Directa Neta por ND #1002 (Servicios: ASESORAMIENTO_VISAS) [Modelo: Deducción Directa / Neto]",
+      "currency": "BOB",
+      "frozenExchangeRate": 6.96,
+      "settlementModel": "DEDUCCION_DIRECTA",
+      "totalAmount": 1880,
+      "totalAmountBob": 1880,
+      "totalAmountUsd": 270.11,
+      "paidAmount": 0,
+      "paidAmountBob": 0,
+      "paidAmountUsd": 0,
+      "balance": 1880,
+      "balanceBob": 1880,
+      "balanceUsd": 270.11,
+      "total_documento": 1880,
+      "saldo_pendiente": 1880,
+      "monto_acumulado_pagado": 0,
+      "status": "IMPAGA",
+      "estado": "IMPAGA",
+      "serviceCategory": "ASESORAMIENTO_VISAS",
+      "serviceType": "ASESORAMIENTO_VISAS",
+      "servicio_tipo": "ASESORAMIENTO_VISAS",
+      "items": [
+        {
+          "id": "NDI-1790107172318-0",
+          "serviceType": "ASESORAMIENTO_VISAS",
+          "gdsTicketId": null,
+          "ticketNumber": "DFGDSFHDH5646",
+          "voucherNumber": "DFGDSFHDH5646",
+          "passengerName": "SFGDSFHDHDGHDFGH",
+          "passengerDocId": "DDRDRFY",
+          "operatorId": "ACC-1790107094973",
+          "operatorName": "EMBAJADA USA",
+          "subServiceName": "VISA AMERICANA",
+          "description": "VISA AMERICANA",
+          "serviceDetails": {
+            "visaCountry": "USA",
+            "visaType": "TURISMO",
+            "appointmentDate": "2026-10-03"
+          },
+          "settlementModel": "DEDUCCION_DIRECTA",
+          "currency": "BOB",
+          "fareAmount": 2000,
+          "grossCost": 2280,
+          "feeAmount": 150,
+          "totalAmount": 2430,
+          "fareAmountBob": 2000,
+          "grossCostBob": 2280,
+          "feeAmountBob": 150,
+          "totalAmountBob": 2430,
+          "providerCommissionRate": 20,
+          "providerCommissionAmount": 400,
+          "providerCommissionAmountBob": 400,
+          "clientCommissionRate": 0,
+          "clientCommissionAmount": 0,
+          "counterCommissionAmount": 0,
+          "netCostToProvider": 1880,
+          "netCostToProviderBob": 1880
+        }
+      ],
+      "accountId": "ACC-1790107094973",
+      "createdById": "USR-001",
+      "createdAt": "22/9/2026, 15:59:32"
     }
   ],
-  "cashReceipts": [],
+  "cashReceipts": [
+    {
+      "id": "RCP-1790107272108",
+      "receiptNumber": 2001,
+      "receiptCode": "RCP-02001",
+      "receiptDate": "2026-09-22",
+      "tipo": "ND",
+      "tipoTransaccion": "RECIBO DE PAGO",
+      "subTipoTransaccion": "ABONO PARCIAL ND",
+      "documentoOrigen": "ND #1002",
+      "debitNoteId": "ND-1790107172318",
+      "debitNoteNumber": 1002,
+      "accountId": "ACC-001",
+      "accountName": "MINERA SAN CRISTOBAL S.A.",
+      "serviceCategory": "ASESORAMIENTO_VISAS",
+      "serviceType": "ASESORAMIENTO_VISAS",
+      "monto_transaccion": 1500,
+      "monto_transaccion_usd": 130.43,
+      "totalPaidBob": 1500,
+      "totalPaidUsd": 130.43,
+      "total_documento": 2430,
+      "saldo_pendiente": 930,
+      "monto_acumulado_pagado": 1500,
+      "isPartial": true,
+      "exchangeRateUsed": 11.5,
+      "status": "VALIDO",
+      "estado": "PENDIENTE",
+      "glosa": "Abono a ND #1002 - MINERA SAN CRISTOBAL S.A. - Abono parcial ND (Saldo pendiente: BOB 930.00)",
+      "concept": "Abono a ND #1002 - MINERA SAN CRISTOBAL S.A. - Abono parcial ND (Saldo pendiente: BOB 930.00)",
+      "paymentMethod": "TRANSFERENCIA",
+      "financialAccountId": "ACC-BNK-GANADERO-02",
+      "cajero": "Luis",
+      "createdByName": "Luis",
+      "createdAt": "22/9/2026, 16:01:12",
+      "details": [
+        {
+          "debitNoteId": "ND-1790107172318",
+          "ndNumber": 1002,
+          "serviceType": "ASESORAMIENTO_VISAS",
+          "totalDocumento": 2430,
+          "amountPaidBob": 1500,
+          "amountPaidUsd": 130.43,
+          "previousBalanceBob": 2430,
+          "remainingBalanceBob": 930
+        }
+      ],
+      "payments": [
+        {
+          "paymentMethodName": "TRANSFERENCIA",
+          "financialAccountId": "ACC-BNK-GANADERO-02",
+          "financialAccountName": "ACC-BNK-GANADERO-02",
+          "titularName": "MARETRAVEL SRL",
+          "reference": "Abono a ND #1002 - MINERA SAN CRISTOBAL S.A.",
+          "currency": "BOB",
+          "amount": 1500
+        }
+      ]
+    }
+  ],
   "cashTransactions": [],
   "expenses": [],
   "travelReminders": [],
@@ -599,6 +840,21 @@
       "name": "EMISIÓN BOLETO AÉREO",
       "serviceType": "BOLETO_AEREO",
       "createdAt": "22/9/2026, 14:45:35"
+    },
+    {
+      "id": "SS-1790107172317cb61",
+      "name": "VISA AMERICANA",
+      "serviceType": "ASESORAMIENTO_VISAS",
+      "createdAt": "22/9/2026, 15:59:32"
+    }
+  ],
+  "passengers": [
+    {
+      "id": "PAX-1790107172318-204",
+      "name": "SFGDSFHDHDGHDFGH",
+      "doc": "DDRDRFY",
+      "count": 1,
+      "lastUse": "22/9/2026, 15:59:32"
     }
   ]
 }

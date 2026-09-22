@@ -204,7 +204,7 @@ window.creditNotesModule = {
 
     const actCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
     const srvCat = actCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (actCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (actCat === 'RENT_A_CAR' ? 'TRASLADO' : actCat));
-    document.getElementById('nc-number-display').textContent = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat) || `NC #${nextNc}`;
+    document.getElementById('nc-number-display').textContent = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);
     document.getElementById('nc-issue-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('nc-currency').value = 'BOB';
 
@@ -229,7 +229,8 @@ window.creditNotesModule = {
 
     const nextNc = (data.creditNotes.length > 0) ? Math.max(...data.creditNotes.map(c => c.ncNumber)) + 1 : 501;
     const activeCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
-    const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat)));
+    const srvCat = activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat));
+    const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);
     const newNc = {
       id: 'NC-' + Date.now(),
       ncNumber: nextNc,
