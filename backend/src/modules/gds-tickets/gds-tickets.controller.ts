@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -31,5 +32,10 @@ export class GdsTicketsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: Partial<CreateTicketDto>) {
     return this.service.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
   }
 }
