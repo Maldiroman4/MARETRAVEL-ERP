@@ -8,11 +8,13 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const sqlDatabase = require('./server/sqlDatabase');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const DB_PATH = path.join(DATA_DIR, 'database.json');
+const SQLITE_PATH = path.join(DATA_DIR, 'maretravel.sqlite');
 const SEED_PATH = path.join(DATA_DIR, 'seedData.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
@@ -161,30 +163,38 @@ function getSeedData() {
 }
 
 /**
- * Lee la base de datos física desde disco. Si no existe, inicializa con la plantilla persistente.
+ * Lee la base de datos completa directamente desde la base de datos SQL relacional (SQLite).
  */
 function readDbSync() {
-  if (!fs.existsSync(DB_PATH)) {
-    const seed = getSeedData();
-    saveDbSync(seed);
-    return JSON.parse(JSON.stringify(seed));
+  try {
+    return sqlDatabase.getFullState();
+  } catch (err) {
+    console.error('[SQL READ ERROR]:', err);
+    if (fs.existsSync(DB_PATH)) {
+      return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+    }
+    return getSeedData();
   }
-  const raw = fs.readFileSync(DB_PATH, 'utf-8');
-  return JSON.parse(raw);
 }
 
 /**
- * Guarda sincrónica y atómicamente la base de datos en data/database.json.
- * Escribe primero en archivo .tmp y renombra atómicamente para prevenir corrupción.
+ * Guarda sincrónica y atómicamente la base de datos en la base de datos SQL relacional (SQLite).
  */
 function saveDbSync(data) {
   if (!data || typeof data !== 'object') {
-    throw new Error('Datos inválidos para persistencia en disco.');
+    throw new Error('Datos inválidos para persistencia en base de datos.');
   }
-  const tempPath = DB_PATH + '.tmp';
-  const jsonContent = JSON.stringify(data, null, 2);
-  fs.writeFileSync(tempPath, jsonContent, 'utf-8');
-  fs.renameSync(tempPath, DB_PATH);
+  // 1. Persistencia transaccional en SQL (SQLite)
+  sqlDatabase.saveFullState(data);
+
+  // 2. Respaldo snapshot en JSON para redundancia
+  try {
+    const tempPath = DB_PATH + '.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempPath, DB_PATH);
+  } catch (e) {
+    console.warn('[AVISO] No se pudo escribir snapshot JSON de respaldo:', e.message);
+  }
   return true;
 }
 
@@ -192,25 +202,33 @@ function saveDbSync(data) {
  * Crea una copia de respaldo fechada en data/backups/
  */
 function createBackupCopy(prefix = 'backup') {
-  if (!fs.existsSync(DB_PATH)) return null;
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFilename = `${prefix}_${ts}.json`;
   const targetPath = path.join(BACKUP_DIR, backupFilename);
-  fs.copyFileSync(DB_PATH, targetPath);
-  return targetPath;
+  try {
+    const full = sqlDatabase.getFullState();
+    fs.writeFileSync(targetPath, JSON.stringify(full, null, 2), 'utf-8');
+    return targetPath;
+  } catch (_) {
+    if (fs.existsSync(DB_PATH)) {
+      fs.copyFileSync(DB_PATH, targetPath);
+      return targetPath;
+    }
+  }
+  return null;
 }
 
-// Carga y validación inicial de persistencia al levantar el servidor
+// Carga y validación inicial de persistencia SQL al levantar el servidor
 try {
-  if (!fs.existsSync(DB_PATH)) {
-    console.log('[INICIO] No se encontró data/database.json. Creando archivo persistente inicial...');
-    saveDbSync(INITIAL_SEED_DATABASE);
+  const stats = sqlDatabase.getStats();
+  if (stats.counts.accounts === 0 && fs.existsSync(DB_PATH)) {
+    console.log('[INICIO] Base de datos SQL vacía. Migrando automáticamente desde data/database.json...');
+    require('./server/migrateJsonToSql')();
   } else {
-    const stat = fs.statSync(DB_PATH);
-    console.log(`[INICIO] Base de datos física verificada: ${DB_PATH} (${stat.size} bytes).`);
+    console.log(`[INICIO SQL] Base de datos relacional SQLite activa: ${stats.file} (${stats.counts.accounts} cuentas, ${stats.counts.debitNotes} NDs).`);
   }
 } catch (err) {
-  console.error('[ERROR CRÍTICO] Error al inicializar almacenamiento en disco:', err);
+  console.error('[ERROR CRÍTICO] Error al inicializar almacenamiento SQL:', err);
 }
 
 // ============================================================================
@@ -562,10 +580,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (doc) {
-        const logoBase64 = obtenerLogoBase64();
-        const html = renderOfficialPrintDocument(doc, isNc ? 'NC' : 'ND', logoBase64);
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(html);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, doc, logoBase64: obtenerLogoBase64() }));
         return;
       } else {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -775,24 +791,19 @@ const server = http.createServer(async (req, res) => {
   // STATUS DE PERSISTENCIA Y SERVIDOR: /api/status
   if (pathname === '/api/status') {
     try {
-      const stat = fs.existsSync(DB_PATH) ? fs.statSync(DB_PATH) : null;
-      const db = stat ? readDbSync() : null;
+      const sqlStats = sqlDatabase.getStats();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         status: 'ONLINE',
         system: 'MARETRAVEL ERP',
         folder: ROOT_DIR,
-        dbFile: 'data/database.json',
-        fileSizeBytes: stat ? stat.size : 0,
-        lastModified: stat ? stat.mtime : null,
-        counts: db ? {
-          debitNotes: (db.debitNotes || []).length,
-          creditNotes: (db.creditNotes || []).length,
-          gdsTickets: (db.gdsTickets || []).length,
-          accounts: (db.accounts || []).length,
-          cashReceipts: (db.cashReceipts || []).length
-        } : null,
-        persistenceType: 'ATOMIC_FILE_SYNC'
+        databaseType: 'RELATIONAL_SQL',
+        engine: sqlStats.engine,
+        sqlFile: sqlStats.file,
+        fileSizeBytes: sqlStats.fileSizeBytes,
+        lastModified: sqlStats.lastModified,
+        counts: sqlStats.counts,
+        persistenceType: 'SQLITE_WAL_ACID_TRANSACTIONS'
       }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -843,11 +854,11 @@ server.on('error', (err) => {
 server.listen(PORT, '0.0.0.0', () => {
   const activePort = server.address().port;
   console.log('================================================================');
-  console.log('       MARETRAVEL ERP - SERVIDOR DE PERSISTENCIA EN DISCO');
+  console.log('   MARETRAVEL ERP - SERVIDOR DE BASE DE DATOS SQL RELACIONAL');
   console.log('================================================================');
   console.log(`  Servidor corriendo en:    http://localhost:${activePort}`);
-  console.log(`  Archivo de Base de Datos: ${DB_PATH}`);
+  console.log(`  Base de Datos SQL:        ${SQLITE_PATH} (SQLite WAL)`);
   console.log(`  Directorio de Respaldos:  ${BACKUP_DIR}`);
-  console.log('  Persistencia en disco:    TRANSACCIONAL ATÓMICA');
+  console.log('  Persistencia:             TRANSACCIONES SQL ATÓMICAS (ACID)');
   console.log('================================================================');
 });

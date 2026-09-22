@@ -1677,7 +1677,7 @@ window.debitNotesModule = {
           case 'ASESORAMIENTO_VISAS': {
             const country = (sd.visaCountry || it.visaCountry || 'ESTADOS UNIDOS').toUpperCase();
             const visaType = (sd.visaType || it.visaType || 'B1/B2 TURISMO').toUpperCase();
-            const consulate = (sd.consulate || it.consulate || 'SECCIÓN CONSULAR LA PAZ').toUpperCase();
+            const consulate = (sd.consulate || it.consulate || '').toUpperCase();
             const appDate = sd.appointmentDate ? this.formatSlashDate(sd.appointmentDate) : (it.appointmentDate ? this.formatSlashDate(it.appointmentDate) : '-');
             const appTime = sd.appointmentTime || it.appointmentTime || '';
             const visaStatus = (sd.visaStatus || it.visaStatus || 'CITA AGENDADA').toUpperCase();
@@ -1698,7 +1698,7 @@ window.debitNotesModule = {
                     <div class="nd-v nd-service-details font-bold">
                       <div class="nd-srv-line" style="color: #dc2626;">TRÁMITE DE VISA: ${country}</div>
                       <div class="nd-srv-line">TIPO VISA: ${visaType}</div>
-                      <div class="nd-srv-line">CONSULADO: ${consulate}</div>
+                      ${consulate ? `<div class="nd-srv-line">CONSULADO: ${consulate}</div>` : ''}
                       <div class="nd-srv-line">ESTADO: ${visaStatus}</div>
                     </div>
                   </div>

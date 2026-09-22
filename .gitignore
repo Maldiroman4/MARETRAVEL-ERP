@@ -1,4 +1,4 @@
-﻿# Dependencias
+# Dependencias
 node_modules/
 
 # Logs
@@ -18,3 +18,7 @@ MARETRAVEL-ERP/
 # Copias de seguridad automáticas
 data/backups/*
 !data/backups/.gitkeep
+
+# SQLite temporary WAL and SHM files
+*.sqlite-wal
+*.sqlite-shm
