@@ -1154,7 +1154,7 @@ class OperationsHubModule {
       providerId: custom.providerId || defaultProv.id,
       providerName: custom.providerName || defaultProv.name,
       subServiceName: custom.subServiceName || (firstSub ? firstSub.serviceName : ''),
-      settlementModel: custom.settlementModel || defaultProv.settlementModel || 'DEDUCCION_DIRECTA',
+      settlementModel: 'DEDUCCION_DIRECTA', // TAREA 4: siempre Deducción Directa (selector eliminado)
       passengerName: custom.passengerName || '',
       passengerDoc: custom.passengerDoc || '',
       voucherNumber: custom.voucherNumber || '',
@@ -1315,8 +1315,8 @@ class OperationsHubModule {
               ` : ''}
             </div>
 
-            <!-- Fila 1: Proveedor / Operador, Sub-servicio (Plan) y Modelo de Liquidación -->
-            <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr 1.1fr; gap: 8px; margin-bottom: 10px;">
+            <!-- Fila 1: Proveedor / Operador y Sub-servicio (Plan) -->
+            <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr; gap: 8px; margin-bottom: 10px;">
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
                 <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
@@ -1325,13 +1325,6 @@ class OperationsHubModule {
               </div>
               <div>
                 ${this.renderSubServiceControl(idx, item, subServicesList, true)}
-              </div>
-              <div>
-                <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
-                <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
-                  <option value="DEDUCCION_DIRECTA" ${item.settlementModel !== 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Deducción Directa (Neto)</option>
-                  <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto</option>
-                </select>
               </div>
             </div>
 
@@ -1461,8 +1454,8 @@ class OperationsHubModule {
             ` : ''}
           </div>
 
-          <!-- Fila 1: Proveedor, Sub-servicio y Modelo de Liquidación (Sin dropdown de Tipo de Servicio) -->
-          <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr 1.1fr; gap: 8px;">
+          <!-- Fila 1: Proveedor y Sub-servicio (Sin dropdown de Tipo de Servicio) -->
+          <div class="form-row" style="grid-template-columns: 1.4fr 1.6fr; gap: 8px;">
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Proveedor / Operador:</label>
               <select class="form-control" onchange="window.operationsHubModule.onItemProviderChange(${idx}, this.value)">
@@ -1471,13 +1464,6 @@ class OperationsHubModule {
             </div>
             <div>
               ${this.renderSubServiceControl(idx, item, subServicesList, false)}
-            </div>
-            <div>
-              <label class="form-label font-bold" style="font-size: 0.75rem;">Modelo Liquidación:</label>
-              <select class="form-control font-bold" onchange="window.operationsHubModule.onItemSettlementModelChange(${idx}, this.value)">
-                <option value="DEDUCCION_DIRECTA" ${item.settlementModel === 'DEDUCCION_DIRECTA' ? 'selected' : ''}>Deducción Directa (Neto)</option>
-                <option value="CONSOLIDADOR_BRUTO" ${item.settlementModel === 'CONSOLIDADOR_BRUTO' ? 'selected' : ''}>Consolidador Bruto</option>
-              </select>
             </div>
           </div>
 
@@ -1818,13 +1804,6 @@ class OperationsHubModule {
         this.activeNdItems[index].subServiceName = '';
       }
     }
-    this.renderItemsRepeater();
-    this.calculateConsolidatedTotals();
-  }
-
-  onItemSettlementModelChange(index, newModel) {
-    if (!this.activeNdItems[index]) return;
-    this.activeNdItems[index].settlementModel = newModel;
     this.renderItemsRepeater();
     this.calculateConsolidatedTotals();
   }
