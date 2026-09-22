@@ -2727,10 +2727,8 @@ class OperationsHubModule {
         visaDetails: document.getElementById('uni-visa-details')?.value || ''
       };
     } else if (srv === 'CERTIFICACION_FA') {
+      // TAREA 5: se eliminó Certificación/Tipo, Entidad Emisora y Fecha Certificación
       return {
-        certCourse: document.getElementById('uni-fa-name')?.value || '',
-        certInstitution: document.getElementById('uni-fa-entity')?.value || '',
-        certDate: document.getElementById('uni-fa-date')?.value || '',
         certHours: document.getElementById('uni-fa-hours')?.value || '',
         certValidity: document.getElementById('uni-fa-validity')?.value || ''
       };
