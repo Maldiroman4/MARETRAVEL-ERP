@@ -35,7 +35,7 @@ export class SupportService {
 
   async getExchangeRate() {
     const latest = await this.prisma.exchangeRate.findFirst({
-      orderBy: { date: 'desc' },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: 1,
     });
     if (!latest) {
@@ -46,6 +46,28 @@ export class SupportService {
       date: latest.date,
       buyRate: Number(latest.buyRate),
       sellRate: Number(latest.sellRate),
+    };
+  }
+
+  async updateExchangeRate(buyRate: number, sellRate: number) {
+    if (isNaN(buyRate) || buyRate <= 0 || isNaN(sellRate) || sellRate <= 0) {
+      throw new BadRequestException(
+        'Los valores de compra y venta deben ser números positivos válidos.',
+      );
+    }
+    const created = await this.prisma.exchangeRate.create({
+      data: {
+        date: new Date(),
+        buyRate,
+        sellRate,
+        createdById: 'USR-001',
+      },
+    });
+    return {
+      id: created.id,
+      date: created.date,
+      buyRate: Number(created.buyRate),
+      sellRate: Number(created.sellRate),
     };
   }
 

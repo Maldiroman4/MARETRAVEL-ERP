@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Req } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req } from '@nestjs/common';
 import { SupportService } from './support.service';
 
 @Controller()
@@ -18,6 +18,14 @@ export class SupportController {
   @Get('exchange-rate')
   getExchangeRate() {
     return this.service.getExchangeRate();
+  }
+
+  @Post('exchange-rate')
+  updateExchangeRate(@Body() body: { buyRate?: number; sellRate?: number }) {
+    return this.service.updateExchangeRate(
+      Number(body?.buyRate),
+      Number(body?.sellRate),
+    );
   }
 
   @Patch('settings')
