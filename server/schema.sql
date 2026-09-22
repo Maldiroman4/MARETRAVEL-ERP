@@ -43,8 +43,7 @@ CREATE TABLE IF NOT EXISTS account_history (
     new_value TEXT,
     user_id TEXT,
     user_name TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_account_history_account_id ON account_history(account_id);

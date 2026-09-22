@@ -1131,7 +1131,31 @@ const sqlDatabase = {
         }
       }
 
+      // Sincronización bidireccional: depurar (prune) registros eliminados en el cliente
+      const pruneMissing = (tableName, idCol, keepList) => {
+        if (!Array.isArray(keepList)) return;
+        const keepSet = new Set(keepList.map(item => (typeof item === 'string' ? item : item.id)).filter(Boolean));
+        const existingRows = db.prepare(`SELECT ${idCol} AS id FROM ${tableName}`).all();
+        const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE ${idCol} = ?`);
+        for (const row of existingRows) {
+          if (!keepSet.has(row.id)) {
+            deleteStmt.run(row.id);
+          }
+        }
+      };
+
+      // Orden de depuración respetando dependencias de integridad referencial
+      pruneMissing('cash_receipts', 'id', state.cashReceipts);
+      pruneMissing('credit_notes', 'id', state.creditNotes);
+      pruneMissing('debit_notes', 'id', state.debitNotes);
+      pruneMissing('gds_tickets', 'id', state.gdsTickets);
+      pruneMissing('accounts', 'id', state.accounts);
+      pruneMissing('passengers', 'id', state.passengers);
+      pruneMissing('subservices', 'id', state.savedSubServices);
+      pruneMissing('financial_accounts', 'id', state.financialAccounts);
+
       db.exec('COMMIT;');
+      try { db.exec('PRAGMA wal_checkpoint(PASSIVE);'); } catch (_) {}
       return { success: true };
     } catch (err) {
       db.exec('ROLLBACK;');

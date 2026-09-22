@@ -530,6 +530,21 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname.startsWith('/api/cuentas/') && req.method === 'DELETE') {
+    const id = pathname.replace('/api/cuentas/', '').trim();
+    try {
+      const db = readDbSync();
+      db.accounts = (db.accounts || []).filter(a => a.id !== id);
+      saveDbSync(db);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, deletedId: id }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   // CONFIGURACIÓN GENERAL: /api/config
   if (pathname === '/api/config') {
     const db = readDbSync();
