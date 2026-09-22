@@ -398,5 +398,24 @@ window.maretravelCodes = {
       if (n > max) max = n;
     });
     return prefix + String(max + 1).padStart(3, '0');
+  },
+  // Registra/actualiza un pasajero en el directorio (data.passengers)
+  registerPassenger(data, name, doc) {
+    const nm = String(name || '').trim();
+    if (!nm) return;
+    data.passengers = data.passengers || [];
+    const key = (nm + '|' + (doc || '')).toLowerCase();
+    const ex = data.passengers.find(p => (p.name + '|' + (p.doc || '')).toLowerCase() === key);
+    if (ex) {
+      ex.count = (ex.count || 1) + 1;
+      ex.lastUse = new Date().toLocaleString();
+      return;
+    }
+    data.passengers.unshift({ id: 'PAX-' + Date.now() + '-' + Math.floor(Math.random() * 999), name: nm, doc: (doc || '').trim(), count: 1, lastUse: new Date().toLocaleString() });
+  },
+  // Muestra el código formateado de un documento (o el numérico de respaldo)
+  showDoc(doc, type) {
+    if (!doc) return '';
+    return doc[type.toLowerCase() + 'Code'] || (type + ' #' + doc[type.toLowerCase() + 'Number']);
   }
 };

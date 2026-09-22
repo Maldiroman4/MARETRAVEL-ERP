@@ -158,6 +158,7 @@ window.debitNotesModule = {
     let filtered = notes.filter(nd => {
       const matchStatus = this.currentStatusFilter === 'TODOS' || nd.status === this.currentStatusFilter;
       const matchSearch = String(nd.ndNumber).includes(search) ||
+                          String(nd.ndCode || '').includes(search) ||
                           nd.accountName.toLowerCase().includes(search) ||
                           (nd.solicitante && nd.solicitante.toLowerCase().includes(search));
       return matchStatus && matchSearch;
@@ -185,7 +186,7 @@ window.debitNotesModule = {
 
       return `
         <tr>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${window.maretravelCodes ? window.maretravelCodes.showDoc(nd, 'ND') : ('ND #' + nd.ndNumber)}</td>
           <td class="font-mono">${nd.issueDate}</td>
           <td>
             <div style="font-weight: 600;">${nd.accountName}</div>
@@ -888,7 +889,8 @@ window.debitNotesModule = {
         createdAt: new Date().toLocaleString()
       };
       data.debitNotes.unshift(newNd);
-      window.app.showToast(`Nota de Débito ND #${newNd.ndNumber} guardada en Borrador`, 'success');
+      if (window.maretravelCodes) window.maretravelCodes.registerPassenger(data, passengerName);
+      window.app.showToast(`Nota de Débito ${window.maretravelCodes ? window.maretravelCodes.showDoc(newNd, 'ND') : ('ND #' + newNd.ndNumber)} guardada en Borrador`, 'success');
     }
 
     window.db.save(data);
@@ -935,7 +937,8 @@ window.debitNotesModule = {
           providerName: item.operatorName || 'Proveedor',
           currency: item.currency,
           totalNetCost: 0,
-          ticketNumbers: []
+          ticketNumbers: [],
+          serviceType: item.serviceType || item.serviceCategory || 'BOLETO_AEREO'
         };
       }
       providerCosts[pId].totalNetCost += (item.netCostToProvider || item.totalAmount);
@@ -949,10 +952,12 @@ window.debitNotesModule = {
       const ncNumber = nextNcBase + idx;
       const netAmount = parseFloat(group.totalNetCost.toFixed(2));
       const prov = data.accounts.find(a => a.id === group.providerId);
+      const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', group.serviceType);
 
       const newNc = {
         id: 'NC-' + Date.now() + '-' + idx,
         ncNumber: ncNumber,
+        ncCode: ncCode,
         providerId: group.providerId,
         providerName: prov ? prov.name : group.providerName,
         providerNit: prov ? prov.nit : '',
@@ -984,7 +989,7 @@ window.debitNotesModule = {
     if (window.operationsHubModule) window.operationsHubModule.render();
     if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
 
-    window.app.showToast(`ND #${nd.ndNumber} CERRADA. Se generaron ${ncGeneratedCount} Nota(s) de Crédito a proveedores`, 'success');
+    window.app.showToast(`ND ${window.maretravelCodes.showDoc(nd, 'ND')} CERRADA. Se generaron ${ncGeneratedCount} Nota(s) de Crédito a proveedores`, 'success');
   },
 
   reopenNd(ndId) {
@@ -1145,8 +1150,8 @@ window.debitNotesModule = {
     const docNumber = isTransaction
       ? (tx.receiptCode || ('RCP-' + String(tx.receiptNumber).padStart(5, '0')))
       : (isNc 
-          ? (doc.ncNumber != null ? doc.ncNumber : doc.id)
-          : (doc.ndNumber != null ? doc.ndNumber : doc.id));
+          ? (doc.ncCode || (doc.ncNumber != null ? doc.ncNumber : doc.id))
+          : (doc.ndCode || (doc.ndNumber != null ? doc.ndNumber : doc.id)));
 
     const data = window.db.get();
     
@@ -1305,10 +1310,15 @@ window.debitNotesModule = {
           case 'BOLETO_GDS': {
             const srvRoute = (sd.flightRoute || it.route || it.description || 'VVI-LPB-VVI').toUpperCase();
             let srvDates = sd.travelDates || '';
+            const soloIda = Boolean(sd.soloIda || it.soloIda);
+            const buildFecha = (dep, ret) => {
+              if (soloIda || !ret || ret === dep) return `DEL ${this.formatSlashDate(dep)} SOLO IDA`;
+              return `DEL ${this.formatSlashDate(dep)} AL ${this.formatSlashDate(ret)}`;
+            };
             if (!srvDates && sd.flightDepDate) {
-              srvDates = `DEL ${this.formatSlashDate(sd.flightDepDate)} AL ${this.formatSlashDate(sd.flightRetDate || sd.flightDepDate)}`;
+              srvDates = buildFecha(sd.flightDepDate, sd.flightRetDate);
             } else if (!srvDates && it.departureDate) {
-              srvDates = `DEL ${this.formatSlashDate(it.departureDate)} AL ${this.formatSlashDate(it.returnDate || it.departureDate)}`;
+              srvDates = buildFecha(it.departureDate, it.returnDate);
             } else if (!srvDates) {
               srvDates = '-';
             }
@@ -2217,7 +2227,7 @@ window.debitNotesModule = {
             /* 1. Configuración Global de Impresión */
             @page {
               size: letter portrait;
-              margin: 8mm 10mm;
+              margin: 10mm 12mm;
             }
             * {
               box-sizing: border-box !important;
@@ -2233,20 +2243,18 @@ window.debitNotesModule = {
               height: auto !important;
               overflow: visible !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-              font-size: 11px !important;
-              line-height: 1.3 !important;
+              font-size: 12.5px !important;
+              line-height: 1.5 !important;
             }
             .nd-official-container {
               width: 100% !important;
               max-width: 800px !important;
               margin: 0 auto !important;
               background: #ffffff !important;
-              padding: 10px 15px !important;
+              padding: 12px 18px !important;
               box-sizing: border-box !important;
               color: #1e293b !important;
-              line-height: 1.25 !important;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
+              line-height: 1.45 !important;
             }
 
             /* 2. Encabezado de 3 Columnas */
@@ -2257,6 +2265,9 @@ window.debitNotesModule = {
               margin-bottom: 12px !important;
               width: 100% !important;
               gap: 10px !important;
+              page-break-inside: avoid !important;
+              page-break-after: avoid !important;
+              break-inside: avoid !important;
             }
             .nd-header-brand {
               width: 27% !important;
@@ -2292,7 +2303,7 @@ window.debitNotesModule = {
               margin: 0 auto !important;
               border-collapse: collapse !important;
               text-align: left !important;
-              font-size: 0.76rem !important;
+              font-size: 0.8rem !important;
               width: 100% !important;
             }
             .nd-meta-table td {
@@ -2312,9 +2323,9 @@ window.debitNotesModule = {
               width: 27% !important;
               flex: 0 0 27% !important;
               text-align: left !important;
-              font-size: 0.72rem !important;
+              font-size: 0.76rem !important;
               color: #334155 !important;
-              line-height: 1.25 !important;
+              line-height: 1.4 !important;
             }
             .nd-agency-bold {
               font-weight: 800 !important;
@@ -2330,6 +2341,8 @@ window.debitNotesModule = {
             .nd-detail-section {
               margin-top: 6px !important;
               width: 100% !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             .nd-green-badge {
               background-color: #00a884 !important;
@@ -2357,9 +2370,11 @@ window.debitNotesModule = {
             .nd-item-block {
               display: flex !important;
               justify-content: space-between !important;
-              font-size: 0.76rem !important;
-              padding: 2px 0 !important;
+              font-size: 0.8rem !important;
+              padding: 3px 0 !important;
               width: 100% !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             .nd-col-left {
               width: 38% !important;
@@ -2405,6 +2420,8 @@ window.debitNotesModule = {
             .nd-footer-section {
               margin-top: 4px !important;
               width: 100% !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             .nd-totals-outer {
               display: flex !important;
@@ -2482,9 +2499,11 @@ window.debitNotesModule = {
             .nd-signatures-container {
               display: flex !important;
               justify-content: space-around !important;
-              margin-top: 45px !important;
+              margin-top: 55px !important;
               margin-bottom: 20px !important;
               width: 100% !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             .nd-signature-box {
               width: 250px !important;
@@ -2503,11 +2522,11 @@ window.debitNotesModule = {
             /* 6. Cláusula Legal */
             .nd-legal-text {
               text-align: center !important;
-              font-size: 0.68rem !important;
+              font-size: 0.72rem !important;
               font-weight: 700 !important;
               color: #1e293b !important;
-              line-height: 1.35 !important;
-              margin-top: 8px !important;
+              line-height: 1.4 !important;
+              margin-top: 10px !important;
             }
             .font-mono {
               font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
@@ -2524,15 +2543,20 @@ window.debitNotesModule = {
       `);
       frameDoc.close();
 
-      // 3. Esperar confirmación de renderizado e imágenes listas antes de invocar print()
+      // 3. Esperar confirmación de renderizado completo e imágenes antes de invocar print()
       const triggerPrint = () => {
-        try {
-          printFrame.contentWindow.focus();
-          printFrame.contentWindow.print();
-        } catch(frameErr) {
-          console.warn('Iframe print error, fallback a window.print():', frameErr);
-          window.print();
-        }
+        // Doble rAF: garantiza layout y logo ya pintados antes de window.print()
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            try {
+              printFrame.contentWindow.focus();
+              printFrame.contentWindow.print();
+            } catch(frameErr) {
+              console.warn('Iframe print error, fallback a window.print():', frameErr);
+              window.print();
+            }
+          });
+        });
       };
 
       const imgs = Array.from(frameDoc.images || []);
@@ -2542,15 +2566,17 @@ window.debitNotesModule = {
         let remaining = unreadyImgs.length;
         const onDone = () => {
           remaining--;
-          if (remaining <= 0) setTimeout(triggerPrint, 80);
+          if (remaining <= 0) triggerPrint();
         };
         unreadyImgs.forEach(img => {
           img.onload = onDone;
           img.onerror = onDone;
         });
-        setTimeout(triggerPrint, 350);
+        setTimeout(triggerPrint, 500);
+      } else if (frameDoc.fonts && frameDoc.fonts.ready) {
+        frameDoc.fonts.ready.then(triggerPrint).catch(triggerPrint);
       } else {
-        setTimeout(triggerPrint, 80);
+        triggerPrint();
       }
     } catch (e) {
       console.warn('Fallback a window.print():', e);

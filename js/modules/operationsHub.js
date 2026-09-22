@@ -477,7 +477,7 @@ class OperationsHubModule {
         return `
           <tr id="row-nd-${nd.id}">
             <td class="font-mono" style="font-weight: 800; color: #0284c7; white-space: nowrap;">
-              ND #${nd.ndNumber}
+              ${nd.ndCode || ('ND #' + nd.ndNumber)}
             </td>
             <td class="font-mono" style="white-space: nowrap;">${nd.issueDate || '-'}</td>
             <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -1585,8 +1585,14 @@ class OperationsHubModule {
           </div>
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha de Retorno:</label>
-            <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
+            <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" ${d.soloIda ? 'disabled' : ''} oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
           </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr; gap: 8px; margin-top: 6px;">
+          <label style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem; cursor: pointer; color: var(--text-muted);">
+            <input type="checkbox" ${d.soloIda ? 'checked' : ''} onchange="const retInp=this.closest('.form-row').previousElementSibling.querySelector('input[type=date]:last-of-type'); if(retInp){ retInp.disabled=this.checked; if(this.checked){ retInp.value=''; window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', ''); } } window.operationsHubModule.onItemDetailChange(${idx}, 'soloIda', this.checked);">
+            Solo Ida (sin fecha de retorno)
+          </label>
         </div>
       `;
     } else if (srv === 'HOTEL') {
@@ -2120,12 +2126,16 @@ class OperationsHubModule {
           </div>
           <div>
             <label class="form-label">Fecha Vuelo Retorno:</label>
-            <input type="date" id="uni-f-flight-ret" class="form-control font-mono" value="${data.flightRetDate || data.returnDate || ''}">
+            <input type="date" id="uni-f-flight-ret" class="form-control font-mono" value="${data.flightRetDate || data.returnDate || ''}" ${data.soloIda ? 'disabled' : ''}>
           </div>
           <div>
             <label class="form-label">Nro de Vuelo / Info Adicional:</label>
             <input type="text" id="uni-f-flight-num" class="form-control font-mono" placeholder="Ej: BoA OB 934 / OB 935" value="${data.flightNumber || ''}">
           </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+          <input type="checkbox" id="uni-f-solo-ida" ${data.soloIda || (!data.flightRetDate && !data.returnDate && (data.flightDepDate || data.departureDate)) ? 'checked' : ''} onchange="const ret=document.getElementById('uni-f-flight-ret'); ret.disabled=this.checked; if(this.checked) ret.value='';">
+          <label for="uni-f-solo-ida" class="form-label" style="margin: 0; cursor: pointer;">Solo Ida (sin fecha de retorno)</label>
         </div>
       `;
     } else if (srv === 'HOTEL' || srv === 'HOTEL_HOSPEDAJE') {
@@ -2701,13 +2711,15 @@ class OperationsHubModule {
   getServiceSpecificValues(srv) {
     srv = (srv || document.getElementById('uni-service-type')?.value || 'BOLETO_AEREO').toUpperCase();
     if (srv === 'BOLETO_AEREO' || srv === 'BOLETO_GDS') {
+      const soloIda = Boolean(document.getElementById('uni-f-solo-ida')?.checked);
       return {
         flightRoute: document.getElementById('uni-f-route')?.value || '',
         pnrCode: document.getElementById('uni-f-pnr')?.value || '',
         cabinClass: document.getElementById('uni-f-cabin')?.value || 'ECONÓMICA',
         flightDepDate: document.getElementById('uni-f-flight-dep')?.value || '',
-        flightRetDate: document.getElementById('uni-f-flight-ret')?.value || '',
-        flightNumber: document.getElementById('uni-f-flight-num')?.value || ''
+        flightRetDate: soloIda ? '' : (document.getElementById('uni-f-flight-ret')?.value || ''),
+        flightNumber: document.getElementById('uni-f-flight-num')?.value || '',
+        soloIda: soloIda
       };
     } else if (srv === 'HOTEL' || srv === 'HOTEL_HOSPEDAJE') {
       return {
@@ -3096,6 +3108,7 @@ class OperationsHubModule {
       const newNd = {
         id: newNdId,
         ndNumber: nextNdNumber,
+        ndCode: window.maretravelCodes.nextFor(data.debitNotes, 'ND', mappedItems[0]?.serviceType || window.state?.servicioActivo || 'BOLETO_AEREO'),
         accountId: clientId,
         accountName: client.name,
         accountNit: client.docNumber || '',
@@ -3126,6 +3139,14 @@ class OperationsHubModule {
         createdAt: new Date().toLocaleString()
       };
       data.debitNotes.push(newNd);
+
+      // TAREA 6: registrar pasajeros en el directorio autocompletable
+      (mappedItems || []).forEach(it => {
+        if (window.maretravelCodes) window.maretravelCodes.registerPassenger(data, it.passengerName, it.passengerDocId || it.documentId || '');
+      });
+
+      // TAREA 3: sincronizar vuelos al Calendario de Viajes (idempotente por ND)
+      this.syncFlightRemindersToCalendar(data, newNd);
 
       // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician PENDIENTE)
       const providerGroups = {};
@@ -3175,6 +3196,7 @@ class OperationsHubModule {
           data.creditNotes.push({
             id: 'NC-' + Date.now() + '-' + gIdx,
             ncNumber: nextNcNumber,
+            ncCode: window.maretravelCodes.nextFor(data.creditNotes, 'NC', grp.items[0]?.serviceType || 'BOLETO_AEREO'),
             providerId: grp.providerId,
             providerName: grp.providerName,
             providerNit: provAcc.docNumber || '',
@@ -3243,7 +3265,7 @@ class OperationsHubModule {
       if (window.cashRegisterModule) window.cashRegisterModule.render();
 
       const providerCount = Object.keys(providerGroups).length;
-      window.app.showToast(`¡ND #${nextNdNumber} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');
+      window.app.showToast(`¡ND ${window.maretravelCodes.showDoc(newNd, 'ND')} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');
     } catch (err) {
       console.error('Error al procesar y guardar la operación:', err);
       window.app.showToast('Error al guardar la operación: ' + (err.message || err), 'error');
@@ -3254,6 +3276,55 @@ class OperationsHubModule {
       }
     }
   }
+
+  /**
+   * TAREA 3: Sincroniza los vuelos de una ND al Calendario de Viajes (idempotente por ND).
+   * Solo ida → solo fecha de partida. Con retorno → partida + retorno.
+   */
+  syncFlightRemindersToCalendar(data, nd) {
+    try {
+      if (!data || !nd) return;
+      data.travelReminders = data.travelReminders || [];
+      // Limpiar recordatorios previos generados por esta ND (evita duplicados)
+      data.travelReminders = data.travelReminders.filter(r => r.sourceDocId !== nd.id);
+      const now = new Date().toLocaleString();
+      (nd.items || []).forEach((it, idx) => {
+        if (it.serviceType !== 'BOLETO_AEREO' && it.serviceType !== 'BOLETO_GDS') return;
+        const sd = it.serviceDetails || {};
+        if (!sd.flightDepDate && !it.departureDate && !sd.flightRoute && !it.route) return;
+        const depDate = sd.flightDepDate || it.departureDate || '';
+        const retDate = (!sd.soloIda && !it.soloIda) ? (sd.flightRetDate || it.returnDate || '') : '';
+        const pax = it.passengerName || nd.passengerName || 'Pasajero';
+        const paxDoc = it.passengerDocId || it.documentId || '';
+        const client = (data.accounts || []).find(a => a.id === nd.accountId) || {};
+        data.travelReminders.push({
+          id: 'TRV-' + Date.now() + '-' + idx,
+          sourceDocId: nd.id,
+          clientId: nd.accountId || null,
+          clientName: nd.accountName || client.name || '',
+          clientPhone: client.phone || '',
+          clientEmail: client.email || '',
+          passengerName: pax,
+          passengerDoc: paxDoc,
+          route: (sd.flightRoute || it.route || '').toUpperCase(),
+          airline: '',
+          flightNumber: sd.flightNumber || it.flightNumber || '',
+          ticketNumber: it.ticketNumber || sd.pnrCode || it.pnrCode || '',
+          departureDate: depDate,
+          departureTime: '',
+          returnDate: retDate,
+          returnTime: '',
+          hasReturn: Boolean(retDate),
+          hotelName: '',
+          status: 'CONFIRMADO',
+          observations: (sd.soloIda || it.soloIda) ? 'SOLO IDA' : '',
+          createdAt: now
+        });
+      });
+    } catch (e) {
+      console.warn('Error sincronizando vuelos al calendario:', e);
+    }
+  },
 
   openEditOperationModal(id) {
     const data = window.db.get();
@@ -3269,7 +3340,7 @@ class OperationsHubModule {
     this.updateGlobalCurrencyButtons(opCurr);
 
     const modalTitle = document.getElementById('unified-modal-title');
-    if (modalTitle) modalTitle.innerHTML = `<i data-lucide="edit-3"></i> Editar Operación Integral (ND #${nd.ndNumber})`;
+    if (modalTitle) modalTitle.innerHTML = `<i data-lucide="edit-3"></i> Editar Operación Integral (${nd.ndCode || ('ND #' + nd.ndNumber)})`;
 
     this.populateAccountsSelects();
 
