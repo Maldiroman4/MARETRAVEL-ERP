@@ -10,8 +10,20 @@ window.calendarModule = {
   viewMonth: new Date().getMonth(),
   selectedReminderId: null,
 
-  init() {
+  async init() {
     this.bindEvents();
+    this.updateNotificationBadge();
+    await this.loadFromApi();
+  },
+
+  async loadFromApi() {
+    try {
+      if (typeof TravelRemindersAdapter !== 'undefined' && typeof TravelRemindersAdapter.syncMirror === 'function') {
+        await TravelRemindersAdapter.syncMirror();
+      }
+    } catch (e) {
+      console.warn('No se pudo sincronizar itinerarios con el backend:', e);
+    }
     this.updateNotificationBadge();
     this.render();
   },
@@ -593,7 +605,7 @@ window.calendarModule = {
     window.app.openModal('modal-new-travel-reminder');
   },
 
-  handleSaveReminder(e) {
+  async handleSaveReminder(e) {
     e.preventDefault();
     const data = window.db.get();
     const clientSelect = document.getElementById('trv-client-select');
@@ -627,17 +639,61 @@ window.calendarModule = {
     if (!data.travelReminders) data.travelReminders = [];
     data.travelReminders.unshift(newReminder);
 
+    // Persistir en el backend (dual-source)
+    try {
+      if (typeof TravelRemindersAdapter !== 'undefined' && typeof TravelRemindersAdapter.create === 'function') {
+        await TravelRemindersAdapter.create({
+          clientId: newReminder.clientId,
+          clientName: newReminder.clientName,
+          clientPhone: newReminder.clientPhone,
+          clientEmail: newReminder.clientEmail,
+          passengerName: newReminder.passengerName,
+          passengerDoc: newReminder.passengerDoc,
+          route: newReminder.route,
+          airline: newReminder.airline,
+          flightNumber: newReminder.flightNumber,
+          ticketNumber: newReminder.ticketNumber,
+          departureDate: newReminder.departureDate,
+          departureTime: newReminder.departureTime,
+          returnDate: newReminder.returnDate || undefined,
+          returnTime: newReminder.returnTime,
+          hasReturn: newReminder.hasReturn,
+          hotelName: newReminder.hotelName,
+          status: newReminder.status,
+          observations: newReminder.observations,
+        });
+        if (typeof TravelRemindersAdapter.syncMirror === 'function') {
+          await TravelRemindersAdapter.syncMirror();
+        }
+      }
+    } catch (err) {
+      console.warn('Itinerario guardado localmente; no se pudo persistir en el backend:', err.message);
+    }
+
     window.db.save(data);
     window.app.closeModal('modal-new-travel-reminder');
     window.app.showToast('Itinerario de viaje registrado en el calendario', 'success');
     this.render();
   },
 
-  deleteReminder(reminderId) {
+  async deleteReminder(reminderId) {
     if (!confirm('¿Confirma que desea eliminar este itinerario del calendario?')) return;
     const data = window.db.get();
+    const rem = (data.travelReminders || []).find(x => x.id === reminderId);
     data.travelReminders = (data.travelReminders || []).filter(x => x.id !== reminderId);
     window.db.save(data);
+
+    try {
+      if (rem && rem.backendId && typeof TravelRemindersAdapter !== 'undefined' && typeof TravelRemindersAdapter.remove === 'function') {
+        await TravelRemindersAdapter.remove(rem.backendId);
+        if (typeof TravelRemindersAdapter.syncMirror === 'function') {
+          await TravelRemindersAdapter.syncMirror();
+        }
+      }
+    } catch (err) {
+      console.warn('Itinerario eliminado localmente; no se pudo borrar en el backend:', err.message);
+    }
+
     window.app.closeModal('modal-reminder-detail');
     window.app.showToast('Itinerario eliminado', 'info');
     this.render();

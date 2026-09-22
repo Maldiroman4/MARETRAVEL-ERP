@@ -317,6 +317,33 @@ model SystemSetting {
   @@map("system_settings")
 }
 
+model TravelReminder {
+  id            String    @id @default(uuid())
+  clientId      String?   @map("client_id")
+  clientName    String?   @map("client_name")
+  clientPhone   String?   @map("client_phone")
+  clientEmail   String?   @map("client_email")
+  passengerName String    @map("passenger_name")
+  passengerDoc  String?   @map("passenger_doc")
+  route         String
+  airline       String?
+  flightNumber  String?   @map("flight_number")
+  ticketNumber  String?   @map("ticket_number")
+  departureDate DateTime  @map("departure_date") @db.Date
+  departureTime String?   @map("departure_time")
+  returnDate    DateTime? @map("return_date") @db.Date
+  returnTime    String?   @map("return_time")
+  hasReturn     Boolean   @default(false) @map("has_return")
+  hotelName     String?   @map("hotel_name")
+  status        String    @default("PROGRAMADO")
+  observations  String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([departureDate])
+  @@map("travel_reminders")
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   userId     String?  @map("user_id")
