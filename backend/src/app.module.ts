@@ -14,6 +14,7 @@ import { CreditNotesModule } from './modules/credit-notes/credit-notes.module';
 import { CashReceiptsModule } from './modules/cash-receipts/cash-receipts.module';
 import { SupportModule } from './modules/support/support.module';
 import { PrintModule } from './modules/print/print.module';
+import { TravelRemindersModule } from './modules/travel-reminders/travel-reminders.module';
 import { JwtAuthGuard } from './common/jwt-auth.guard';
 
 @Module({
@@ -33,6 +34,7 @@ import { JwtAuthGuard } from './common/jwt-auth.guard';
     CashReceiptsModule,
     SupportModule,
     PrintModule,
+    TravelRemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],

@@ -47,6 +47,11 @@ window.app = {
   },
 
   isAuthenticated() {
+    // Requiere una sesión local VÁLIDA y un JWT presente (evita el bucle de recarga
+    // cuando existe una sesión antigua sin token de la migración).
+    if (!window.API || typeof API.getToken !== 'function' || !API.getToken()) {
+      return false;
+    }
     try {
       const auth = localStorage.getItem(this.AUTH_KEY);
       if (!auth) return false;
