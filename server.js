@@ -8,7 +8,6 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const { renderOfficialPrintDocument } = require('./printRenderer');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -704,14 +703,8 @@ const server = http.createServer(async (req, res) => {
       // 3. Sobrescribir atómica y sincrónicamente el archivo central data/database.json
       saveDbSync(seedData);
 
-      // 4. Sobrescribir archivos físicos individuales en /data/ usando fs.promises.writeFile
-      await Promise.all([
-        fs.promises.writeFile(path.join(DATA_DIR, 'seedData.json'), JSON.stringify(seedData, null, 2), 'utf-8'),
-        fs.promises.writeFile(path.join(DATA_DIR, 'operaciones.json'), JSON.stringify(seedData.debitNotes || [], null, 2), 'utf-8'),
-        fs.promises.writeFile(path.join(DATA_DIR, 'cuentas.json'), JSON.stringify(seedData.accounts || [], null, 2), 'utf-8'),
-        fs.promises.writeFile(path.join(DATA_DIR, 'boletos.json'), JSON.stringify(seedData.gdsTickets || [], null, 2), 'utf-8'),
-        fs.promises.writeFile(path.join(DATA_DIR, 'config.json'), JSON.stringify(seedData.systemSettings || {}, null, 2), 'utf-8')
-      ]);
+      // 4. Asegurar archivo semilla
+      await fs.promises.writeFile(path.join(DATA_DIR, 'seedData.json'), JSON.stringify(seedData, null, 2), 'utf-8');
 
       console.log(`[RESET] Sistema restablecido a datos de prueba iniciales con persistencia en disco.`);
 
