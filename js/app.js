@@ -104,7 +104,7 @@ window.app = {
     }
   },
 
-  handleLogin(e) {
+  async handleLogin(e) {
     if (e) {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -117,8 +117,47 @@ window.app = {
     const username = (userEl ? userEl.value : '').trim().toLowerCase();
     const password = (passEl ? passEl.value : '').trim();
 
-    // Credenciales autorizadas oficiales: usuario: luis / contraseña: 585858
-    if ((username === 'luis' || username === 'admin') && (password === '585858')) {
+    const completeLogin = () => {
+      if (passEl) passEl.value = '';
+      this.showApp();
+      if (!this.initialized) {
+        try {
+          this.init();
+        } catch (initErr) {
+          console.error('Error during init:', initErr);
+        }
+      } else {
+        this.updateDashboardKpis();
+        this.updateExchangeRateWidget();
+        if (window.operationsHubModule) window.operationsHubModule.render();
+      }
+      this.showToast('¡Bienvenido al sistema MARETRAVEL ERP, Luis!', 'success');
+    };
+
+    const failLogin = () => {
+      if (errorAlert) {
+        errorAlert.style.display = 'flex';
+        if (errorText) {
+          errorText.textContent = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
+        }
+      }
+      if (passEl) {
+        passEl.value = '';
+        passEl.focus();
+      }
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+      } catch (err) {}
+    };
+
+    try {
+      const res = await API.login(username, password);
+      if (res && res.access_token) {
+        API.setToken(res.access_token);
+      } else {
+        return failLogin();
+      }
+
       if (errorAlert) errorAlert.style.display = 'none';
       const sessionData = {
         username: 'luis',
@@ -132,44 +171,14 @@ window.app = {
         console.warn('LocalStorage error:', err);
       }
 
-      if (passEl) passEl.value = '';
-
-      const completeLogin = () => {
-        this.showApp();
-        if (!this.initialized) {
-          try {
-            this.init();
-          } catch (initErr) {
-            console.error('Error during init:', initErr);
-          }
-        } else {
-          this.updateDashboardKpis();
-          this.updateExchangeRateWidget();
-          if (window.operationsHubModule) window.operationsHubModule.render();
-        }
-        this.showToast('¡Bienvenido al sistema MARETRAVEL ERP, Luis!', 'success');
-      };
-
       if (window.db && typeof window.db.syncWithServerFile === 'function') {
         window.db.syncWithServerFile().then(completeLogin).catch(completeLogin);
       } else {
         completeLogin();
       }
       return false;
-    } else {
-      if (errorAlert) {
-        errorAlert.style.display = 'flex';
-        if (errorText) {
-          errorText.textContent = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
-        }
-      }
-      if (passEl) {
-        passEl.value = '';
-        passEl.focus();
-      }
-      try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
-      } catch (e) {}
+    } catch (err) {
+      failLogin();
       return false;
     }
   },
