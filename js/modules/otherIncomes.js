@@ -546,6 +546,7 @@ window.otherIncomesModule = {
 
     this.render();
     if (window.debitNotesModule) window.debitNotesModule.render();
+    if (window.cashRegisterModule) window.cashRegisterModule.render();
   },
 
   /* =========================================================================
