@@ -19,10 +19,21 @@ window.cashRegisterModule = {
     this.renderReceiptsHistory();
   },
 
-  init() {
+  async init() {
     if (!this._eventsBound) {
       this.bindEvents();
       this._eventsBound = true;
+    }
+    await this.loadFromApi();
+  },
+
+  async loadFromApi() {
+    try {
+      if (typeof CashReceiptsAdapter !== 'undefined' && typeof CashReceiptsAdapter.syncMirror === 'function') {
+        await CashReceiptsAdapter.syncMirror();
+      }
+    } catch (e) {
+      console.warn('No se pudo sincronizar recibos de caja con el backend:', e);
     }
     this.render();
   },
@@ -1096,7 +1107,7 @@ window.cashRegisterModule = {
     }
   },
 
-  processCollection() {
+  async processCollection() {
     const data = window.db.get();
     const clientId = document.getElementById('cash-client-select').value;
     const client = data.accounts.find(a => a.id === clientId);
@@ -1332,6 +1343,33 @@ window.cashRegisterModule = {
 
     if (!data.cashReceipts) data.cashReceipts = [];
     data.cashReceipts.unshift(newReceipt);
+
+    // Persistir la cobranza en el backend (dual-source) — best-effort
+    try {
+      const canBackend = client.backendId && amortizations.every(it => it.nd.backendId);
+      if (canBackend && typeof CashReceiptsAdapter !== 'undefined' && typeof CashReceiptsAdapter.create === 'function') {
+        const apiLines = amortizations.map(item => ({
+          debitNoteId: item.nd.backendId,
+          amountPaidBob: item.amountPaidBob || 0,
+          amountPaidUsd: item.amountPaidUsd || 0,
+        }));
+        await CashReceiptsAdapter.create({
+          clientAccountId: client.backendId,
+          issueDate: new Date().toISOString().split('T')[0],
+          exchangeRate: sellRate,
+          lines: apiLines,
+        });
+        if (typeof CashReceiptsAdapter.syncMirror === 'function') {
+          await CashReceiptsAdapter.syncMirror();
+        }
+        if (typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.syncMirror === 'function') {
+          await DebitNotesAdapter.syncMirror();
+        }
+      }
+    } catch (err) {
+      console.warn('Recibo guardado localmente; no se pudo persistir la cobranza en el backend:', err.message);
+    }
+
     window.db.save(data);
 
     if (isPartial) {
@@ -2144,7 +2182,7 @@ window.cashRegisterModule = {
     window.app.openModal('modal-reversal');
   },
 
-  handleConfirmReversal(e) {
+  async handleConfirmReversal(e) {
     e.preventDefault();
     const receiptId = document.getElementById('rev-receipt-id').value;
     const reason = document.getElementById('rev-reason').value.trim();
@@ -2157,6 +2195,25 @@ window.cashRegisterModule = {
     const data = window.db.get();
     const receipt = data.cashReceipts.find(r => r.id === receiptId);
     if (!receipt || receipt.status !== 'VALIDO') return;
+
+    // Si el recibo existe en el backend, delegar la reversión a la API (lógica atómica)
+    if (receipt.backendId && typeof CashReceiptsAdapter !== 'undefined' && typeof CashReceiptsAdapter.void === 'function') {
+      try {
+        await CashReceiptsAdapter.void(receipt.backendId, reason);
+        await CashReceiptsAdapter.syncMirror();
+        if (typeof DebitNotesAdapter !== 'undefined' && typeof DebitNotesAdapter.syncMirror === 'function') await DebitNotesAdapter.syncMirror();
+        window.app.closeModal('modal-reversal');
+        window.app.showToast(`Recibo #${receipt.receiptNumber} REVERTIDO en el servidor. Los saldos de las NDs fueron restaurados.`, 'info');
+        this.renderReceiptsHistory();
+        if (window.debitNotesModule) window.debitNotesModule.render();
+        if (window.operationsHubModule) window.operationsHubModule.render();
+        if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
+        return;
+      } catch (err) {
+        window.app.showToast('Error al revertir en el servidor: ' + err.message, 'error');
+        return;
+      }
+    }
 
     // Restaurar saldos de las NDs amortizadas en el recibo
     receipt.details.forEach(item => {
