@@ -36,32 +36,74 @@ window.creditNotesModule = {
     }
   },
 
-  render() {
-    return this.renderNotasCredito();
+  isNcForActiveService(nc, activeService, allDebitNotes) {
+    if (!activeService || activeService === 'ALL' || activeService === 'TODOS') return true;
+    const srv = activeService.toUpperCase();
+
+    const matchesService = (val) => {
+      if (!val) return false;
+      const v = String(val).toUpperCase();
+      if (v === srv) return true;
+      if (srv === 'BOLETO_AEREO' && (v.includes('BOLETO') || v.includes('AEREO') || v.includes('GDS'))) return true;
+      if (srv === 'SEGURO_VIAJE' && (v.includes('SEGURO'))) return true;
+      if (srv === 'CERTIFICACION_FA' && (v.includes('CERTIFICACION') || v.includes('IFA'))) return true;
+      if (srv === 'ASESORAMIENTO_VISAS' && (v.includes('VISA') || v.includes('ASESORAMIENTO'))) return true;
+      if (srv === 'PAQUETES' && (v.includes('PAQUETE'))) return true;
+      if (srv === 'HOTEL' && (v.includes('HOTEL') || v.includes('HOSPEDAJE'))) return true;
+      if (srv === 'RENT_A_CAR' && (v.includes('RENT') || v.includes('CAR') || v.includes('TRASLADO') || v.includes('AUTO'))) return true;
+      return false;
+    };
+
+    // 1. Coincidencia directa por campos de servicio en la NC
+    if (matchesService(nc.serviceCategory)) return true;
+    if (matchesService(nc.serviceType)) return true;
+    if (matchesService(nc.servicio_tipo)) return true;
+
+    // 2. Coincidencia por ítems directos en la NC si los tiene
+    if (nc.items && Array.isArray(nc.items) && nc.items.some(it => matchesService(it.serviceType || it.serviceCategory))) {
+      return true;
+    }
+
+    // 3. Coincidencia por la Nota de Débito de origen que generó esta NC
+    if (nc.originDebitNoteId || nc.originDebitNoteNumber) {
+      const originNd = (allDebitNotes || []).find(nd => 
+        (nc.originDebitNoteId && nd.id === nc.originDebitNoteId) ||
+        (nc.originDebitNoteNumber && nd.ndNumber === nc.originDebitNoteNumber)
+      );
+      if (originNd) {
+        if (matchesService(originNd.serviceCategory) || matchesService(originNd.serviceType)) return true;
+        if (originNd.items && Array.isArray(originNd.items) && originNd.items.some(it => matchesService(it.serviceType || it.serviceCategory))) {
+          return true;
+        }
+      }
+    }
+
+    // 4. Coincidencia por concepto / glosa (ej: "(Servicios: BOLETO_AEREO)", "(Servicios: PAQUETES)")
+    if (nc.concept) {
+      const c = String(nc.concept).toUpperCase();
+      if (c.includes(`SERVICIOS: ${srv}`)) return true;
+      if (matchesService(c)) return true;
+    }
+
+    return false;
   },
 
-  renderNotasCredito() {
+  render() {
     const data = window.db.get();
-    const notasCredito = data.creditNotes || [];
-    const state = window.state || { servicioActivo: 'BOLETO_AEREO' };
+    const notes = data.creditNotes || [];
+    const debitNotes = data.debitNotes || [];
     const search = (document.getElementById('nc-search-input')?.value || '').toLowerCase();
     const tableBodies = document.querySelectorAll('#nc-table-body');
     if (tableBodies.length === 0) return;
 
-    // 1. Aislamiento estricto por servicio activo
-    const ncsFiltradas = notasCredito.filter(nc => {
-      const activeService = state.servicioActivo || window.currentServiceCategory || 'ALL';
-      if (!activeService || activeService === 'ALL') return true;
+    // Obtener servicio activo del estado global
+    const activeService = (window.state?.servicioActivo || window.currentServiceCategory || window.app?.servicioActivo || window.operationsHubModule?.filterService || 'ALL').toUpperCase();
 
-      const srvTipo = nc.servicio_tipo || nc.serviceType || nc.serviceCategory;
-      if (nc.servicio_tipo === activeService) return true;
-      if (srvTipo === activeService) return true;
-      if (activeService === 'BOLETO_AEREO' && (srvTipo === 'BOLETO_GDS' || nc.servicio_tipo === 'BOLETO_GDS')) return true;
-      return false;
-    });
+    // 1. Filtrar exclusivamente por el servicio donde se generó la NC
+    let list = notes.filter(nc => this.isNcForActiveService(nc, activeService, debitNotes));
 
-    // 2. Filtros secundarios por estado contable y búsqueda rápida
-    let filtered = ncsFiltradas.filter(nc => {
+    // 2. Filtros secundarios por estado y búsqueda
+    let filtered = list.filter(nc => {
       const isPaid = nc.status === 'PAGADA' || (nc.balance <= 0.01 && (nc.paidAmount > 0 || nc.paidAmountBob > 0));
       const isPartial = !isPaid && ((nc.paidAmount > 0.01 || nc.paidAmountBob > 0.01) || nc.status === 'PARCIAL');
       const isUnpaid = !isPaid && !isPartial;
@@ -103,7 +145,7 @@ window.creditNotesModule = {
 
       return `
         <tr>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">NC #${nc.ncNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nc.ncCode || ('NC #' + nc.ncNumber)}</td>
           <td class="font-mono">${nc.issueDate}</td>
           <td>
             <div style="font-weight: 600;">${nc.providerName}</div>
@@ -160,8 +202,9 @@ window.creditNotesModule = {
         providers.map(p => `<option value="${p.id}">${p.name} (${p.code})</option>`).join('');
     }
 
-    const nextNc = (data.creditNotes.length > 0) ? Math.max(...data.creditNotes.map(c => c.ncNumber)) + 1 : 501;
-    document.getElementById('nc-number-display').textContent = `NC #${nextNc}`;
+    const actCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
+    const srvCat = actCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (actCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (actCat === 'RENT_A_CAR' ? 'TRASLADO' : actCat));
+    document.getElementById('nc-number-display').textContent = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat) || `NC #${nextNc}`;
     document.getElementById('nc-issue-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('nc-currency').value = 'BOB';
 
@@ -185,9 +228,12 @@ window.creditNotesModule = {
     }
 
     const nextNc = (data.creditNotes.length > 0) ? Math.max(...data.creditNotes.map(c => c.ncNumber)) + 1 : 501;
+    const activeCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
+    const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat)));
     const newNc = {
       id: 'NC-' + Date.now(),
       ncNumber: nextNc,
+      ncCode: ncCode,
       providerId: provider.id,
       providerName: provider.name,
       providerNit: provider.nit || '',
@@ -202,9 +248,9 @@ window.creditNotesModule = {
       status: 'IMPAGA',
       estado: 'IMPAGA',
       isAutoGenerated: false,
-      servicio_tipo: window.state?.servicioActivo || window.currentServiceCategory || 'BOLETO_AEREO',
-      serviceCategory: window.state?.servicioActivo || window.currentServiceCategory || 'BOLETO_AEREO',
-      serviceType: window.state?.servicioActivo || window.currentServiceCategory || 'BOLETO_AEREO',
+      serviceCategory: activeCat,
+      serviceType: activeCat,
+      servicio_tipo: activeCat,
       createdById: data.currentUser.id,
       createdAt: new Date().toLocaleString()
     };
@@ -212,7 +258,7 @@ window.creditNotesModule = {
     data.creditNotes.unshift(newNc);
     window.db.save(data);
     window.app.closeModal('modal-nc-manual');
-    window.app.showToast(`Nota de Crédito NC #${newNc.ncNumber} registrada correctamente`, 'success');
+    window.app.showToast(`Nota de Crédito ${newNc.ncCode || ('NC #' + newNc.ncNumber)} registrada correctamente`, 'success');
     this.render();
     if (window.operationsHubModule) window.operationsHubModule.render();
     if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
@@ -241,11 +287,5 @@ window.creditNotesModule = {
     if (window.debitNotesModule && typeof window.debitNotesModule.directPrint === 'function') {
       window.debitNotesModule.directPrint(ncId, 'NC', transactionContext);
     }
-  }
-};
-
-window.renderNotasCredito = function() {
-  if (window.creditNotesModule && typeof window.creditNotesModule.renderNotasCredito === 'function') {
-    return window.creditNotesModule.renderNotasCredito();
   }
 };

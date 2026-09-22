@@ -70,6 +70,7 @@ const initialDatabase = {
   cashTransactions: [],
   expenses: [],
   travelReminders: [],
+  passengers: [],
   auditLog: [],
   accountingModifications: [],
   otherIncomes: [],
@@ -371,3 +372,31 @@ class LocalDatabase {
 if (typeof window !== 'undefined') {
   window.db = new LocalDatabase();
 }
+
+/* ── Códigos de documentos con prefijo por servicio (#NDBA001 / #NCBA001) ── */
+window.maretravelCodes = {
+  serviceAbbrev(serviceType) {
+    const map = {
+      BOLETO_AEREO: 'BA', BOLETO_GDS: 'BA',
+      SEGURO_VIAJE: 'SV',
+      CERTIFICACION_FA: 'FA',
+      ASESORAMIENTO_VISAS: 'VI',
+      PAQUETE_TURISTICO: 'PQ', PAQUETE_CRUCERO: 'PQ', PAQUETE_CONCIERTO: 'PQ',
+      HOTEL: 'HO', HOTEL_HOSPEDAJE: 'HO',
+      RENT_A_CAR: 'TR', TRASLADO: 'TR'
+    };
+    return map[serviceType] || 'OT';
+  },
+  // Siguiente correlativo único para el prefijo dado (cuenta máx existente + 1)
+  nextFor(docs, type, serviceType) {
+    const abbr = this.serviceAbbrev(serviceType);
+    const prefix = '#' + type.toLowerCase() + abbr;
+    let max = 0;
+    (docs || []).forEach(d => {
+      const s = String(d[type.toLowerCase() + 'Code'] || '').match(new RegExp('^' + prefix + '(\\d+)$', 'i'));
+      const n = s ? parseInt(s[1], 10) : 0;
+      if (n > max) max = n;
+    });
+    return prefix + String(max + 1).padStart(3, '0');
+  }
+};
