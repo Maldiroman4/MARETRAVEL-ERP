@@ -117,8 +117,8 @@ window.accountsModule = {
         <tr>
           <td class="font-mono" style="font-weight: 700; color: var(--navy);">${acc.code}</td>
           <td>
-            <div style="font-weight: 600;">${acc.name}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${acc.legalName || 'Sin Razón Social'}</div>
+            <div style="font-weight: 600; color: var(--navy);">${acc.name || acc.legalName || '-'}</div>
+            ${(acc.legalName && acc.name && acc.legalName !== acc.name) ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${acc.legalName}</div>` : ''}
           </td>
           <td class="font-mono">${acc.nit || '-'}</td>
           <td><span class="badge ${relationBadge}">${acc.relationType}</span></td>
@@ -142,6 +142,9 @@ window.accountsModule = {
               ` : ''}
               <button class="btn btn-secondary btn-sm" onclick="window.accountsModule.showAuditHistory('${acc.id}')" title="Auditoría de cambios">
                 <i data-lucide="history"></i>
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="window.accountsModule.deleteAccount('${acc.id}')" title="Eliminar cuenta">
+                <i data-lucide="trash-2"></i> Eliminar
               </button>
             </div>
           </td>
@@ -171,14 +174,21 @@ window.accountsModule = {
     const servicesContainer = document.getElementById('provider-services-list');
     if (servicesContainer) servicesContainer.innerHTML = '';
 
+    const btnDelete = document.getElementById('btn-delete-account');
+    if (btnDelete) {
+      btnDelete.style.display = accountId ? 'inline-flex' : 'none';
+    }
+
     if (accountId) {
       modalTitle.textContent = 'Editar Cuenta';
       const data = window.db.get();
       const acc = data.accounts.find(a => a.id === accountId);
       if (acc) {
         document.getElementById('acc-code').value = acc.code;
-        document.getElementById('acc-name').value = acc.name;
-        document.getElementById('acc-legal-name').value = acc.legalName || '';
+        const legalNameEl = document.getElementById('acc-legal-name');
+        if (legalNameEl) legalNameEl.value = acc.legalName || acc.name || '';
+        const nameEl = document.getElementById('acc-name');
+        if (nameEl) nameEl.value = acc.name || acc.legalName || '';
         document.getElementById('acc-nit').value = acc.nit || '';
         document.getElementById('acc-relation-type').value = acc.relationType;
         document.getElementById('acc-type').value = acc.accountType;
@@ -189,7 +199,8 @@ window.accountsModule = {
         document.getElementById('acc-phone').value = acc.phone || '';
         document.getElementById('acc-cellphone').value = acc.cellphone || '';
         document.getElementById('acc-email').value = acc.email || '';
-        document.getElementById('acc-web').value = acc.webPage || '';
+        const webEl = document.getElementById('acc-web');
+        if (webEl) webEl.value = acc.webPage || '';
 
         // Cargar prestadores de servicios si aplica
         if (acc.providerServices && acc.providerServices.length > 0) {
@@ -269,10 +280,17 @@ window.accountsModule = {
       }
     });
 
+    const legalNameEl = document.getElementById('acc-legal-name');
+    const nameEl = document.getElementById('acc-name');
+    const primaryName = (legalNameEl ? legalNameEl.value.trim() : '') || (nameEl ? nameEl.value.trim() : '');
+
+    const webEl = document.getElementById('acc-web');
+    const webVal = webEl ? webEl.value.trim() : '';
+
     const accountData = {
       code: document.getElementById('acc-code').value.trim(),
-      name: document.getElementById('acc-name').value.trim(),
-      legalName: document.getElementById('acc-legal-name').value.trim(),
+      name: primaryName,
+      legalName: primaryName,
       nit: document.getElementById('acc-nit').value.trim(),
       relationType: document.getElementById('acc-relation-type').value,
       accountType: document.getElementById('acc-type').value,
@@ -283,7 +301,7 @@ window.accountsModule = {
       phone: document.getElementById('acc-phone').value.trim(),
       cellphone: document.getElementById('acc-cellphone').value.trim(),
       email: document.getElementById('acc-email').value.trim(),
-      webPage: document.getElementById('acc-web').value.trim(),
+      webPage: webVal,
       providerServices: services,
       status: 'ACTIVO'
     };
@@ -348,6 +366,104 @@ window.accountsModule = {
       window.operationsHubModule.render();
     }
     if (window.app && window.app.updateDashboardKpis) {
+      window.app.updateDashboardKpis();
+    }
+  },
+
+  deleteAccount(accountId) {
+    if (!accountId) return;
+    const data = window.db.get();
+    const acc = (data.accounts || []).find(a => a.id === accountId);
+    if (!acc) {
+      window.app.showToast('Cuenta no encontrada.', 'error');
+      return;
+    }
+
+    // 1. Detección de documentos y operaciones comerciales vinculadas
+    const linkedNds = (data.debitNotes || []).filter(nd => nd.accountId === accountId || nd.accountName === acc.name);
+    const linkedNcs = (data.creditNotes || []).filter(nc => nc.providerId === accountId || nc.accountId === accountId || nc.providerName === acc.name || nc.accountName === acc.name);
+    const linkedReceipts = (data.cashReceipts || []).filter(r => r.accountId === accountId || r.accountName === acc.name);
+    const linkedPayments = (data.providerPayments || []).filter(p => p.providerId === accountId || p.providerName === acc.name);
+    const linkedTickets = (data.gdsTickets || []).filter(t => t.operatorId === accountId);
+
+    const totalMovements = linkedNds.length + linkedNcs.length + linkedReceipts.length + linkedPayments.length + linkedTickets.length;
+
+    // 2. Diálogo de confirmación seguro
+    if (totalMovements > 0) {
+      const details = [];
+      if (linkedNds.length > 0) details.push(`${linkedNds.length} Nota(s) de Débito`);
+      if (linkedNcs.length > 0) details.push(`${linkedNcs.length} Nota(s) de Crédito / Liquidación`);
+      if (linkedReceipts.length > 0) details.push(`${linkedReceipts.length} Recibo(s) de Caja`);
+      if (linkedPayments.length > 0) details.push(`${linkedPayments.length} Comprobante(s) de Pago`);
+      if (linkedTickets.length > 0) details.push(`${linkedTickets.length} Boleto(s) GDS`);
+
+      const msg = `⚠️ ADVERTENCIA CONTABLE Y OPERATIVA:\n\n` +
+        `La cuenta "${acc.name}" (${acc.code}) tiene ${totalMovements} registro(s) vinculado(s):\n` +
+        `• ${details.join('\n• ')}\n\n` +
+        `Si elimina esta cuenta, sus documentos históricos conservarán el nombre pero la cuenta desaparecerá del directorio comercial.\n\n` +
+        `¿Está absolutamente seguro de ELIMINAR definitivamente la cuenta "${acc.name}"?`;
+
+      if (!confirm(msg)) {
+        return;
+      }
+    } else {
+      const msg = `¿Confirma que desea eliminar la cuenta "${acc.name}" (${acc.code}) del directorio?`;
+      if (!confirm(msg)) {
+        return;
+      }
+    }
+
+    // 3. Auditoría de eliminación
+    if (!data.accountHistory) data.accountHistory = [];
+    data.accountHistory.unshift({
+      id: 'AH-' + Date.now(),
+      accountId: acc.id,
+      accountName: acc.name,
+      changeType: 'DELETE',
+      fieldChanged: 'Eliminación de Cuenta',
+      oldValue: `${acc.code} - ${acc.name} (${acc.relationType || 'CUENTA'})`,
+      newValue: 'ELIMINADA',
+      userId: data.currentUser ? data.currentUser.id : 'USR-001',
+      userName: data.currentUser ? data.currentUser.name : 'Administrador',
+      createdAt: new Date().toLocaleString()
+    });
+
+    // 4. Limpiar contactos de empresa asociados
+    if (data.companyContacts && Array.isArray(data.companyContacts)) {
+      data.companyContacts = data.companyContacts.filter(c => c.companyId !== accountId);
+    }
+
+    // 5. Eliminar la cuenta del arreglo principal
+    data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
+
+    // 6. Guardar cambios en la base de datos física / localStorage
+    window.db.save(data);
+
+    // Cerrar modal si estaba abierto
+    window.app.closeModal('modal-account');
+    window.app.showToast(`Cuenta "${acc.name}" eliminada exitosamente.`, 'success');
+
+    // 7. Refrescar vistas reactivamente
+    this.render();
+    if (window.operationsHubModule && typeof window.operationsHubModule.render === 'function') {
+      window.operationsHubModule.render();
+    }
+    if (window.debitNotesModule && typeof window.debitNotesModule.render === 'function') {
+      window.debitNotesModule.render();
+    }
+    if (window.creditNotesModule && typeof window.creditNotesModule.render === 'function') {
+      window.creditNotesModule.render();
+    }
+    if (window.cashRegisterModule && typeof window.cashRegisterModule.render === 'function') {
+      window.cashRegisterModule.render();
+    }
+    if (window.gdsModule && typeof window.gdsModule.render === 'function') {
+      window.gdsModule.render();
+    }
+    if (window.otherIncomesModule && typeof window.otherIncomesModule.render === 'function') {
+      window.otherIncomesModule.render();
+    }
+    if (window.app && typeof window.app.updateDashboardKpis === 'function') {
       window.app.updateDashboardKpis();
     }
   },

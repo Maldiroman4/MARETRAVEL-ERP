@@ -6,7 +6,7 @@
   <title>MARETRAVEL - Sistema ERP Contable y Comercial</title>
   <!-- BUILD: v20260917-TABS4 -->
   <!-- Estilos y Tipografía -->
-  <link rel="stylesheet" href="css/style.css?v=20260917_v3">
+  <link rel="stylesheet" href="css/style.css?v=20260918_v2">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js para Gráficos Estadísticos (Local) -->
@@ -21,7 +21,7 @@
   <div id="login-screen" class="login-screen-overlay">
     <div class="login-card">
       <div class="login-header">
-        <img src="assets/logo.jpg" alt="MARETRAVEL Logo" class="login-logo" onerror="this.style.display='none'">
+        <img src="assets/logo.png" alt="MARETRAVEL Logo" class="login-logo" onerror="this.style.display='none'">
         <h2 class="login-title">MARETRAVEL S.R.L.</h2>
         <span class="login-badge">SISTEMA ERP COMERCIAL &amp; CONTABLE</span>
         <p class="login-subtitle">Control de Emisiones, Facturación, Tesorería y Cobranzas</p>
@@ -67,7 +67,7 @@
          ========================================================================== -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <img src="assets/logo.jpg" class="sidebar-logo" alt="MARETRAVEL">
+        <img src="assets/logo.png" class="sidebar-logo" alt="MARETRAVEL">
         <div class="brand-text">
           <h1>MARETRAVEL</h1>
           <span>ERP Comercial &amp; Boletos</span>
@@ -411,7 +411,7 @@
                   <i data-lucide="file-minus-2"></i> Nota Crédito
                 </button>
                 <button type="button" class="hub-tab-btn" data-hub-tab="cash" onclick="window.operationsHubModule.switchTab('cash')">
-                  <i data-lucide="wallet"></i> Caja - Cobranzas
+                  <i data-lucide="wallet"></i> IMP PAGOS-COBROS
                 </button>
               </div>
               <!-- BOTÓN ACCIÓN PRINCIPAL (CONTEXTUAL) -->
@@ -463,10 +463,10 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                   <div>
                     <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                      <i data-lucide="printer" style="color: #00a884;"></i> Imprimibles de Caja: Recibos (ND) y Comprobantes de Pago (NC)
+                      <i data-lucide="printer" style="color: #00a884;"></i> Imprimibles de Pagos y Cobros: Recibos (ND) y Pagos a Proveedor (NC)
                     </h3>
                     <p style="margin: 2px 0 0; font-size: 0.82rem; color: #64748b;">
-                      Listado oficial de recibos de cobranza a clientes y comprobantes de liquidación a proveedores listos para imprimir y verificar.
+                      Listado oficial de recibos de cobranza a clientes y pagos a proveedores listos para imprimir y verificar.
                     </p>
                   </div>
                   <!-- Filtros rápidos de Tipo de Imprimible -->
@@ -478,7 +478,7 @@
                       <i data-lucide="file-spreadsheet"></i> Recibos (ND)
                     </button>
                     <button type="button" class="hub-tab-btn cash-filter-pill" data-filter="NC" onclick="window.cashRegisterModule.setPrintablesFilter('NC')">
-                      <i data-lucide="file-minus-2"></i> Pagos (NC)
+                      <i data-lucide="arrow-up-right"></i> Pagos a Proveedor (NC)
                     </button>
                   </div>
                 </div>
@@ -563,7 +563,7 @@
                     <th>Calificación</th>
                     <th>Ciudad</th>
                     <th>Servicios</th>
-                    <th>Acciones</th>
+                    <th style="min-width: 250px;">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="accounts-table-body">
@@ -1165,21 +1165,14 @@
       </div>
       <form id="account-form">
         <div class="modal-content">
-          <div class="form-row">
+          <div class="form-row" style="grid-template-columns: 140px 1fr 180px;">
             <div>
               <label class="form-label">Código Cuenta:</label>
               <input type="text" id="acc-code" class="form-control font-mono" required>
             </div>
-            <div style="grid-column: span 2;">
-              <label class="form-label">Nombre Comercial / Titular:</label>
-              <input type="text" id="acc-name" class="form-control" required>
-            </div>
-          </div>
-
-          <div class="form-row" style="margin-top: 10px;">
-            <div style="grid-column: span 2;">
+            <div>
               <label class="form-label">Razón Social (Facturación):</label>
-              <input type="text" id="acc-legal-name" class="form-control">
+              <input type="text" id="acc-legal-name" class="form-control" required placeholder="Nombre o Razón Social">
             </div>
             <div>
               <label class="form-label">NIT / CI:</label>
@@ -1219,7 +1212,7 @@
             </div>
           </div>
 
-          <div class="form-row" style="margin-top: 10px;">
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: repeat(4, 1fr);">
             <div>
               <label class="form-label">Departamento:</label>
               <input type="text" id="acc-department" class="form-control" value="La Paz">
@@ -1238,18 +1231,14 @@
             </div>
           </div>
 
-          <div class="form-row" style="margin-top: 10px;">
-            <div style="grid-column: span 2;">
+          <div class="form-row" style="margin-top: 10px; grid-template-columns: 2fr 1fr;">
+            <div>
               <label class="form-label">Dirección:</label>
               <input type="text" id="acc-address" class="form-control">
             </div>
             <div>
               <label class="form-label">Email de Contacto:</label>
               <input type="email" id="acc-email" class="form-control">
-            </div>
-            <div>
-              <label class="form-label">Página Web:</label>
-              <input type="text" id="acc-web" class="form-control">
             </div>
           </div>
 
@@ -1269,9 +1258,14 @@
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close-modal="modal-account">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-danger" id="btn-delete-account" style="display: none;" onclick="window.accountsModule.deleteAccount(window.accountsModule.editingAccountId)">
+            <i data-lucide="trash-2"></i> Eliminar Cuenta
+          </button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" data-close-modal="modal-account">Cancelar</button>
+            <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Cuenta</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1344,11 +1338,11 @@
               </select>
             </div>
             <div>
-              <label class="form-label">AIR FARE:</label>
-              <input type="number" step="0.01" id="sim-fare-amount" class="form-control font-mono" placeholder="AIR FARE (ej. 800)" oninput="window.gdsModule.recalcSimulateTotals()" required>
+              <label class="form-label">Costo Prov. (Bruto) / AIR FARE:</label>
+              <input type="number" step="0.01" id="sim-fare-amount" class="form-control font-mono" placeholder="Costo Prov. (ej. 800)" oninput="window.gdsModule.recalcSimulateTotals()" required>
             </div>
             <div>
-              <label class="form-label">Precio de Boleto Aéreo:</label>
+              <label class="form-label">Costo Boleto / Tarifa GDS:</label>
               <input type="number" step="0.01" id="sim-net-amount" class="form-control font-mono" placeholder="Importe total (ej. 960)" oninput="window.gdsModule.recalcSimulateTotals()" required>
             </div>
           </div>
@@ -2657,7 +2651,7 @@
               1. Cabecera Corporativa de la Operación (Cliente y Términos)
             </div>
 
-            <div class="form-row" style="grid-template-columns: 2fr 1fr; gap: 12px;">
+            <div class="form-row" style="grid-template-columns: 2fr 1.1fr 1.2fr; gap: 12px; align-items: flex-end;">
               <div>
                 <label class="form-label" style="font-weight: 700;">Cliente / Empresa a Facturar (Cuentas por Cobrar):</label>
                 <select id="uni-client-select" class="form-control" required>
@@ -2667,6 +2661,17 @@
               <div>
                 <label class="form-label" id="lbl-uni-issue-date" style="font-weight: 700;">Fecha de Emisión:</label>
                 <input type="date" id="uni-issue-date" class="form-control font-mono" required>
+              </div>
+              <div>
+                <label class="form-label" style="font-weight: 700; color: #0f172a;">Moneda de Operación:</label>
+                <div class="btn-group" role="group" style="display: flex; width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1;">
+                  <button type="button" id="uni-btn-currency-bob" class="btn btn-sm btn-primary font-bold" onclick="window.operationsHubModule.setGlobalCurrency('BOB')" style="flex: 1; padding: 7px 10px;">
+                    BOB (Bs)
+                  </button>
+                  <button type="button" id="uni-btn-currency-usd" class="btn btn-sm btn-secondary font-bold" onclick="window.operationsHubModule.setGlobalCurrency('USD')" style="flex: 1; padding: 7px 10px;">
+                    USD ($us)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2680,9 +2685,6 @@
                 <span class="badge badge-blue" id="uni-items-count-badge">1 Servicio</span>
               </div>
               <div style="display: flex; gap: 8px;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="window.operationsHubModule.openNewServiceTypeModal()" style="font-size: 0.78rem;">
-                  <i data-lucide="plus"></i> + Añadir Tipo de Servicio
-                </button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="window.operationsHubModule.addNewItemToNd()" style="font-weight: 700;">
                   <i data-lucide="plus-circle"></i> + Adicionar Otro Servicio a la ND
                 </button>
@@ -2695,50 +2697,6 @@
             </div>
           </div>
 
-          <!-- 3. RESUMEN FINANCIERO CONSOLIDADO Y BIFURCACIÓN DE CUENTAS POR PAGAR -->
-          <div style="background: #0f172a; color: #fff; border-radius: 10px; padding: 16px; margin-top: 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">
-              <div style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="calculator" style="width: 16px; height: 16px;"></i>
-                3. Consolidación Financiera y Bifurcación Automática a Proveedores
-              </div>
-              <div style="font-size: 0.75rem; color: #94a3b8;">
-                T/C Aplicado: <strong class="font-mono text-white" id="uni-summary-tc">6.96 BOB</strong>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1.5fr 1.5fr 1.5fr; gap: 16px; margin-bottom: 14px;">
-              <div style="background: #1e293b; border-radius: 8px; padding: 12px;">
-                <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Total Venta (ND Cliente):</span>
-                <div class="font-mono" id="uni-total-sale-preview" style="font-size: 1.35rem; font-weight: 800; color: #38bdf8;">BOB 0.00</div>
-                <div class="font-mono" id="uni-total-sale-usd-preview" style="font-size: 0.85rem; color: #94a3b8;">USD 0.00</div>
-              </div>
-
-              <div style="background: #1e293b; border-radius: 8px; padding: 12px;">
-                <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Total Costo a Proveedores:</span>
-                <div class="font-mono" id="uni-total-cost-preview" style="font-size: 1.35rem; font-weight: 800; color: #f87171;">BOB 0.00</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;">Suma de liquidaciones netas/brutas</div>
-              </div>
-
-              <div style="background: #1e293b; border-radius: 8px; padding: 12px;">
-                <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Utilidad Total Agencia:</span>
-                <div class="font-mono" id="uni-utility-preview" style="font-size: 1.35rem; font-weight: 800; color: #4ade80;">BOB 0.00</div>
-                <div class="font-mono" id="uni-utility-usd-preview" style="font-size: 0.85rem; color: #94a3b8;">USD 0.00</div>
-              </div>
-            </div>
-
-            <!-- PREVISUALIZACIÓN DE BIFURCACIÓN DE NCs POR PROVEEDOR -->
-            <div style="background: #1e293b; border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="git-branch" style="width: 14px; height: 14px; color: #38bdf8;"></i>
-                Bifurcación Automática: Cuentas por Pagar (NCs) que se generarán por proveedor:
-              </div>
-              <div id="uni-bifurcation-preview" style="display: flex; flex-direction: column; gap: 6px;">
-                <!-- Lista dinámica de proveedores involucrados -->
-              </div>
-            </div>
-          </div>
-
           <!-- Observaciones de la ND -->
           <div class="form-group" style="margin-top: 14px;">
             <label class="form-label">Observaciones / Glosa General de la Nota de Débito:</label>
@@ -2748,8 +2706,8 @@
 
         <div class="modal-footer" style="flex-shrink: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 22px; display: flex; justify-content: space-between; align-items: center;">
           <button type="button" class="btn btn-secondary" data-close-modal="modal-unified-operation">Cancelar</button>
-          <button type="submit" id="btn-save-unified-operation" class="btn btn-primary btn-lg" style="font-weight: 700; min-width: 260px;">
-            <i data-lucide="check-circle"></i> Guardar y Emitir ND Multi-Servicio
+          <button type="submit" id="btn-save-unified-operation" class="btn btn-primary btn-lg" style="font-weight: 700; min-width: 220px;">
+            <i data-lucide="check-circle"></i> Guardar y Emitir
           </button>
         </div>
       </form>
@@ -2870,6 +2828,140 @@
     </div>
   </div>
 
+  <!-- Modal: Registro de Pago / Amortización Transaccional -->
+  <div class="modal-overlay" id="modal-payment-transaction">
+    <div class="modal-box" style="max-width: 520px; border-radius: 14px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);">
+      <div class="modal-header" style="background: #0f172a; color: #fff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div id="modal-pay-icon-container" style="background: #00a884; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff;">
+            <i data-lucide="hand-coins" style="width: 20px; height: 20px;"></i>
+          </div>
+          <div>
+            <h3 class="modal-title" id="modal-pay-title" style="color: #fff; font-size: 1.05rem; margin: 0; font-weight: 700;">
+              Registro de Pago / Amortización
+            </h3>
+            <div id="modal-pay-subtitle" style="font-size: 0.76rem; color: #94a3b8;">
+              Gestión transaccional y emisión de comprobante de caja
+            </div>
+          </div>
+        </div>
+        <button type="button" class="modal-close" data-close-modal="modal-payment-transaction" style="color: #fff; opacity: 0.8; font-size: 1.5rem; background: none; border: none; cursor: pointer;">&times;</button>
+      </div>
+
+      <form id="form-payment-transaction" onsubmit="window.cashRegisterModule.processPaymentTransaction(event); return false;" style="margin: 0;">
+        <input type="hidden" id="pay-doc-type" value="ND">
+        <input type="hidden" id="pay-doc-id" value="">
+
+        <div class="modal-content" style="padding: 18px 20px; background: #ffffff;">
+          
+          <!-- 1. Resumen de Deuda del Documento -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span id="pay-doc-label" class="font-mono font-bold" style="color: #0284c7; font-size: 0.95rem;">ND #00000</span>
+              <span id="pay-entity-name" style="font-size: 0.82rem; font-weight: 600; color: #334155; max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Cliente / Proveedor</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+              <div>
+                <span style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 700; display: block;">Total del Documento:</span>
+                <div id="pay-doc-total" class="font-mono font-bold" style="font-size: 1.15rem; color: #0f172a;">BOB 0.00</div>
+              </div>
+              <div>
+                <span style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 700; display: block;">Saldo Pendiente Actual:</span>
+                <div id="pay-doc-balance" class="font-mono font-bold" style="font-size: 1.15rem; color: #dc2626;">BOB 0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Moneda y Tipo de Cambio -->
+          <div class="form-row" style="grid-template-columns: 1.2fr 1fr; gap: 12px; margin-bottom: 12px; align-items: flex-end;">
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.78rem;">Moneda:</label>
+              <div class="btn-group" role="group" style="display: flex; width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1;">
+                <button type="button" id="pay-curr-btn-bob" class="btn btn-xs btn-primary font-bold" onclick="window.cashRegisterModule.onPaymentCurrencyChange('BOB')" style="flex: 1; padding: 7px 0; text-align: center;">
+                  BOB (Bs)
+                </button>
+                <button type="button" id="pay-curr-btn-usd" class="btn btn-xs btn-secondary" onclick="window.cashRegisterModule.onPaymentCurrencyChange('USD')" style="flex: 1; padding: 7px 0; text-align: center;">
+                  USD ($us)
+                </button>
+              </div>
+              <input type="hidden" id="pay-currency" value="BOB">
+            </div>
+            <div>
+              <label class="form-label font-bold" style="font-size: 0.78rem;">Tipo de Cambio:</label>
+              <input type="number" step="0.01" id="pay-exchange-rate" class="form-control font-mono font-bold" style="text-align: right;" value="6.96" oninput="window.cashRegisterModule.onModalPaymentAmountChange()">
+            </div>
+          </div>
+
+          <!-- 3. Monto a Ingresar / Amortizar -->
+          <div class="form-group" style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="form-label font-bold" style="font-size: 0.82rem; color: #0f172a; margin: 0;">
+                Monto a Ingresar / Amortizar:
+              </label>
+              <button type="button" class="btn btn-link btn-xs" onclick="window.cashRegisterModule.setFullPaymentAmount()" style="font-size: 0.74rem; color: #0284c7; padding: 0; text-decoration: underline; font-weight: 600; cursor: pointer;">
+                Liquidar Saldo Total
+              </button>
+            </div>
+            <div style="position: relative;">
+              <input type="number" step="0.01" min="0.01" id="pay-amount-input" class="form-control font-mono font-bold" 
+                style="font-size: 1.25rem; height: 44px; text-align: right; padding-right: 50px; border: 2px solid #0284c7; color: #0284c7;" 
+                placeholder="0.00" oninput="window.cashRegisterModule.onModalPaymentAmountChange()" required>
+              <span id="pay-amount-curr-label" class="font-mono font-bold" style="position: absolute; right: 12px; top: 12px; color: #64748b; font-size: 0.9rem;">
+                BOB
+              </span>
+            </div>
+            <div id="pay-countervalue-preview" class="font-mono" style="font-size: 0.76rem; color: #64748b; text-align: right; margin-top: 4px;">
+              ≈ USD 0.00 (T/C: 6.96)
+            </div>
+          </div>
+
+          <!-- 4. Previsualización de Saldo Restante -->
+          <div style="background: #f1f5f9; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.78rem; font-weight: 600; color: #475569;">Saldo Restante tras transacción:</span>
+            <div class="font-mono font-bold" id="pay-remaining-balance-preview" style="font-size: 0.95rem; color: #dc2626;">
+              BOB 0.00
+            </div>
+          </div>
+
+          <!-- 5. Forma de Pago y Cuenta Financiera -->
+          <div class="form-row" style="grid-template-columns: 1.2fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label class="form-label" style="font-size: 0.75rem;">Forma de Pago:</label>
+              <select id="pay-method-select" class="form-control" style="font-size: 0.8rem;">
+                <option value="TRANSFERENCIA" selected>Transferencia Bancaria</option>
+                <option value="EFECTIVO">Efectivo en Caja</option>
+                <option value="QR">Pago QR</option>
+                <option value="TARJETA_DEBITO">Tarjeta de Débito</option>
+                <option value="TARJETA_CREDITO">Tarjeta de Crédito</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 0.75rem;">Cuenta de Depósito:</label>
+              <select id="pay-account-select" class="form-control" style="font-size: 0.8rem;">
+                <option value="CAJA_GENERAL">Caja General Central</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 6. Observaciones / Glosa -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.75rem;">Glosa / Observación del Recibo:</label>
+            <input type="text" id="pay-notes-input" class="form-control" placeholder="Ej: Pago total o abono en transferencia bancaria" style="font-size: 0.8rem;">
+          </div>
+        </div>
+
+        <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-payment-transaction">Cancelar</button>
+          <button type="submit" id="btn-confirm-payment-transaction" class="btn btn-primary" style="font-weight: 700; padding: 9px 20px; background: #00a884; border-color: #008f70;">
+            <i data-lucide="check-circle"></i> Confirmar y Procesar Transacción
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Contenedor de Toasts -->
   <div id="toast-container"></div>
 
@@ -2877,22 +2969,22 @@
   <div id="print-area"></div>
 
   <!-- Scripts del Sistema ERP -->
-  <script src="js/db.js?v=20260917_v3"></script>
-  <script src="js/modules/financialGuard.js?v=20260917_v3"></script>
-  <script src="js/modules/bankAccounts.js?v=20260917_v3"></script>
-  <script src="js/api.js?v=20260917_v3"></script>
-  <script src="js/adapters/accounts.js?v=20260917_v3"></script>
-  <script src="js/modules/accounts.js?v=20260917_v3"></script>
-  <script src="js/modules/gds.js?v=20260917_v3"></script>
-  <script src="js/modules/debitNotes.js?v=20260917_v3"></script>
-  <script src="js/modules/creditNotes.js?v=20260917_v3"></script>
-  <script src="js/modules/cashRegister.js?v=20260917_v3"></script>
-  <script src="js/modules/otherIncomes.js?v=20260917_v3"></script>
-  <script src="js/modules/reports.js?v=20260917_v3"></script>
-  <script src="js/modules/calendar.js?v=20260917_v3"></script>
-  <script src="js/modules/settings.js?v=20260917_v3"></script>
-  <script src="js/modules/operationsHub.js?v=20260917_v3"></script>
-  <script src="js/app.js?v=20260917_v3"></script>
+<script src="js/db.js?v=20260921_v17"></script>
+  <script src="js/modules/financialGuard.js?v=20260921_v17"></script>
+  <script src="js/modules/bankAccounts.js?v=20260921_v17"></script>
+  <script src="js/api.js?v=20260921_v17"></script>
+  <script src="js/adapters/accounts.js?v=20260921_v17"></script>
+  <script src="js/modules/accounts.js?v=20260921_v17"></script>
+  <script src="js/modules/gds.js?v=20260921_v17"></script>
+  <script src="js/modules/debitNotes.js?v=20260921_v17"></script>
+  <script src="js/modules/creditNotes.js?v=20260921_v17"></script>
+  <script src="js/modules/cashRegister.js?v=20260921_v17"></script>
+  <script src="js/modules/otherIncomes.js?v=20260921_v17"></script>
+  <script src="js/modules/reports.js?v=20260921_v17"></script>
+  <script src="js/modules/calendar.js?v=20260921_v17"></script>
+  <script src="js/modules/settings.js?v=20260921_v17"></script>
+  <script src="js/modules/operationsHub.js?v=20260921_v17"></script>
+  <script src="js/app.js?v=20260921_v17"></script>
 
 
 

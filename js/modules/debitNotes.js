@@ -193,15 +193,24 @@ window.debitNotesModule = {
           </td>
           <td><span class="badge badge-slate">${nd.paymentTerm.replace(/_/g, ' ')}</span></td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
-            ${nd.currency} ${Number(nd.totalAmountBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD' 
+              ? `USD ${Number(nd.totalAmountUsd !== undefined && nd.totalAmountUsd !== null ? nd.totalAmountUsd : ((nd.totalAmountBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+              : `BOB ${Number(nd.totalAmountBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
           <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 600;">
-            ${nd.currency} ${Number(nd.balanceBob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
+            ${nd.currency === 'USD' 
+              ? `USD ${Number(nd.balanceUsd !== undefined && nd.balanceUsd !== null ? nd.balanceUsd : ((nd.balanceBob || 0) / (nd.frozenExchangeRate || 6.96))).toFixed(2)}` 
+              : `BOB ${Number(nd.balanceBob || 0).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`}
           </td>
-          <td><span class="badge ${statusBadge}">${nd.status}</span></td>
+          <td>${window.cashRegisterModule ? window.cashRegisterModule.renderStatusBadge(nd.status, (Number(nd.totalAmountBob || 0) - Number(nd.balanceBob || 0)), Number(nd.balanceBob || 0)) : `<span class="badge ${statusBadge}">${nd.status}</span>`}</td>
           <td style="font-size: 0.78rem;">${(nd.isCommissionNd || nd.serviceType === 'COMISION_PLATAFORMA') ? '<span class="badge badge-emerald">Comisión</span>' : ((nd.items?.length || 0) + ' serv.')}</td>
           <td>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+              ${nd.status !== 'ANULADA' ? `
+                <button type="button" class="btn ${(Number(nd.balanceBob || 0) > 0.01 || Number(nd.balanceUsd || 0) > 0.01) ? 'btn-success' : 'btn-secondary'} btn-sm" onclick="window.cashRegisterModule.openPaymentModal('ND', '${nd.id}')" title="Cobrar / Amortizar" style="padding: 4px 8px; font-weight: 700; ${(Number(nd.balanceBob || 0) > 0.01 || Number(nd.balanceUsd || 0) > 0.01) ? 'background: #00a884; border-color: #008f70; color: #fff;' : ''} display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="hand-coins" style="width: 14px; height: 14px;"></i> Cobrar
+                </button>
+              ` : ''}
               ${!isLocked ? `
                 <button class="btn btn-primary btn-sm" onclick="window.debitNotesModule.closeNd('${nd.id}')" title="Cerrar ND y generar NCs a proveedores">
                   <i data-lucide="lock"></i> Cerrar
@@ -222,12 +231,6 @@ window.debitNotesModule = {
                   <i data-lucide="x-circle"></i>
                 </button>
               ` : ''}
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.directPrint('${nd.id}')" title="Impresión Directa (Oficial)">
-                <i data-lucide="printer"></i>
-              </button>
-              <button class="btn btn-secondary btn-sm" onclick="window.debitNotesModule.printPreview('${nd.id}', 'long')" title="Vista Previa y Emisión Oficial">
-                <i data-lucide="file-text"></i>
-              </button>
             </div>
           </td>
         </tr>
@@ -1117,15 +1120,26 @@ window.debitNotesModule = {
    * por servicio con switch (item.tipo_servicio) para los 10 servicios,
    * tabla de totales en verde #00a884, observaciones y firmas inferiores.
    */
-  generateOfficialVoucherHtml(doc, customEmissionDate, customEmissionTime, explicitDocType = null) {
+  generateOfficialVoucherHtml(doc, customEmissionDate, customEmissionTime, explicitDocType = null, transactionContext = null) {
     if (!doc) return '';
 
-    const isNc = explicitDocType === 'NC' || doc.ncNumber !== undefined || doc.docType === 'NC' || doc.type === 'NC';
+    const tx = transactionContext || (doc && (doc.receiptCode || doc.receiptNumber) ? doc : null);
+    const isTransaction = Boolean(tx);
+
+    const isNc = explicitDocType === 'NC' 
+      || (tx && (tx.tipo === 'NC' || tx.creditNoteId || tx.creditNoteNumber || tx.providerId))
+      || doc.ncNumber !== undefined 
+      || doc.docType === 'NC' 
+      || doc.type === 'NC';
     const docType = isNc ? 'NC' : 'ND';
-    const docTitle = isNc ? 'Nota de Crédito' : 'Nota de Débito';
-    const docNumber = isNc 
-      ? (doc.ncNumber != null ? doc.ncNumber : doc.id)
-      : (doc.ndNumber != null ? doc.ndNumber : doc.id);
+    const docTitle = isTransaction
+      ? (isNc ? 'PAGO A PROVEEDOR' : 'RECIBO DE PAGO')
+      : (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
+    const docNumber = isTransaction
+      ? (tx.receiptCode || ('RCP-' + String(tx.receiptNumber).padStart(5, '0')))
+      : (isNc 
+          ? (doc.ncNumber != null ? doc.ncNumber : doc.id)
+          : (doc.ndNumber != null ? doc.ndNumber : doc.id));
 
     const data = window.db.get();
     
@@ -1312,7 +1326,7 @@ window.debitNotesModule = {
                       <div class="nd-srv-line" style="color: #0284c7;">BOLETO AÉREO / GDS</div>
                       <div class="nd-srv-line">RUTA: ${srvRoute}</div>
                       ${srvDates !== '-' ? `<div class="nd-srv-line">FECHAS: ${srvDates}</div>` : ''}
-                      <div class="nd-srv-line">LOCALIZADOR: ${pnrCode} | CABINA: ${cabinClass}</div>
+                      <div class="nd-srv-line">LOCALIZADOR: ${pnrCode}</div>
                     </div>
                   </div>
                 </div>
@@ -1975,19 +1989,37 @@ window.debitNotesModule = {
     // Tipo de cambio congelado al emitir
     const tcUsed = doc.frozenExchangeRate || doc.exchangeRateUsed || (data.systemSettings ? data.systemSettings.activeExchangeSell : 6.96) || 6.96;
 
-    // Totales
+    // Totales y Mapeo de Transacción (Recibo de Caja / Pago)
     const currencyStr = doc.currency || 'BOB';
-    const amountVal = Number(doc.totalAmountBob != null ? doc.totalAmountBob : (doc.totalAmount || 0));
-    let totalUsdFormatted = '0.00';
-    let totalBobFormatted = '0.00';
+    const isDocUsd = (currencyStr === 'USD');
 
-    if (currencyStr === 'USD') {
-      totalUsdFormatted = Number(doc.totalAmountUsd || (amountVal / tcUsed) || doc.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      totalBobFormatted = Number(amountVal * (amountVal === (doc.totalAmountUsd || doc.totalAmount) ? tcUsed : 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } else {
-      totalUsdFormatted = Number(amountVal / tcUsed).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      totalBobFormatted = Number(amountVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+    const totalDocBob = Number(doc.totalAmountBob ?? (isDocUsd ? ((doc.totalAmountUsd || doc.total_documento || 0) * tcUsed) : (doc.total_documento || 0)));
+    const totalDocUsd = Number(doc.totalAmountUsd ?? (tcUsed > 0 ? totalDocBob / tcUsed : 0));
+    const totalDocVal = isDocUsd ? totalDocUsd : totalDocBob;
+
+    const montoTransaccionBob = isTransaction
+      ? Number(tx.monto_transaccion ?? tx.totalPaidBob ?? tx.amountPaidBob ?? tx.amountBob ?? 0)
+      : totalDocBob;
+
+    const montoTransaccionUsd = isTransaction
+      ? Number(tx.monto_transaccion_usd ?? tx.totalPaidUsd ?? tx.amountPaidUsd ?? tx.amountUsd ?? (tcUsed > 0 ? montoTransaccionBob / tcUsed : 0))
+      : totalDocUsd;
+
+    const saldoRemanenteBob = isTransaction
+      ? Number(tx.saldo_pendiente_bob ?? (tx.details && tx.details[0] && tx.details[0].remainingBalanceBob) ?? doc.balanceBob ?? (isDocUsd ? ((doc.balanceUsd || doc.saldo_pendiente || 0) * tcUsed) : (doc.saldo_pendiente || 0)))
+      : Number(doc.balanceBob ?? (isDocUsd ? ((doc.balanceUsd || doc.saldo_pendiente || 0) * tcUsed) : (doc.saldo_pendiente || 0)));
+
+    const saldoRemanenteUsd = isTransaction
+      ? Number(tx.saldo_pendiente_usd ?? (tcUsed > 0 ? saldoRemanenteBob / tcUsed : 0))
+      : Number(doc.balanceUsd ?? (tcUsed > 0 ? saldoRemanenteBob / tcUsed : 0));
+
+    const isPartialPayment = isTransaction && (saldoRemanenteBob > 0.005 || saldoRemanenteUsd > 0.005 || tx.isPartial || tx.estado === 'PENDIENTE');
+
+    const displayAmountBob = isTransaction ? montoTransaccionBob : totalDocBob;
+    const displayAmountUsd = isTransaction ? montoTransaccionUsd : totalDocUsd;
+
+    const totalBobFormatted = Number(displayAmountBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalUsdFormatted = Number(displayAmountUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Observaciones
     let obsText = '';
@@ -2016,6 +2048,11 @@ window.debitNotesModule = {
             <div class="nd-number-line">Nro.: ${docNumber}</div>
             
             <table class="nd-meta-table">
+              ${isTransaction ? `
+              <tr>
+                <td class="nd-lbl-cell">Documento Origen :</td>
+                <td class="nd-val-cell font-mono font-bold" style="color: #0284c7;">${docType} #${doc.ndNumber || doc.ncNumber || doc.id}</td>
+              </tr>` : ''}
               <tr>
                 <td class="nd-lbl-cell">Fecha de Emisión :</td>
                 <td class="nd-val-cell">${emissionDateFormatted}</td>
@@ -2069,16 +2106,29 @@ window.debitNotesModule = {
               </thead>
               <tbody>
                 <tr>
-                  <td class="nd-td-total-label">Importe Total ${docType}:</td>
-                  <td class="nd-td-total-val font-mono">${currencyStr === 'USD' ? '$us ' + totalUsdFormatted : 'BOB ' + totalBobFormatted}</td>
+                  <td class="nd-td-total-label">${isTransaction ? (isNc ? 'Monto Pagado a Proveedor:' : 'Monto Abonado / Pagado:') : `Importe Total ${docType}:`}</td>
+                  <td class="nd-td-total-val font-mono" style="background: #f0fdf4; color: #15803d; font-size: 0.95rem; font-weight: 800;">
+                    ${currencyStr === 'USD' ? '$us ' + totalUsdFormatted : 'BOB ' + totalBobFormatted}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
+          ${isPartialPayment ? `
+          <div class="nd-partial-summary" style="margin-top: 6px; margin-bottom: 8px; padding: 6px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #00a884; border-radius: 4px; font-size: 0.8rem; display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end;">
+            <div><span style="color: #64748b; font-weight: 600;">Total Servicio:</span> <strong class="font-mono" style="color: #0f172a;">${currencyStr} ${(isDocUsd ? totalDocUsd : totalDocBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Monto Abonado en este Recibo:</span> <strong class="font-mono" style="color: #00a884;">${currencyStr} ${(isDocUsd ? montoTransaccionUsd : montoTransaccionBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: #64748b; font-weight: 600;">Saldo Remanente:</span> <strong class="font-mono" style="color: #dc2626;">${currencyStr} ${(isDocUsd ? saldoRemanenteUsd : saldoRemanenteBob).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>
+          </div>
+          ` : ''}
+
           <div class="nd-obs-row">
-            <span class="nd-obs-badge">Observaciones ${docType}:</span>
-            <span class="nd-obs-content font-bold">${obsText}</span>
+            <span class="nd-obs-badge">Observaciones ${isTransaction ? 'Recibo' : docType}:</span>
+            <span class="nd-obs-content font-bold">
+              ${isTransaction && tx.glosa ? tx.glosa : obsText}
+              ${isPartialPayment ? ` | Total: ${currencyStr} ${(isDocUsd ? totalDocUsd : totalDocBob).toFixed(2)} | Abonado: ${currencyStr} ${(isDocUsd ? montoTransaccionUsd : montoTransaccionBob).toFixed(2)} | Saldo: ${currencyStr} ${(isDocUsd ? saldoRemanenteUsd : saldoRemanenteBob).toFixed(2)}` : ''}
+            </span>
           </div>
         </div>
 
@@ -2109,9 +2159,9 @@ window.debitNotesModule = {
   /**
    * Ejecución de impresión infalible mediante iframe aislado (evita páginas en blanco en Chrome)
    */
-  executePrint(voucherHtml, docType = 'ND') {
+  executePrint(voucherHtml, docType = 'ND', customTitle = null) {
     const isNc = docType === 'NC';
-    const docTitle = isNc ? 'Nota de Crédito' : 'Nota de Débito';
+    const docTitle = customTitle || (isNc ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
 
     // 1. Inyectar en #print-area para soporte nativo
     const printArea = document.getElementById('print-area');
@@ -2120,19 +2170,31 @@ window.debitNotesModule = {
     }
 
     try {
+      // 2. Limpiar iframe anterior si existe para evitar acumulaciones o contextos congelados
       let printFrame = document.getElementById('maretravel-print-frame');
-      if (!printFrame) {
-        printFrame = document.createElement('iframe');
-        printFrame.id = 'maretravel-print-frame';
-        printFrame.style.position = 'fixed';
-        printFrame.style.right = '0';
-        printFrame.style.bottom = '0';
-        printFrame.style.width = '0';
-        printFrame.style.height = '0';
-        printFrame.style.border = '0';
-        printFrame.style.opacity = '0';
-        printFrame.style.pointerEvents = 'none';
-        document.body.appendChild(printFrame);
+      if (printFrame) {
+        try { printFrame.remove(); } catch(e) {}
+      }
+
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'maretravel-print-frame';
+      // Posición fuera de pantalla pero con dimensiones reales de página (800x1100)
+      // para que el motor de renderizado de Chrome compute de inmediato las flexboxes, anchos y tablas
+      printFrame.style.position = 'fixed';
+      printFrame.style.left = '-9999px';
+      printFrame.style.top = '-9999px';
+      printFrame.style.width = '800px';
+      printFrame.style.height = '1100px';
+      printFrame.style.border = '0';
+      printFrame.style.opacity = '0.01';
+      printFrame.style.pointerEvents = 'none';
+      printFrame.style.zIndex = '-9999';
+      document.body.appendChild(printFrame);
+
+      const logo = this.cachedLogoBase64 || window.maretravelLogoBase64 || (window.db && window.db.get()?.systemSettings?.logoBase64);
+      let resolvedVoucherHtml = voucherHtml;
+      if (logo) {
+        resolvedVoucherHtml = resolvedVoucherHtml.replace(/src=["']assets\/logo\.(?:jpg|png|jpeg)["']/gi, `src="${logo}"`);
       }
 
       const frameDoc = printFrame.contentWindow.document;
@@ -2142,15 +2204,16 @@ window.debitNotesModule = {
         <html lang="es">
         <head>
           <meta charset="UTF-8">
+          <base href="${window.location.origin}/">
           <title>${docTitle} - MARETRAVEL SRL</title>
-          <link rel="stylesheet" href="css/style.css">
           <style>
+            /* 1. Configuración Global de Impresión */
             @page {
               size: letter portrait;
               margin: 8mm 10mm;
             }
             * {
-              box-sizing: border-box;
+              box-sizing: border-box !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -2162,54 +2225,300 @@ window.debitNotesModule = {
               display: block !important;
               height: auto !important;
               overflow: visible !important;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+              font-size: 11px !important;
+              line-height: 1.3 !important;
             }
             .nd-official-container {
               width: 100% !important;
-              max-width: 100% !important;
-              padding: 5px 10px !important;
+              max-width: 800px !important;
               margin: 0 auto !important;
+              background: #ffffff !important;
+              padding: 10px 15px !important;
+              box-sizing: border-box !important;
+              color: #1e293b !important;
+              line-height: 1.25 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+
+            /* 2. Encabezado de 3 Columnas */
+            .nd-official-header {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: flex-start !important;
+              margin-bottom: 12px !important;
+              width: 100% !important;
+              gap: 10px !important;
+            }
+            .nd-header-brand {
+              width: 27% !important;
+              flex: 0 0 27% !important;
+              text-align: left !important;
+            }
+            .nd-official-logo {
+              max-width: 195px !important;
+              height: auto !important;
+              max-height: 62px !important;
+              object-fit: contain !important;
+              display: block !important;
+            }
+            .nd-header-title-box {
+              width: 46% !important;
+              flex: 0 0 46% !important;
+              text-align: center !important;
+            }
+            .nd-title-main {
+              font-size: 1.35rem !important;
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              margin: 0 0 2px 0 !important;
+              letter-spacing: 0.2px !important;
+            }
+            .nd-number-line {
+              font-size: 0.95rem !important;
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              margin-bottom: 6px !important;
+            }
+            .nd-meta-table {
+              margin: 0 auto !important;
+              border-collapse: collapse !important;
+              text-align: left !important;
+              font-size: 0.76rem !important;
+              width: 100% !important;
+            }
+            .nd-meta-table td {
+              padding: 1.5px 5px !important;
+              vertical-align: top !important;
+            }
+            .nd-lbl-cell {
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              white-space: nowrap !important;
+              width: 115px !important;
+            }
+            .nd-val-cell {
+              color: #1e293b !important;
+            }
+            .nd-header-agency-info {
+              width: 27% !important;
+              flex: 0 0 27% !important;
+              text-align: left !important;
+              font-size: 0.72rem !important;
+              color: #334155 !important;
+              line-height: 1.25 !important;
+            }
+            .nd-agency-bold {
+              font-weight: 800 !important;
+              font-size: 0.82rem !important;
+              color: #0f172a !important;
+              margin-bottom: 2px !important;
+            }
+            .nd-agency-line {
+              margin-bottom: 1px !important;
+            }
+
+            /* 3. Sección Detalle */
+            .nd-detail-section {
+              margin-top: 6px !important;
+              width: 100% !important;
             }
             .nd-green-badge {
               background-color: #00a884 !important;
               color: #ffffff !important;
+              display: inline-block !important;
+              padding: 4px 18px !important;
+              font-weight: 800 !important;
+              font-size: 0.8rem !important;
+              border-radius: 2px 2px 0 0 !important;
+              letter-spacing: 0.3px !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
             .nd-green-line {
+              height: 3.5px !important;
               background-color: #00a884 !important;
+              width: 100% !important;
+              margin: 0 0 12px 0 !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+            }
+            .nd-items-wrapper {
+              width: 100% !important;
+            }
+            .nd-item-block {
+              display: flex !important;
+              justify-content: space-between !important;
+              font-size: 0.76rem !important;
+              padding: 2px 0 !important;
+              width: 100% !important;
+            }
+            .nd-col-left {
+              width: 38% !important;
+              flex: 0 0 38% !important;
+            }
+            .nd-col-center {
+              width: 32% !important;
+              flex: 0 0 32% !important;
+            }
+            .nd-col-right {
+              width: 30% !important;
+              flex: 0 0 30% !important;
+            }
+            .nd-kv-row {
+              display: flex !important;
+              margin-bottom: 3px !important;
+              align-items: baseline !important;
+            }
+            .nd-k {
+              font-weight: 800 !important;
+              color: #0f172a !important;
+              display: inline-block !important;
+              flex-shrink: 0 !important;
+              white-space: nowrap !important;
+            }
+            .nd-v {
+              color: #1e293b !important;
+              margin-left: 6px !important;
+              flex-grow: 1 !important;
+            }
+            .nd-service-details {
+              line-height: 1.35 !important;
+            }
+            .nd-srv-line {
+              margin-bottom: 1px !important;
+            }
+            .nd-item-subdivider {
+              border-top: 1px dashed #cbd5e1 !important;
+              margin: 8px 0 !important;
+            }
+
+            /* 4. Totales y Observaciones */
+            .nd-footer-section {
+              margin-top: 4px !important;
+              width: 100% !important;
+            }
+            .nd-totals-outer {
+              display: flex !important;
+              justify-content: flex-end !important;
+              margin-bottom: 8px !important;
+              width: 100% !important;
+            }
+            .nd-totals-grid {
+              border-collapse: collapse !important;
             }
             .nd-th-currency {
               background-color: #00a884 !important;
               color: #ffffff !important;
+              font-weight: 800 !important;
+              font-size: 0.75rem !important;
+              text-align: center !important;
+              padding: 4px 18px !important;
+              min-width: 80px !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            .nd-official-logo {
-              max-width: 165px !important;
-              height: 65px !important;
-              object-fit: contain !important;
-              display: block !important;
+            .nd-td-total-label {
+              font-weight: 800 !important;
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+              text-align: right !important;
+              padding-right: 14px !important;
+            }
+            .nd-td-total-val {
+              font-weight: 800 !important;
+              font-size: 0.85rem !important;
+              text-align: right !important;
+              padding: 4px 10px !important;
+              border: 1px solid #e2e8f0 !important;
+              color: #0f172a !important;
+            }
+            .nd-partial-summary {
+              display: flex !important;
+              gap: 18px !important;
+              flex-wrap: wrap !important;
+              justify-content: flex-end !important;
+              margin-top: 6px !important;
+              margin-bottom: 8px !important;
+              padding: 6px 14px !important;
+              background: #f8fafc !important;
+              border: 1px solid #e2e8f0 !important;
+              border-left: 4px solid #00a884 !important;
+              border-radius: 4px !important;
+              font-size: 0.8rem !important;
+            }
+            .nd-obs-row {
+              display: flex !important;
+              align-items: center !important;
+              gap: 10px !important;
+              margin-top: 4px !important;
+              width: 100% !important;
+            }
+            .nd-obs-badge {
+              background-color: #00a884 !important;
+              color: #ffffff !important;
+              font-weight: 800 !important;
+              font-size: 0.72rem !important;
+              padding: 3px 12px !important;
+              border-radius: 2px !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              flex-shrink: 0 !important;
+            }
+            .nd-obs-content {
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+            }
+
+            /* 5. Firmas */
+            .nd-signatures-container {
+              display: flex !important;
+              justify-content: space-around !important;
+              margin-top: 45px !important;
+              margin-bottom: 20px !important;
+              width: 100% !important;
+            }
+            .nd-signature-box {
+              width: 250px !important;
+              text-align: center !important;
+            }
+            .nd-signature-line {
+              border-top: 1.5px solid #334155 !important;
+              margin-bottom: 6px !important;
+            }
+            .nd-signature-text {
+              font-weight: 800 !important;
+              font-size: 0.78rem !important;
+              color: #0f172a !important;
+            }
+
+            /* 6. Cláusula Legal */
+            .nd-legal-text {
+              text-align: center !important;
+              font-size: 0.68rem !important;
+              font-weight: 700 !important;
+              color: #1e293b !important;
+              line-height: 1.35 !important;
+              margin-top: 8px !important;
+            }
+            .font-mono {
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+            }
+            .font-bold {
+              font-weight: 700 !important;
             }
           </style>
         </head>
         <body>
-          ${(() => {
-            const logo = this.cachedLogoBase64 || window.maretravelLogoBase64;
-            if (logo) {
-              return voucherHtml.replace(/src=["']assets\/logo\.(?:jpg|png|jpeg)["']/gi, `src="${logo}"`);
-            }
-            return voucherHtml;
-          })()}
+          ${resolvedVoucherHtml}
         </body>
         </html>
       `);
       frameDoc.close();
 
-      // Esperar a que cargue el CSS e imágenes antes de invocar print()
-      setTimeout(() => {
+      // 3. Esperar confirmación de renderizado e imágenes listas antes de invocar print()
+      const triggerPrint = () => {
         try {
           printFrame.contentWindow.focus();
           printFrame.contentWindow.print();
@@ -2217,7 +2526,25 @@ window.debitNotesModule = {
           console.warn('Iframe print error, fallback a window.print():', frameErr);
           window.print();
         }
-      }, 350);
+      };
+
+      const imgs = Array.from(frameDoc.images || []);
+      const unreadyImgs = imgs.filter(img => !img.complete);
+
+      if (unreadyImgs.length > 0) {
+        let remaining = unreadyImgs.length;
+        const onDone = () => {
+          remaining--;
+          if (remaining <= 0) setTimeout(triggerPrint, 80);
+        };
+        unreadyImgs.forEach(img => {
+          img.onload = onDone;
+          img.onerror = onDone;
+        });
+        setTimeout(triggerPrint, 350);
+      } else {
+        setTimeout(triggerPrint, 80);
+      }
     } catch (e) {
       console.warn('Fallback a window.print():', e);
       window.print();
@@ -2314,17 +2641,53 @@ window.debitNotesModule = {
   /**
    * Impresión directa sin modal
    */
-  directPrint(docId, docType = 'ND') {
+  directPrint(docId, docType = 'ND', transactionContext = null) {
     const data = window.db.get();
-    let doc = (docType === 'NC' || String(docId).startsWith('NC'))
-      ? (data.creditNotes || []).find(n => n.id === docId)
-      : (data.debitNotes || []).find(n => n.id === docId);
+    let tx = transactionContext;
+    if (!tx) {
+      tx = (data.cashReceipts || []).find(r => r.id === docId || r.receiptCode === docId)
+        || (data.providerPayments || []).find(p => p.id === docId || p.receiptCode === docId);
+    }
+
+    let doc = null;
+    if (tx) {
+      if (tx.tipo === 'NC' || docType === 'NC') {
+        const ncId = tx.creditNoteId || (tx.details && tx.details[0] && tx.details[0].creditNoteId);
+        const ncNum = tx.creditNoteNumber || (tx.details && tx.details[0] && tx.details[0].ncNumber);
+        doc = (data.creditNotes || []).find(n => (ncId && n.id === ncId) || (ncNum && n.ncNumber === ncNum));
+        docType = 'NC';
+      } else {
+        const ndId = tx.debitNoteId || (tx.details && tx.details[0] && tx.details[0].debitNoteId);
+        const ndNum = tx.debitNoteNumber || (tx.details && tx.details[0] && tx.details[0].ndNumber);
+        doc = (data.debitNotes || []).find(n => (ndId && n.id === ndId) || (ndNum && n.ndNumber === ndNum));
+        docType = 'ND';
+      }
+    }
+
+    if (!doc) {
+      doc = (docType === 'NC' || String(docId).startsWith('NC'))
+        ? (data.creditNotes || []).find(n => n.id === docId)
+        : (data.debitNotes || []).find(n => n.id === docId);
+    }
     if (!doc) {
       doc = (data.creditNotes || []).find(n => n.id === docId);
       if (doc) docType = 'NC';
     }
-    if (!doc) return;
-    const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType);
-    this.executePrint(voucherHtml, docType);
+    if (!doc) {
+      if (tx && (tx.tipo === 'NC' || docType === 'NC') && window.cashRegisterModule && typeof window.cashRegisterModule.printProviderPayment === 'function') {
+        window.cashRegisterModule.printProviderPayment(tx.id || docId);
+        return;
+      }
+      if (tx && window.cashRegisterModule && typeof window.cashRegisterModule.printReceipt === 'function') {
+        window.cashRegisterModule.printReceipt(tx.id || docId);
+        return;
+      }
+      return;
+    }
+    const voucherHtml = this.generateOfficialVoucherHtml(doc, null, null, docType, tx);
+    const resolvedTitle = tx 
+      ? (docType === 'NC' ? 'PAGO A PROVEEDOR' : 'RECIBO DE PAGO') 
+      : (docType === 'NC' ? 'NOTA DE CRÉDITO' : 'NOTA DE DÉBITO');
+    this.executePrint(voucherHtml, docType, resolvedTitle);
   }
 };

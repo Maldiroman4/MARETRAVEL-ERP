@@ -523,6 +523,26 @@ body {
 .badge-slate { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .badge-indigo { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
 
+/* Semáforo Visual de Estados por Bordes (ND y NC) */
+.badge-status-pagada, .border-success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 2px solid #00a884 !important;
+  font-weight: 700 !important;
+}
+.badge-status-pendiente, .border-warning {
+  background: #fefce8 !important;
+  color: #b45309 !important;
+  border: 2px solid #eab308 !important;
+  font-weight: 700 !important;
+}
+.badge-status-impaga, .border-secondary {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 2px solid #94a3b8 !important;
+  font-weight: 700 !important;
+}
+
 /* Botones */
 .btn {
   display: inline-flex;
@@ -1558,8 +1578,12 @@ body {
   }
 
   .print-logo {
-    height: 55px;
+    height: auto;
+    max-height: 58px;
     width: auto;
+    max-width: 195px;
+    object-fit: contain;
+    display: block;
   }
 
   .print-agency-info {
@@ -1687,17 +1711,19 @@ body {
   }
 
   .nd-header-brand {
-    width: 25%;
+    width: 27%;
   }
 
   .nd-official-logo {
-    max-width: 165px;
-    height: 65px;
+    max-width: 195px;
+    height: auto;
+    max-height: 62px;
     object-fit: contain;
+    display: block;
   }
 
   .nd-header-title-box {
-    width: 48%;
+    width: 46%;
     text-align: center;
   }
 
@@ -1953,15 +1979,17 @@ body {
   margin-bottom: 12px;
 }
 .nd-header-brand {
-  width: 25%;
+  width: 27%;
 }
 .nd-official-logo {
-  max-width: 165px;
-  height: 65px;
+  max-width: 195px;
+  height: auto;
+  max-height: 62px;
   object-fit: contain;
+  display: block;
 }
 .nd-header-title-box {
-  width: 48%;
+  width: 46%;
   text-align: center;
 }
 .nd-title-main {
