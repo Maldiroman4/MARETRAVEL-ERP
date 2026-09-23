@@ -78,34 +78,21 @@ body {
   padding: 16px 20px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.15);
 }
 
 .sidebar-logo {
-  height: 42px;
+  height: 46px;
   width: auto;
-  border-radius: 6px;
-  background: #fff;
-  padding: 2px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.brand-text h1 {
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  color: #fff;
-  line-height: 1.1;
-}
-
-.brand-text span {
-  font-size: 0.72rem;
-  color: var(--primary);
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.8px;
+  max-width: 100%;
+  object-fit: contain;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .sidebar-menu {
