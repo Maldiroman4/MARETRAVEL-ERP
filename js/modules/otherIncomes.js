@@ -690,15 +690,20 @@ window.otherIncomesModule = {
    */
   recordDepositTransaction(item) {
     try {
-      if (!window.financialGuard || typeof window.financialGuard.recordTransaction !== 'function') return;
       if (!item || !item.depositAccountId) return;
+      if (!window.financialGuard || typeof window.financialGuard.recordTransaction !== 'function') return;
       const data = window.db ? window.db.get() : null;
-      if (!data || !(data.bankAccounts || []).some(a => a.id === item.depositAccountId)) return;
+      if (!data) return;
+      const acc = (data.bankAccounts || []).find(a => a.id === item.depositAccountId);
+      if (!acc) return;
+      const reference = String(item.ticketNumber || item.id || '');
+      const already = (data.bankTransactions || []).some(t => t.accountId === item.depositAccountId && t.reference === reference);
+      if (already) return; // ya registrado: no duplicar
       window.financialGuard.recordTransaction(item.depositAccountId, {
         type: 'INGRESO',
         amount: Number(item.amount) || 0,
         medio: 'TRANSFERENCIA',
-        reference: item.ticketNumber || item.id,
+        reference: reference,
         description: 'Otro ingreso / depósito'
       });
     } catch (err) {
