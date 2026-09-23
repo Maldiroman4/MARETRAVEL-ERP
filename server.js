@@ -9,6 +9,14 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const sqlDatabase = require('./server/sqlDatabase');
+const tursoDatabase = require('./server/tursoDatabase');
+
+// Carga .env si existe (credenciales Turso). API nativa de Node (>=21.7), sin dependencias externas.
+try { process.loadEnvFile(path.join(__dirname, '.env')); } catch (_) {}
+
+// Capa de persistencia activa: Turso (nube) si hay credenciales, si no SQLite local.
+// Un solo punto de decisión: todas las rutas pasan por readDbSync/saveDbSync.
+const persistence = tursoDatabase.isAvailable() ? tursoDatabase : sqlDatabase;
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -167,7 +175,7 @@ function getSeedData() {
  */
 function readDbSync() {
   try {
-    return sqlDatabase.getFullState();
+    return persistence.getFullState();
   } catch (err) {
     console.error('[SQL READ ERROR]:', err);
     if (fs.existsSync(DB_PATH)) {
@@ -184,8 +192,8 @@ function saveDbSync(data) {
   if (!data || typeof data !== 'object') {
     throw new Error('Datos inválidos para persistencia en base de datos.');
   }
-  // 1. Persistencia transaccional en SQL (SQLite)
-  sqlDatabase.saveFullState(data);
+  // 1. Persistencia transaccional (Turso nube o SQLite local según capa activa)
+  persistence.saveFullState(data);
 
   // 2. Respaldo snapshot en JSON para redundancia
   try {
@@ -206,7 +214,7 @@ function createBackupCopy(prefix = 'backup') {
   const backupFilename = `${prefix}_${ts}.json`;
   const targetPath = path.join(BACKUP_DIR, backupFilename);
   try {
-    const full = sqlDatabase.getFullState();
+    const full = persistence.getFullState();
     fs.writeFileSync(targetPath, JSON.stringify(full, null, 2), 'utf-8');
     return targetPath;
   } catch (_) {
@@ -218,18 +226,35 @@ function createBackupCopy(prefix = 'backup') {
   return null;
 }
 
-// Carga y validación inicial de persistencia SQL al levantar el servidor
-try {
-  const stats = sqlDatabase.getStats();
-  if (stats.counts.accounts === 0 && fs.existsSync(DB_PATH)) {
-    console.log('[INICIO] Base de datos SQL vacía. Migrando automáticamente desde data/database.json...');
-    require('./server/migrateJsonToSql')();
-  } else {
-    console.log(`[INICIO SQL] Base de datos relacional SQLite activa: ${stats.file} (${stats.counts.accounts} cuentas, ${stats.counts.debitNotes} NDs).`);
+// Carga y validación inicial de persistencia al levantar el servidor
+(async () => {
+  try {
+    if (persistence === tursoDatabase) {
+      // Modo nube (Turso): garantizar esquema + migración única local→nube
+      const ok = await tursoDatabase.init();
+      if (ok) {
+        const cloudStats = await tursoDatabase.getStats();
+        if (cloudStats.counts.accounts === 0 && fs.existsSync(SQLITE_PATH)) {
+          console.log('[TURSO CLOUD] Nube vacía. Sembrando desde SQLite local (data/maretravel.sqlite)...');
+          await tursoDatabase.saveFullState(sqlDatabase.getFullState());
+          console.log('[TURSO CLOUD] Datos locales sembrados en la nube. Cero pérdida de datos.');
+        } else {
+          console.log(`[TURSO CLOUD] Activa: ${process.env.TURSO_DATABASE_URL} (${cloudStats.counts.accounts} cuentas, ${cloudStats.counts.debitNotes} NDs).`);
+        }
+      }
+    } else {
+      const stats = sqlDatabase.getStats();
+      if (stats.counts.accounts === 0 && fs.existsSync(DB_PATH)) {
+        console.log('[INICIO] Base de datos SQL vacía. Migrando automáticamente desde data/database.json...');
+        require('./server/migrateJsonToSql')();
+      } else {
+        console.log(`[INICIO SQL] Base de datos relacional SQLite activa: ${stats.file} (${stats.counts.accounts} cuentas, ${stats.counts.debitNotes} NDs).`);
+      }
+    }
+  } catch (err) {
+    console.error('[ERROR CRÍTICO] Error al inicializar almacenamiento:', err);
   }
-} catch (err) {
-  console.error('[ERROR CRÍTICO] Error al inicializar almacenamiento SQL:', err);
-}
+})();
 
 // ============================================================================
 // REGLAS Y VALIDACIONES DE SEGURIDAD (GUARDRAILS)
@@ -806,19 +831,24 @@ const server = http.createServer(async (req, res) => {
   // STATUS DE PERSISTENCIA Y SERVIDOR: /api/status
   if (pathname === '/api/status') {
     try {
-      const sqlStats = sqlDatabase.getStats();
+      const isCloud = persistence === tursoDatabase;
+      const sqlStats = persistence.getStats();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         status: 'ONLINE',
         system: 'MARETRAVEL ERP',
         folder: ROOT_DIR,
-        databaseType: 'RELATIONAL_SQL',
+        databaseType: isCloud ? 'TURSO_CLOUD' : 'RELATIONAL_SQL',
         engine: sqlStats.engine,
-        sqlFile: sqlStats.file,
-        fileSizeBytes: sqlStats.fileSizeBytes,
-        lastModified: sqlStats.lastModified,
+        ...(isCloud
+          ? { databaseUrl: sqlStats.url }
+          : {
+              sqlFile: sqlStats.file,
+              fileSizeBytes: sqlStats.fileSizeBytes,
+              lastModified: sqlStats.lastModified
+            }),
         counts: sqlStats.counts,
-        persistenceType: 'SQLITE_WAL_ACID_TRANSACTIONS'
+        persistenceType: isCloud ? 'LIBSQL_CLOUD_ACID' : 'SQLITE_WAL_ACID_TRANSACTIONS'
       }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -868,12 +898,17 @@ server.on('error', (err) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   const activePort = server.address().port;
+  const cloud = persistence === tursoDatabase;
   console.log('================================================================');
-  console.log('   MARETRAVEL ERP - SERVIDOR DE BASE DE DATOS SQL RELACIONAL');
+  console.log(`   MARETRAVEL ERP - SERVIDOR DE PERSISTENCIA ${cloud ? 'CLOUD (TURSO)' : 'SQL RELACIONAL (SQLITE)'}`);
   console.log('================================================================');
   console.log(`  Servidor corriendo en:    http://localhost:${activePort}`);
-  console.log(`  Base de Datos SQL:        ${SQLITE_PATH} (SQLite WAL)`);
-  console.log(`  Directorio de Respaldos:  ${BACKUP_DIR}`);
-  console.log('  Persistencia:             TRANSACCIONES SQL ATÓMICAS (ACID)');
+  if (cloud) {
+    console.log(`  Base de Datos Cloud:       ${process.env.TURSO_DATABASE_URL} (libSQL ACID)`);
+  } else {
+    console.log(`  Base de Datos SQL:        ${SQLITE_PATH} (SQLite WAL)`);
+    console.log(`  Directorio de Respaldos:  ${BACKUP_DIR}`);
+  }
+  console.log(`  Persistencia:             ${cloud ? 'LIBSQL CLOUD ACID (datos en la nube)' : 'TRANSACCIONES SQL ATÓMICAS (ACID)'}`);
   console.log('================================================================');
 });

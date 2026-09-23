@@ -19,6 +19,11 @@ MARETRAVEL-ERP/
 data/backups/*
 !data/backups/.gitkeep
 
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
 # SQLite temporary WAL and SHM files
 *.sqlite-wal
 *.sqlite-shm
