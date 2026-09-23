@@ -24,7 +24,7 @@
   "exchangeRates": [
     {
       "id": "TC-001",
-      "date": "2026-09-22",
+      "date": "2026-09-23",
       "buyRate": 6.86,
       "sellRate": 6.96
     }
@@ -131,26 +131,10 @@
       "isActive": true,
       "currentBalance": 12400,
       "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
-    },
-    {
-      "id": "ACC-BNK-GANADERO-02",
-      "type": "BANCO",
-      "bankName": "Banco Ganadero S.A.",
-      "accountNumber": "1051-20948-3",
-      "accountType": "CORRIENTE",
-      "titularName": "MARETRAVEL S.R.L.",
-      "currency": "BOB",
-      "isActive": true,
-      "currentBalance": 32850.5,
-      "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
     },
     {
       "id": "ACC-BNK-BMSC-01",
@@ -163,42 +147,26 @@
       "isActive": true,
       "currentBalance": 45200,
       "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
     },
     {
-      "id": "ACC-DIG-BINANCE-04",
-      "type": "BINANCE",
-      "bankName": "Binance Pay / P2P",
-      "accountNumber": "89410293",
-      "binanceId": "89410293",
-      "walletAddress": "0x89410293MareTravelPayWallet",
-      "titularName": "MARETRAVEL CRYPTO SRL",
-      "currency": "USDT",
-      "isActive": true,
-      "currentBalance": 8500,
-      "createdAt": "17/9/2026, 08:00:00",
+      "id": "ACC-BNK-GANADERO-02",
+      "type": "BANCO",
+      "bankName": "Banco Ganadero S.A.",
+      "accountNumber": "1051-20948-3",
       "accountType": "CORRIENTE",
-      "cashDeskName": null,
-      "custodianName": null
-    },
-    {
-      "id": "ACC-CSH-CENTRAL-USD-06",
-      "type": "EFECTIVO",
-      "bankName": "Caja Central Oficina Dólares",
-      "cashDeskName": "Caja General Oficina Central USD",
-      "accountNumber": "CAJA-USD-01",
-      "custodianName": "Luis (Cajero Principal)",
-      "titularName": "MARETRAVEL S.R.L. (Custodio: Luis)",
-      "currency": "USD",
+      "titularName": "MARETRAVEL S.R.L.",
+      "currency": "BOB",
       "isActive": true,
-      "currentBalance": 2100,
+      "currentBalance": 32850.5,
       "createdAt": "17/9/2026, 08:00:00",
-      "accountType": "CORRIENTE",
-      "binanceId": null,
-      "walletAddress": null
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
     },
     {
       "id": "ACC-CSH-CENTRAL-BOB-05",
@@ -213,8 +181,40 @@
       "currentBalance": 5000,
       "createdAt": "17/9/2026, 08:00:00",
       "accountType": "CORRIENTE",
-      "binanceId": null,
-      "walletAddress": null
+      "binanceId": "",
+      "walletAddress": ""
+    },
+    {
+      "id": "ACC-CSH-CENTRAL-USD-06",
+      "type": "EFECTIVO",
+      "bankName": "Caja Central Oficina Dólares",
+      "cashDeskName": "Caja General Oficina Central USD",
+      "accountNumber": "CAJA-USD-01",
+      "custodianName": "Luis (Cajero Principal)",
+      "titularName": "MARETRAVEL S.R.L. (Custodio: Luis)",
+      "currency": "USD",
+      "isActive": true,
+      "currentBalance": 2100,
+      "createdAt": "17/9/2026, 08:00:00",
+      "accountType": "CORRIENTE",
+      "binanceId": "",
+      "walletAddress": ""
+    },
+    {
+      "id": "ACC-DIG-BINANCE-04",
+      "type": "BINANCE",
+      "bankName": "Binance Pay / P2P",
+      "accountNumber": "89410293",
+      "binanceId": "89410293",
+      "walletAddress": "0x89410293MareTravelPayWallet",
+      "titularName": "MARETRAVEL CRYPTO SRL",
+      "currency": "USDT",
+      "isActive": true,
+      "currentBalance": 8500,
+      "createdAt": "17/9/2026, 08:00:00",
+      "accountType": "CORRIENTE",
+      "cashDeskName": "",
+      "custodianName": ""
     }
   ],
   "bankAccounts": [
@@ -229,26 +229,10 @@
       "isActive": true,
       "currentBalance": 12400,
       "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
-    },
-    {
-      "id": "ACC-BNK-GANADERO-02",
-      "type": "BANCO",
-      "bankName": "Banco Ganadero S.A.",
-      "accountNumber": "1051-20948-3",
-      "accountType": "CORRIENTE",
-      "titularName": "MARETRAVEL S.R.L.",
-      "currency": "BOB",
-      "isActive": true,
-      "currentBalance": 32850.5,
-      "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
     },
     {
       "id": "ACC-BNK-BMSC-01",
@@ -261,10 +245,26 @@
       "isActive": true,
       "currentBalance": 45200,
       "createdAt": "17/9/2026, 08:00:00",
-      "cashDeskName": null,
-      "custodianName": null,
-      "binanceId": null,
-      "walletAddress": null
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
+    },
+    {
+      "id": "ACC-BNK-GANADERO-02",
+      "type": "BANCO",
+      "bankName": "Banco Ganadero S.A.",
+      "accountNumber": "1051-20948-3",
+      "accountType": "CORRIENTE",
+      "titularName": "MARETRAVEL S.R.L.",
+      "currency": "BOB",
+      "isActive": true,
+      "currentBalance": 32850.5,
+      "createdAt": "17/9/2026, 08:00:00",
+      "cashDeskName": "",
+      "custodianName": "",
+      "binanceId": "",
+      "walletAddress": ""
     }
   ],
   "accounts": [],
@@ -434,10 +434,22 @@
   "providerPayments": [],
   "serviceTypes": [
     {
+      "id": "SRV-AUTO",
+      "code": "RENT_A_CAR",
+      "name": "RENT A CAR",
+      "category": "VEHÍCULOS"
+    },
+    {
       "id": "SRV-BOLETO",
       "code": "BOLETO_AEREO",
       "name": "BOLETO AÉREO / GDS",
       "category": "AÉREO"
+    },
+    {
+      "id": "SRV-FA",
+      "code": "CERTIFICACION_FA",
+      "name": "CERTIFICACIÓN INTERNACIONAL FA",
+      "category": "CERTIFICACIONES"
     },
     {
       "id": "SRV-HOTEL",
@@ -446,9 +458,15 @@
       "category": "HOSPEDAJE"
     },
     {
-      "id": "SRV-PAQ-TUR",
-      "code": "PAQUETE_TURISTICO",
-      "name": "PAQUETE TURÍSTICO",
+      "id": "SRV-OTRO",
+      "code": "OTRO",
+      "name": "OTRO SERVICIO",
+      "category": "VARIOS"
+    },
+    {
+      "id": "SRV-PAQ-CON",
+      "code": "PAQUETE_CONCIERTO",
+      "name": "PAQUETE CONCIERTO",
       "category": "PAQUETES"
     },
     {
@@ -458,28 +476,10 @@
       "category": "PAQUETES"
     },
     {
-      "id": "SRV-PAQ-CON",
-      "code": "PAQUETE_CONCIERTO",
-      "name": "PAQUETE CONCIERTO",
+      "id": "SRV-PAQ-TUR",
+      "code": "PAQUETE_TURISTICO",
+      "name": "PAQUETE TURÍSTICO",
       "category": "PAQUETES"
-    },
-    {
-      "id": "SRV-VISA",
-      "code": "ASESORAMIENTO_VISAS",
-      "name": "ASESORAMIENTO DE VISAS",
-      "category": "VISAS"
-    },
-    {
-      "id": "SRV-FA",
-      "code": "CERTIFICACION_FA",
-      "name": "CERTIFICACIÓN INTERNACIONAL FA",
-      "category": "CERTIFICACIONES"
-    },
-    {
-      "id": "SRV-AUTO",
-      "code": "RENT_A_CAR",
-      "name": "RENT A CAR",
-      "category": "VEHÍCULOS"
     },
     {
       "id": "SRV-SEG",
@@ -488,10 +488,10 @@
       "category": "SEGUROS"
     },
     {
-      "id": "SRV-OTRO",
-      "code": "OTRO",
-      "name": "OTRO SERVICIO",
-      "category": "VARIOS"
+      "id": "SRV-VISA",
+      "code": "ASESORAMIENTO_VISAS",
+      "name": "ASESORAMIENTO DE VISAS",
+      "category": "VISAS"
     }
   ],
   "savedSubServices": [

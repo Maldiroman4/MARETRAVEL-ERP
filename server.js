@@ -171,13 +171,13 @@ function getSeedData() {
 }
 
 /**
- * Lee la base de datos completa directamente desde la base de datos SQL relacional (SQLite).
+ * Lee la base de datos completa directamente desde la base de datos SQL (Turso o SQLite).
  */
-function readDbSync() {
+async function readDb() {
   try {
-    return persistence.getFullState();
+    return await persistence.getFullState();
   } catch (err) {
-    console.error('[SQL READ ERROR]:', err);
+    console.error('[DB READ ERROR]:', err);
     if (fs.existsSync(DB_PATH)) {
       return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
     }
@@ -186,14 +186,14 @@ function readDbSync() {
 }
 
 /**
- * Guarda sincrónica y atómicamente la base de datos en la base de datos SQL relacional (SQLite).
+ * Guarda sincrónica y atómicamente la base de datos en la base de datos SQL (Turso o SQLite).
  */
-function saveDbSync(data) {
+async function saveDb(data) {
   if (!data || typeof data !== 'object') {
     throw new Error('Datos inválidos para persistencia en base de datos.');
   }
   // 1. Persistencia transaccional (Turso nube o SQLite local según capa activa)
-  persistence.saveFullState(data);
+  await persistence.saveFullState(data);
 
   // 2. Respaldo snapshot en JSON para redundancia
   try {
@@ -209,12 +209,12 @@ function saveDbSync(data) {
 /**
  * Crea una copia de respaldo fechada en data/backups/
  */
-function createBackupCopy(prefix = 'backup') {
+async function createBackupCopy(prefix = 'backup') {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFilename = `${prefix}_${ts}.json`;
   const targetPath = path.join(BACKUP_DIR, backupFilename);
   try {
-    const full = persistence.getFullState();
+    const full = await persistence.getFullState();
     fs.writeFileSync(targetPath, JSON.stringify(full, null, 2), 'utf-8');
     return targetPath;
   } catch (_) {
@@ -360,16 +360,16 @@ const server = http.createServer(async (req, res) => {
   // GET /api/db: Retorna el contenido real y actualizado desde disco
   if (pathname === '/api/db' && req.method === 'GET') {
     try {
-      const dbData = readDbSync();
+      const dbData = await readDb();
       if (dbData && dbData.systemSettings) {
         dbData.systemSettings.logoBase64 = obtenerLogoBase64();
       }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(dbData));
     } catch (err) {
-      console.error('[ERROR] Fallo al leer data/database.json:', err);
+      console.error('[ERROR] Fallo al leer base de datos:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Error al leer base de datos en disco: ' + err.message }));
+      res.end(JSON.stringify({ error: 'Error al leer base de datos: ' + err.message }));
     }
     return;
   }
@@ -406,10 +406,10 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // PERSISTENCIA FÍSICA OBLIGATORIA EN DISCO
-      saveDbSync(parsed);
+      // PERSISTENCIA FÍSICA OBLIGATORIA
+      await saveDb(parsed);
 
-      console.log(`[${new Date().toLocaleTimeString()}] Base de datos confirmada en disco: data/database.json`);
+      console.log(`[${new Date().toLocaleTimeString()}] Base de datos confirmada y persistida exitosamente.`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
@@ -424,21 +424,20 @@ const server = http.createServer(async (req, res) => {
         }
       }));
     } catch (err) {
-      console.error('[ERROR] Error crítico al persistir en disco:', err);
-      // PROHIBIDO RESPONDER 200 SI FALLÓ LA ESCRITURA EN DISCO
+      console.error('[ERROR] Error crítico al persistir base de datos:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Fallo al guardar en disco: ' + err.message }));
+      res.end(JSON.stringify({ error: 'Fallo al guardar base de datos: ' + err.message }));
     }
     return;
   }
 
   // --------------------------------------------------------------------------
-  // 2. ENDPOINTS REST GRANULARES (Persistencia Directa en Disco)
+  // 2. ENDPOINTS REST GRANULARES (Persistencia Directa)
   // --------------------------------------------------------------------------
 
   // OPERACIONES / NOTAS DE DÉBITO: /api/operaciones
   if (pathname === '/api/operaciones') {
-    const db = readDbSync();
+    const db = await readDb();
     if (req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(db.debitNotes || []));
@@ -454,7 +453,7 @@ const server = http.createServer(async (req, res) => {
         } else {
           db.debitNotes.unshift({ ...item, createdAt: new Date().toLocaleString() });
         }
-        saveDbSync(db);
+        await saveDb(db);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, item }));
       } catch (err) {
@@ -468,10 +467,10 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/operaciones/') && req.method === 'DELETE') {
     const id = pathname.replace('/api/operaciones/', '').trim();
     try {
-      const db = readDbSync();
+      const db = await readDb();
       db.debitNotes = (db.debitNotes || []).filter(n => n.id !== id);
       db.creditNotes = (db.creditNotes || []).filter(nc => nc.originDebitNoteId !== id);
-      saveDbSync(db);
+      await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
     } catch (err) {
@@ -483,7 +482,7 @@ const server = http.createServer(async (req, res) => {
 
   // BOLETOS GDS: /api/boletos
   if (pathname === '/api/boletos') {
-    const db = readDbSync();
+    const db = await readDb();
     if (req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(db.gdsTickets || []));
@@ -499,7 +498,7 @@ const server = http.createServer(async (req, res) => {
         } else {
           db.gdsTickets.unshift({ ...tkt, createdAt: new Date().toLocaleString() });
         }
-        saveDbSync(db);
+        await saveDb(db);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, ticket: tkt }));
       } catch (err) {
@@ -513,10 +512,10 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/boletos/') && req.method === 'DELETE') {
     const id = pathname.replace('/api/boletos/', '').trim();
     try {
-      const db = readDbSync();
+      const db = await readDb();
       db.gdsTickets = (db.gdsTickets || []).filter(t => t.id !== id);
       db.otherIncomes = (db.otherIncomes || []).filter(i => i.ticketId !== id);
-      saveDbSync(db);
+      await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
     } catch (err) {
@@ -528,7 +527,7 @@ const server = http.createServer(async (req, res) => {
 
   // CUENTAS (CLIENTES Y PROVEEDORES): /api/cuentas
   if (pathname === '/api/cuentas') {
-    const db = readDbSync();
+    const db = await readDb();
     if (req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(db.accounts || []));
@@ -544,7 +543,7 @@ const server = http.createServer(async (req, res) => {
         } else {
           db.accounts.unshift({ ...acc, createdAt: new Date().toLocaleString() });
         }
-        saveDbSync(db);
+        await saveDb(db);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, account: acc }));
       } catch (err) {
@@ -558,9 +557,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/cuentas/') && req.method === 'DELETE') {
     const id = pathname.replace('/api/cuentas/', '').trim();
     try {
-      const db = readDbSync();
+      const db = await readDb();
       db.accounts = (db.accounts || []).filter(a => a.id !== id);
-      saveDbSync(db);
+      await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
     } catch (err) {
@@ -572,7 +571,7 @@ const server = http.createServer(async (req, res) => {
 
   // CONFIGURACIÓN GENERAL: /api/config
   if (pathname === '/api/config') {
-    const db = readDbSync();
+    const db = await readDb();
     if (req.method === 'GET') {
       const settings = { ...(db.systemSettings || {}) };
       settings.logoBase64 = obtenerLogoBase64();
@@ -584,7 +583,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const config = await parseRequestBody(req);
         db.systemSettings = { ...db.systemSettings, ...config };
-        saveDbSync(db);
+        await saveDb(db);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, systemSettings: db.systemSettings }));
       } catch (err) {
@@ -609,7 +608,7 @@ const server = http.createServer(async (req, res) => {
     const subRoute = parts[2];
     const docId = parts[3] || parts[2];
     if (docId && docId !== 'logo') {
-      const db = readDbSync();
+      const db = await readDb();
       const isNc = (subRoute && subRoute.toLowerCase() === 'nc') || String(docId).startsWith('NC');
       let doc = isNc 
         ? (db.creditNotes || []).find(n => n.id === docId)
@@ -633,7 +632,7 @@ const server = http.createServer(async (req, res) => {
 
   // TIPO DE CAMBIO GLOBAL: /api/exchange-rate
   if (pathname === '/api/exchange-rate') {
-    const db = readDbSync();
+    const db = await readDb();
     if (req.method === 'GET') {
       const settings = db.systemSettings || {};
       const rates = db.exchangeRates || [];
@@ -677,7 +676,7 @@ const server = http.createServer(async (req, res) => {
         if (!db.exchangeRates) db.exchangeRates = [];
         db.exchangeRates.unshift(newEntry);
 
-        saveDbSync(db);
+        await saveDb(db);
         console.log(`[T/C PERSISTIDO] Compra: ${buy} | Venta: ${sell} por ${updatedBy}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -698,7 +697,7 @@ const server = http.createServer(async (req, res) => {
   if ((pathname === '/api/backup/download' || pathname === '/api/db/export') && req.method === 'GET') {
     try {
       if (!fs.existsSync(DB_PATH)) {
-        saveDbSync(INITIAL_SEED_DATABASE);
+        await saveDb(INITIAL_SEED_DATABASE);
       }
       const fileData = fs.readFileSync(DB_PATH, 'utf-8');
       const dateStr = new Date().toISOString().split('T')[0];
@@ -727,10 +726,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Guardar respaldo de seguridad previo antes de sobreescribir
-      createBackupCopy('pre_restore');
+      await createBackupCopy('pre_restore');
 
       // Sobreescribir archivo permanente en disco
-      saveDbSync(backupData);
+      await saveDb(backupData);
 
       console.log(`[RESTORE] Base de datos restaurada exitosamente desde archivo JSON.`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -751,13 +750,13 @@ const server = http.createServer(async (req, res) => {
   if ((pathname === '/api/admin/reset-datos-prueba' || pathname === '/api/db/reset') && req.method === 'POST') {
     try {
       // 1. Crear copia de seguridad preventiva antes del reseteo
-      createBackupCopy('pre_reset');
+      await createBackupCopy('pre_reset');
 
       // 2. Obtener estructura semilla de prueba inicial
       const seedData = getSeedData();
 
       // 3. Sobrescribir atómica y sincrónicamente el archivo central data/database.json
-      saveDbSync(seedData);
+      await saveDb(seedData);
 
       // 4. Asegurar archivo semilla
       await fs.promises.writeFile(path.join(DATA_DIR, 'seedData.json'), JSON.stringify(seedData, null, 2), 'utf-8');
@@ -788,7 +787,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/financial-accounts' && req.method === 'GET') {
     try {
-      const db = readDbSync();
+      const db = await readDb();
       const accounts = (db ? db.financialAccounts || db.bankAccounts : []) || [];
       const onlyActive = parsedUrl.searchParams.get('active') === 'true';
       const filtered = onlyActive ? accounts.filter(a => a.isActive) : accounts;
@@ -811,7 +810,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/financial-accounts/validate' && req.method === 'POST') {
     try {
       const payload = await parseRequestBody(req);
-      const db = readDbSync();
+      const db = await readDb();
       let targetAccount = payload.account;
       if (!targetAccount && payload.accountId) {
         const list = (db ? db.financialAccounts || db.bankAccounts : []) || [];
@@ -832,7 +831,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/status') {
     try {
       const isCloud = persistence === tursoDatabase;
-      const sqlStats = persistence.getStats();
+      const sqlStats = await persistence.getStats();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         status: 'ONLINE',
