@@ -172,6 +172,9 @@ window.bankAccountsModule = {
             </div>
 
             <div class="bank-card-actions">
+              <button class="btn btn-secondary btn-sm" onclick="window.bankAccountsModule.openLedgerModal('${acc.id}')" title="Ver movimientos y saldo derivado">
+                <i data-lucide="list"></i> Movimientos
+              </button>
               <button class="btn btn-secondary btn-sm" onclick="window.bankAccountsModule.openEditModal('${acc.id}')" title="Editar datos de la cuenta">
                 <i data-lucide="edit-2"></i> Editar
               </button>
@@ -399,5 +402,29 @@ window.bankAccountsModule = {
     } catch (e) {
       window.app.showToast(`Número de cuenta: ${text}`, 'info');
     }
+  },
+
+  openLedgerModal(accountId) {
+    const data = window.db.get();
+    const acc = (data.bankAccounts || []).find(a => a.id === accountId);
+    if (!acc) return;
+    const bal = window.financialGuard.getAccountBalance(accountId);
+    const neg = bal.saldo < 0;
+    document.getElementById('acc-ledger-title').textContent = `${acc.bankName || acc.name || 'Cuenta'} ${acc.accountNumber ? '- Cta. ' + acc.accountNumber : ''}`;
+    document.getElementById('acc-ledger-balance').textContent = `Saldo: BOB ${bal.saldo.toFixed(2)}`;
+    document.getElementById('acc-ledger-balance').className = 'font-bold ' + (neg ? 'text-danger' : 'text-success');
+    document.getElementById('acc-ledger-balance').style.color = neg ? '#dc2626' : '#00a884';
+    const tbody = document.getElementById('acc-ledger-body');
+    tbody.innerHTML = bal.transactions.length === 0
+      ? '<tr><td colspan="5" style="text-align:center;padding:16px;color:#64748b;">Sin transacciones (saldo inicial: BOB ' + bal.saldo.toFixed(2) + ')</td></tr>'
+      : bal.transactions.map(t => `
+        <tr>
+          <td>${t.date}</td>
+          <td><span class="badge ${t.type === 'EGRESO' ? 'badge-rose' : 'badge-emerald'}">${t.type === 'EGRESO' ? 'EGRESO' : 'INGRESO'}</span></td>
+          <td class="font-mono">${t.amount.toFixed(2)}</td>
+          <td>${t.medio}</td>
+          <td>${t.reference || '-'}</td>
+        </tr>`).join('');
+    window.app.openModal('modal-account-ledger');
   }
 };

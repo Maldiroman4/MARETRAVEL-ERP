@@ -2422,6 +2422,36 @@
     </div>
   </div>
 
+  <!-- Modal: Bitácora y Saldo Derivado de Cuenta Bancaria -->
+  <div class="modal-overlay" id="modal-account-ledger">
+    <div class="modal-box" style="max-width: 860px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="acc-ledger-title"><i data-lucide="list"></i> Movimientos de Cuenta</h3>
+          <div id="acc-ledger-balance" style="font-size: 0.95rem; margin-top: 2px; color: var(--text-muted);">Saldo: BOB 0.00</div>
+        </div>
+        <button class="modal-close" data-close-modal="modal-account-ledger">&times;</button>
+      </div>
+      <div class="modal-content">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Monto</th>
+              <th>Medio</th>
+              <th>Referencia</th>
+            </tr>
+          </thead>
+          <tbody id="acc-ledger-body"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-account-ledger">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Contactos Autorizados de la Empresa (Jerarquía Corporativa) -->
   <div class="modal-overlay" id="modal-company-contacts">
     <div class="modal-box" style="max-width: 860px;">
