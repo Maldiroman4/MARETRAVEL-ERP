@@ -678,8 +678,32 @@ window.otherIncomesModule = {
     window.app.closeModal('modal-assign-deposit-account');
     window.app.showToast(`Depósito registrado exitosamente en: ${accName}`, 'success');
 
+    this.recordDepositTransaction(item);
+
     this.updateKpis();
     this.renderTable();
+  },
+
+  /**
+   * Registra una transacción INGRESO (depósito) en la cuenta bancaria destino
+   * cuando un otro ingreso se marca como PAGADO con cuenta de depósito.
+   */
+  recordDepositTransaction(item) {
+    try {
+      if (!window.financialGuard || typeof window.financialGuard.recordTransaction !== 'function') return;
+      if (!item || !item.depositAccountId) return;
+      const data = window.db ? window.db.get() : null;
+      if (!data || !(data.bankAccounts || []).some(a => a.id === item.depositAccountId)) return;
+      window.financialGuard.recordTransaction(item.depositAccountId, {
+        type: 'INGRESO',
+        amount: Number(item.amount) || 0,
+        medio: 'TRANSFERENCIA',
+        reference: item.ticketNumber || item.id,
+        description: 'Otro ingreso / depósito'
+      });
+    } catch (err) {
+      console.warn('financialGuard.recordTransaction (otro ingreso) falló:', err);
+    }
   },
 
   openEditModal(id) {
@@ -845,6 +869,12 @@ window.otherIncomesModule = {
 
     window.db.save(data);
     window.app.closeModal('modal-other-income');
+
+    const savedItem = this.editingIncomeId
+      ? data.otherIncomes.find(i => i.id === this.editingIncomeId)
+      : data.otherIncomes[0];
+    if (savedItem) this.recordDepositTransaction(savedItem);
+
     this.updateKpis();
     this.renderTable();
   },
