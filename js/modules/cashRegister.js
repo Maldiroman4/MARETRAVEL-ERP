@@ -22,6 +22,29 @@ window.cashRegisterModule = {
     return 'TRANSFERENCIA';
   },
 
+  // Registra la transacción de una cuenta en el ledger al procesar un cobro/pago
+  // (recibe un recibo/comprobante con financialAccountId). Dedup por accountId+reference.
+  recordCobranzaTx(receipt, type) {
+    const accId = receipt && receipt.financialAccountId;
+    if (!accId) return;
+    if (!window.financialGuard || typeof window.financialGuard.recordTransaction !== 'function') return;
+    const data = window.db ? window.db.get() : null;
+    if (!data || !(data.bankAccounts || []).some(a => a.id === accId)) return;
+    const reference = receipt.receiptCode;
+    if ((data.bankTransactions || []).some(t => t.accountId === accId && t.reference === reference)) return;
+    try {
+      window.financialGuard.recordTransaction(accId, {
+        type: type,
+        amount: Number(receipt.monto_transaccion) || Number(receipt.totalPaidBob) || Number(receipt.totalPaid) || 0,
+        medio: this.mapMedio(receipt.paymentMethod || 'TRANSFERENCIA'),
+        reference: reference,
+        description: type === 'EGRESO' ? 'Pago a proveedor' : 'Cobranza a cliente'
+      });
+    } catch (e) {
+      console.warn('financialGuard.recordTransaction (cobro/pago) falló:', e);
+    }
+  },
+
   setPrintablesFilter(filter) {
     this.printablesFilter = filter;
     document.querySelectorAll('.cash-filter-pill').forEach(btn => {
@@ -532,6 +555,7 @@ window.cashRegisterModule = {
       };
       if (!data.cashReceipts) data.cashReceipts = [];
       data.cashReceipts.unshift(newReceipt);
+      this.recordCobranzaTx(newReceipt, 'INGRESO');
     } else {
       const newPayment = {
         id: 'PAY-' + Date.now(),
@@ -581,6 +605,7 @@ window.cashRegisterModule = {
       };
       if (!data.providerPayments) data.providerPayments = [];
       data.providerPayments.unshift(newPayment);
+      this.recordCobranzaTx(newPayment, 'EGRESO');
     }
 
     window.db.save(data);
