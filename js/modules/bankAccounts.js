@@ -203,6 +203,12 @@ window.bankAccountsModule = {
     const activeCheck = document.getElementById('bank-is-active');
     if (activeCheck) activeCheck.checked = true;
 
+    const typeSelect = document.getElementById('bank-type');
+    if (typeSelect) typeSelect.value = 'BANCO';
+
+    const initialBalanceInput = document.getElementById('bank-initial-balance');
+    if (initialBalanceInput) initialBalanceInput.value = '';
+
     window.app.openModal('modal-bank-account');
   },
 
@@ -222,6 +228,9 @@ window.bankAccountsModule = {
     document.getElementById('bank-titular').value = acc.titularName;
     document.getElementById('bank-is-active').checked = !!acc.isActive;
 
+    document.getElementById('bank-type').value = acc.type || 'BANCO';
+    document.getElementById('bank-initial-balance').value = acc.initialBalance ?? '';
+
     window.app.openModal('modal-bank-account');
   },
 
@@ -233,6 +242,8 @@ window.bankAccountsModule = {
     const currency = document.getElementById('bank-currency').value;
     const titularName = document.getElementById('bank-titular').value.trim();
     const isActive = document.getElementById('bank-is-active').checked;
+    const type = document.getElementById('bank-type').value || 'BANCO';
+    const initialBalance = parseFloat(document.getElementById('bank-initial-balance').value) || 0;
 
     // Validaciones estrictas
     if (!bankName) {
@@ -274,6 +285,8 @@ window.bankAccountsModule = {
           accountType,
           currency,
           titularName,
+          type,
+          initialBalance,
           isActive,
           updatedAt: now
         };
@@ -289,6 +302,8 @@ window.bankAccountsModule = {
         accountType,
         currency,
         titularName,
+        type,
+        initialBalance,
         isActive,
         createdAt: now,
         updatedAt: now
