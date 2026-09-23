@@ -185,7 +185,7 @@ window.cashRegisterModule = {
 
     const accSelect = document.getElementById('pay-account-select');
     if (accSelect) {
-      const finAccounts = data.financialAccounts || data.bankAccounts || [];
+      const finAccounts = data.bankAccounts || [];
       if (finAccounts.length > 0) {
         accSelect.innerHTML = finAccounts.map(a => 
           `<option value="${a.id}">${a.name || a.bankName} (${a.currency || 'BOB'}) - ${a.accountNumber || ''}</option>`
