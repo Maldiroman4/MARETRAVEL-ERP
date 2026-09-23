@@ -1334,6 +1334,26 @@ window.cashRegisterModule = {
     data.cashReceipts.unshift(newReceipt);
     window.db.save(data);
 
+    // Registrar transacción INGRESO en la cuenta bancaria destino de cada forma de pago
+    if (window.financialGuard && typeof window.financialGuard.recordTransaction === 'function') {
+      try {
+        (newReceipt.payments || []).forEach(p => {
+          const accId = p.financialAccountId;
+          if (accId && (data.bankAccounts || []).some(a => a.id === accId)) {
+            window.financialGuard.recordTransaction(accId, {
+              type: 'INGRESO',
+              amount: p.amount || p.amountBob || 0,
+              medio: p.paymentMethodCode || p.paymentMethodName || 'TRANSFERENCIA',
+              reference: newReceipt.receiptCode,
+              description: 'Cobranza a cliente'
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('financialGuard.recordTransaction (cobranza) falló:', err);
+      }
+    }
+
     if (isPartial) {
       window.app.showToast(`Recibo ${receiptCode} emitido con éxito. ¡Abono Parcial registrado! Saldo restante: BOB ${remainingTotalBalance.toFixed(2)}`, 'success');
     } else {
@@ -1679,6 +1699,23 @@ window.cashRegisterModule = {
     if (!data.providerPayments) data.providerPayments = [];
     data.providerPayments.unshift(receipt);
     window.db.save(data);
+
+    // Registrar transacción EGRESO en la cuenta bancaria origen del pago
+    if (window.financialGuard && typeof window.financialGuard.recordTransaction === 'function') {
+      try {
+        if (account.id && (data.bankAccounts || []).some(a => a.id === account.id)) {
+          window.financialGuard.recordTransaction(account.id, {
+            type: 'EGRESO',
+            amount: receipt.totalPaid,
+            medio: account.bankName || account.code || 'TRANSFERENCIA',
+            reference: receipt.receiptCode,
+            description: 'Pago a proveedor'
+          });
+        }
+      } catch (err) {
+        console.warn('financialGuard.recordTransaction (pago a proveedor) falló:', err);
+      }
+    }
 
     window.app.showToast(`Comprobante de Pago a Proveedor ${receiptCode} emitido exitosamente`, 'success');
     this.loadProviderPendingNcs(provId);
