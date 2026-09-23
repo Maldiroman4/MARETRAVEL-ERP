@@ -2227,7 +2227,7 @@ window.debitNotesModule = {
             /* 1. Configuración Global de Impresión */
             @page {
               size: letter portrait;
-              margin: 10mm 12mm;
+              margin: 8mm 10mm;
             }
             * {
               box-sizing: border-box !important;
@@ -2243,7 +2243,7 @@ window.debitNotesModule = {
               height: auto !important;
               overflow: visible !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-              font-size: 12.5px !important;
+              font-size: 17px !important;
               line-height: 1.5 !important;
             }
             .nd-official-container {
