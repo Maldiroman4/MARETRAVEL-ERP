@@ -1745,8 +1745,6 @@ window.debitNotesModule = {
             const certName = (sd.certCourse || it.certCourse || it.description || 'CERTIFICACIÓN INTERNACIONAL FA').toUpperCase();
             const entity = (sd.certInstitution || it.certInstitution || opName).toUpperCase();
             const certDate = sd.certDate ? this.formatSlashDate(sd.certDate) : (it.certDate ? this.formatSlashDate(it.certDate) : ticketDate);
-            const hours = (sd.certHours || it.certHours || '120 HORAS ACADÉMICAS').toUpperCase();
-            const validity = (sd.certValidity || it.certValidity || 'VIGENCIA 2 AÑOS').toUpperCase();
 
             return `
               <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
@@ -1763,9 +1761,7 @@ window.debitNotesModule = {
                     <span class="nd-k" style="width: 100px;">Servicio :</span>
                     <div class="nd-v nd-service-details font-bold">
                       <div class="nd-srv-line" style="color: #4338ca;">CERTIFICACIÓN: ${certName}</div>
-                      <div class="nd-srv-line">CARGA HORARIA: ${hours}</div>
-                      <div class="nd-srv-line">VIGENCIA: ${validity}</div>
-                    </div>
+                      </div>
                   </div>
                 </div>
                 <div class="nd-item-col nd-col-center">

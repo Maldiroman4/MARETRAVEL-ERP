@@ -1474,10 +1474,8 @@ class OperationsHubModule {
             </div>
           </div>
 
-          <!-- Fila 3: Campos Específicos Personalizados -->
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 10px;">
-            ${this.renderItemSpecificFieldsHtml(idx, item)}
-          </div>
+          <!-- Fila 3: Campos Específicos Personalizados (oculta si el servicio no tiene) -->
+          ${(sp => sp ? `<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 10px;">${sp}</div>` : '')(this.renderItemSpecificFieldsHtml(idx, item))}
 
           <!-- Fila 4: Toggle de Moneda y Fila de Cálculos Financieros -->
           <div style="background: #f1f5f9; border-radius: 6px; padding: 12px; margin-top: 10px;">
@@ -1628,19 +1626,8 @@ class OperationsHubModule {
         </div>
       `;
     } else if (srv === 'CERTIFICACION_FA') {
-      // TAREA 5: campos innecesarios eliminados (Certificación/Tipo, Entidad Emisora, Fecha Certificación)
-      return `
-        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 8px;">
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Carga Horaria Académica:</label>
-            <input type="text" class="form-control" placeholder="Ej: 120 Horas Académicas" value="${d.certHours || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certHours', this.value)">
-          </div>
-          <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Vigencia / Vencimiento:</label>
-            <input type="text" class="form-control" placeholder="Ej: Vigencia 2 Años" value="${d.certValidity || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'certValidity', this.value)">
-          </div>
-        </div>
-      `;
+      // IFA sin campos específicos de captura
+      return '';
     } else if (srv === 'RENT_A_CAR') {
       return `
         <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr; gap: 8px;">
