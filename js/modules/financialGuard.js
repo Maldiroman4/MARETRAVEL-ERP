@@ -81,12 +81,7 @@ window.financialGuard = {
   getActiveAccounts(currencyFilter = null) {
     const data = window.db ? window.db.get() : null;
     if (!data) return [];
-
-    let list = data.financialAccounts || [];
-    if (list.length === 0 && Array.isArray(data.bankAccounts)) {
-      list = data.bankAccounts;
-    }
-
+    const list = data.bankAccounts || [];
     return list.filter(acc => {
       const isAct = acc.isActive !== false && acc.status !== 'INACTIVO';
       const currMatch = !currencyFilter || currencyFilter === 'TODOS' || acc.currency === currencyFilter;
@@ -102,8 +97,48 @@ window.financialGuard = {
     if (!id) return null;
     const data = window.db ? window.db.get() : null;
     if (!data) return null;
-    const list = [...(data.financialAccounts || []), ...(data.bankAccounts || [])];
-    return list.find(a => a.id === id) || null;
+    return (data.bankAccounts || []).find(a => a.id === id) || null;
+  },
+
+  /**
+   * Registra una transacción en la cuenta indicada (INGRESO/EGRESO)
+   */
+  recordTransaction(accountId, datos) {
+    const data = window.db ? window.db.get() : null;
+    if (!data || !accountId) return null;
+    const acc = (data.bankAccounts || []).find(a => a.id === accountId);
+    if (!acc || acc.isActive === false) return null; // cuenta inactiva: no transactable
+    if (!data.bankTransactions) data.bankTransactions = [];
+    const tx = {
+      id: 'BTX-' + Date.now() + Math.random().toString(36).substr(2, 6),
+      accountId: accountId,
+      type: datos.type === 'EGRESO' ? 'EGRESO' : 'INGRESO',
+      amount: Number(datos.amount) || 0,
+      medio: datos.medio || 'TRANSFERENCIA',
+      date: datos.date || new Date().toISOString().split('T')[0],
+      reference: datos.reference || '',
+      description: datos.description || '',
+      createdAt: new Date().toLocaleString()
+    };
+    data.bankTransactions.unshift(tx);
+    if (window.db && typeof window.db.save === 'function') window.db.save(data);
+    return tx;
+  },
+
+  /**
+   * Calcula el saldo derivado de una cuenta a partir de su saldo inicial y transacciones
+   */
+  getAccountBalance(accountId) {
+    const data = window.db ? window.db.get() : null;
+    const acc = (data && data.bankAccounts || []).find(a => a.id === accountId);
+    const initial = acc ? Number(acc.initialBalance) || 0 : 0;
+    const txs = (data && data.bankTransactions || []).filter(t => t.accountId === accountId);
+    let ingresos = 0, egresos = 0;
+    txs.forEach(t => {
+      if (t.type === 'EGRESO') egresos += Number(t.amount) || 0;
+      else ingresos += Number(t.amount) || 0;
+    });
+    return { saldo: +(initial + ingresos - egresos).toFixed(2), ingresos: +ingresos.toFixed(2), egresos: +egresos.toFixed(2), transactions: txs };
   },
 
   /**
