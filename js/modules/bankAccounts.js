@@ -411,12 +411,11 @@ window.bankAccountsModule = {
     const bal = window.financialGuard.getAccountBalance(accountId);
     const neg = bal.saldo < 0;
     document.getElementById('acc-ledger-title').textContent = `${acc.bankName || acc.name || 'Cuenta'} ${acc.accountNumber ? '- Cta. ' + acc.accountNumber : ''}`;
-    document.getElementById('acc-ledger-balance').textContent = `Saldo: BOB ${bal.saldo.toFixed(2)}`;
-    document.getElementById('acc-ledger-balance').className = 'font-bold ' + (neg ? 'text-danger' : 'text-success');
+    document.getElementById('acc-ledger-balance').textContent = `Saldo: ${acc.currency} ${bal.saldo.toFixed(2)}`;
     document.getElementById('acc-ledger-balance').style.color = neg ? '#dc2626' : '#00a884';
     const tbody = document.getElementById('acc-ledger-body');
     tbody.innerHTML = bal.transactions.length === 0
-      ? '<tr><td colspan="5" style="text-align:center;padding:16px;color:#64748b;">Sin transacciones (saldo inicial: BOB ' + bal.saldo.toFixed(2) + ')</td></tr>'
+      ? '<tr><td colspan="5" style="text-align:center;padding:16px;color:#64748b;">Sin transacciones (saldo inicial: ' + acc.currency + ' ' + bal.saldo.toFixed(2) + ')</td></tr>'
       : bal.transactions.map(t => `
         <tr>
           <td>${t.date}</td>

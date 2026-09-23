@@ -107,7 +107,7 @@ window.financialGuard = {
     const data = window.db ? window.db.get() : null;
     if (!data || !accountId) return null;
     const acc = (data.bankAccounts || []).find(a => a.id === accountId);
-    if (!acc || acc.isActive === false) return null; // cuenta inactiva: no transactable
+    if (!acc || acc.isActive === false || acc.status === 'INACTIVO') return null; // cuenta inactiva: no transactable
     if (!data.bankTransactions) data.bankTransactions = [];
     const tx = {
       id: 'BTX-' + Date.now() + Math.random().toString(36).substr(2, 6),

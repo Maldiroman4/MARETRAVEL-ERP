@@ -11,6 +11,17 @@ window.cashRegisterModule = {
   selectedProviderNcs: [],
   activePaymentRows: [],
 
+  // Normaliza un medio de pago al enum estándar del ledger:
+  // EFECTIVO | QR | TRANSFERENCIA | CHEQUE | CRIPTO
+  mapMedio(method) {
+    const m = String(method || '').toUpperCase();
+    if (m.includes('EFECTIVO') || m.includes('CAJA') || m.includes('CASH')) return 'EFECTIVO';
+    if (m.includes('QR')) return 'QR';
+    if (m.includes('CHEQUE') || m.includes('CHECK')) return 'CHEQUE';
+    if (m.includes('CRIPTO') || m.includes('CRYPTO') || m.includes('BINANCE') || m.includes('USDT') || m.includes('P2P')) return 'CRIPTO';
+    return 'TRANSFERENCIA';
+  },
+
   setPrintablesFilter(filter) {
     this.printablesFilter = filter;
     document.querySelectorAll('.cash-filter-pill').forEach(btn => {
@@ -1340,11 +1351,14 @@ window.cashRegisterModule = {
         (newReceipt.payments || []).forEach(p => {
           const accId = p.financialAccountId;
           if (accId && (data.bankAccounts || []).some(a => a.id === accId)) {
+            const reference = newReceipt.receiptCode;
+            const already = (data.bankTransactions || []).some(t => t.accountId === accId && t.reference === reference);
+            if (already) return;
             window.financialGuard.recordTransaction(accId, {
               type: 'INGRESO',
               amount: p.amount || p.amountBob || 0,
-              medio: p.paymentMethodCode || p.paymentMethodName || 'TRANSFERENCIA',
-              reference: newReceipt.receiptCode,
+              medio: this.mapMedio(p.paymentMethodCode || p.paymentMethodName || 'TRANSFERENCIA'),
+              reference: reference,
               description: 'Cobranza a cliente'
             });
           }
@@ -1707,7 +1721,7 @@ window.cashRegisterModule = {
           window.financialGuard.recordTransaction(account.id, {
             type: 'EGRESO',
             amount: receipt.totalPaid,
-            medio: account.bankName || account.code || 'TRANSFERENCIA',
+            medio: this.mapMedio(account.bankName || account.cashDeskName || account.code || 'TRANSFERENCIA'),
             reference: receipt.receiptCode,
             description: 'Pago a proveedor'
           });

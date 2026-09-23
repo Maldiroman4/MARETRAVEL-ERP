@@ -696,7 +696,7 @@ window.otherIncomesModule = {
       if (!data) return;
       const acc = (data.bankAccounts || []).find(a => a.id === item.depositAccountId);
       if (!acc) return;
-      const reference = String(item.ticketNumber || item.id || '');
+      const reference = String(item.id || item.ticketNumber || '');
       const already = (data.bankTransactions || []).some(t => t.accountId === item.depositAccountId && t.reference === reference);
       if (already) return; // ya registrado: no duplicar
       window.financialGuard.recordTransaction(item.depositAccountId, {
