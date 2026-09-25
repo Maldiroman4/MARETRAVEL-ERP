@@ -359,6 +359,14 @@ window.bankAccountsModule = {
     acc.deleted = true;
     acc.deletedAt = new Date().toLocaleString();
     acc.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+    // La cuenta bancaria vive realmente en financial_accounts (type='BANCO') y bankAccounts
+    // es una proyección: marcar también la fuente para que el soft-delete persista en la BD.
+    const finCopy = (data.financialAccounts || []).find(f => f.id === acc.id && f.type === 'BANCO');
+    if (finCopy) {
+      finCopy.deleted = true;
+      finCopy.deletedAt = acc.deletedAt;
+      finCopy.deletedBy = acc.deletedBy;
+    }
     window.db.save(data);
     window.app.showToast('Cuenta bancaria movida a la PAPELERA. No se borró de la base de datos.', 'info');
     this.render();

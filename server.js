@@ -375,11 +375,14 @@ function collectTrash(state) {
   for (const [type, arr] of Object.entries(state)) {
     if (!Array.isArray(arr)) continue;
     for (const item of arr) {
+      // Las cuentas bancarias son proyección de financial_accounts (type='BANCO'):
+      // se listan una sola vez bajo 'bankAccounts' para no duplicarlas en la papelera.
+      if (type === 'financialAccounts' && item && item.type === 'BANCO') continue;
       if (item && item.deleted === true) {
         items.push({
           type,
           id: item.id,
-          label: item.name || item.ndNumber || item.ticketNumber || item.accountName || item.passengerName || item.id,
+          label: item.name || item.ndNumber || item.ticketNumber || item.accountName || item.passengerName || item.bankName || item.id,
           deletedAt: item.deletedAt || null,
           deletedBy: item.deletedBy || null
         });
@@ -481,6 +484,8 @@ const server = http.createServer(async (req, res) => {
         gdsTickets: 'gds_tickets',
         cashReceipts: 'cash_receipts',
         financialAccounts: 'financial_accounts',
+        // Las cuentas bancarias NO tienen tabla propia: son filas financial_accounts con type='BANCO'
+        bankAccounts: 'financial_accounts',
         passengers: 'passengers'
       };
       const body = await parseRequestBody(req);
@@ -494,6 +499,11 @@ const server = http.createServer(async (req, res) => {
       // Cascada: purgar una ND también purga sus NCs vinculadas
       if (body.type === 'debitNotes') {
         state.creditNotes = (state.creditNotes || []).filter(nc => nc.originDebitNoteId !== body.id);
+      }
+      // Las cuentas bancarias viven en financial_accounts (type='BANCO'): al purgar una,
+      // se quita también la fila financiera de origen, o la cuenta reaparecería en el próximo read.
+      if (body.type === 'bankAccounts') {
+        state.financialAccounts = (state.financialAccounts || []).filter(f => !(f.id === body.id && f.type === 'BANCO'));
       }
       await saveDb(state); // snapshot JSON + upserts (el prune conserva filas con flag soft-delete)
 
