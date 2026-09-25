@@ -2684,47 +2684,30 @@ class OperationsHubModule {
     const nd = (data.debitNotes || []).find(n => n.id === id);
     if (!nd) return;
 
-    if (!confirm(`¿Está seguro de BORRAR DEFINITIVAMENTE la operación ND #${nd.ndNumber}?\n\nEsta acción eliminará el registro y limpiará en cascada sus cuentas por pagar y comprobantes vinculados.`)) {
+    if (!confirm(`¿Está seguro de mover a la PAPELERA la operación ND #${nd.ndNumber}?\n\nLa nota de débito y sus notas de crédito vinculadas dejarán de verse, pero NO se borran de la base de datos. Solo el súper usuario puede restaurarlas o purgarlas definitivamente.`)) {
       return;
     }
 
     try {
-      // 1. Borrado en cascada de NCs vinculadas
-      data.creditNotes = (data.creditNotes || []).filter(nc => nc.originDebitNoteId !== id && nc.originDebitNoteNumber !== nd.ndNumber);
-
-      // 2. Borrado en cascada de Boletos GDS vinculados
-      (nd.items || []).forEach(it => {
-        if (it.gdsTicketId) {
-          data.gdsTickets = (data.gdsTickets || []).filter(t => t.id !== it.gdsTicketId);
+      // 1. Soft-delete en cascada: NCs vinculadas → papelera (se conservan en la BD)
+      const markDeleted = (rec) => {
+        if (!rec) return;
+        rec.deleted = true;
+        rec.deletedAt = new Date().toLocaleString();
+        rec.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+      };
+      (data.creditNotes || []).forEach(nc => {
+        if (nc.originDebitNoteId === id || nc.originDebitNoteNumber === nd.ndNumber) {
+          markDeleted(nc);
         }
       });
 
-      // 3. Borrado en cascada de Recibos de Caja (RCP) vinculados
-      data.cashReceipts = (data.cashReceipts || []).filter(r => {
-        if (r.debitNoteId === id || r.debitNoteNumber === nd.ndNumber) return false;
-        if (r.details && r.details.some(d => d.debitNoteId === id || d.ndNumber === nd.ndNumber)) return false;
-        return true;
-      });
+      // 2. Soft-delete de la Nota de Débito → papelera.
+      //    Los boletos GDS, recibos de caja y otros ingresos vinculados NO se destruyen:
+      //    son documentos independientes que conservan su referencia al número de ND.
+      markDeleted(nd);
 
-      // Limpiar también cualquier recibo huérfano sin ND existente
-      const remainingNdIds = new Set((data.debitNotes || []).filter(n => n.id !== id).map(n => n.id));
-      const remainingNdNums = new Set((data.debitNotes || []).filter(n => n.id !== id).map(n => n.ndNumber));
-      data.cashReceipts = (data.cashReceipts || []).filter(r => {
-        if (!r.details || r.details.length === 0) {
-          return (r.debitNoteId && remainingNdIds.has(r.debitNoteId)) || (r.debitNoteNumber && remainingNdNums.has(r.debitNoteNumber));
-        }
-        return r.details.some(d => remainingNdIds.has(d.debitNoteId) || remainingNdNums.has(d.ndNumber));
-      });
-
-      // 4. Borrado en cascada de Otros Ingresos (Comisiones)
-      data.otherIncomes = (data.otherIncomes || []).filter(inc => {
-        return !nd.items.some(it => it.ticketNumber && inc.ticketNumber === it.ticketNumber);
-      });
-
-      // 5. Borrado de la Nota de Débito
-      data.debitNotes = (data.debitNotes || []).filter(n => n.id !== id);
-
-      // 6. Persistencia síncrona/asíncrona en base de datos
+      // 3. Persistencia síncrona/asíncrona en base de datos
       window.db.save(data);
 
       // 7. Borrado reactivo del nodo DOM para evitar re-renderizado masivo y lag
@@ -2737,7 +2720,7 @@ class OperationsHubModule {
       window.app.updateDashboardKpis();
       if (window.creditNotesModule) window.creditNotesModule.render();
       if (window.cashRegisterModule) window.cashRegisterModule.renderReceiptsHistory();
-      window.app.showToast(`Operación ND #${nd.ndNumber} eliminada en cascada correctamente`, 'success');
+      window.app.showToast(`Operación ND #${nd.ndNumber} movida a la PAPELERA. No se borró de la base de datos.`, 'success');
     } catch (err) {
       console.error('Error en eliminación en cascada:', err);
       window.app.showToast('Error al eliminar operación: ' + (err.message || err), 'error');
@@ -2745,16 +2728,27 @@ class OperationsHubModule {
   }
 
   deleteTicket(id) {
-    if (!confirm('¿Desea eliminar definitivamente este boleto aéreo?')) return;
+    if (!confirm('¿Desea mover a la PAPELERA este boleto aéreo?\n\nDejará de verse en el sistema, pero NO se borra de la base de datos. Solo el súper usuario puede restaurarlo o purgarlo.')) return;
     const data = window.db.get();
-    data.gdsTickets = (data.gdsTickets || []).filter(t => t.id !== id);
-    data.otherIncomes = (data.otherIncomes || []).filter(i => i.ticketId !== id);
+    const tkt = (data.gdsTickets || []).find(t => t.id === id);
+    if (tkt) {
+      tkt.deleted = true;
+      tkt.deletedAt = new Date().toLocaleString();
+      tkt.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+    }
+    (data.otherIncomes || []).forEach(i => {
+      if (i.ticketId === id) {
+        i.deleted = true;
+        i.deletedAt = new Date().toLocaleString();
+        i.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+      }
+    });
     window.db.save(data);
     this.render();
     if (window.gdsModule) window.gdsModule.render();
     if (window.otherIncomesModule) window.otherIncomesModule.render();
     window.app.updateDashboardKpis();
-    window.app.showToast('Boleto eliminado del sistema', 'success');
+    window.app.showToast('Boleto movido a la PAPELERA. No se borró de la base de datos.', 'success');
   }
 
   voidOperation(id) {

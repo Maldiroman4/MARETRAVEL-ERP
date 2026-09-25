@@ -400,14 +400,16 @@ window.accountsModule = {
       const msg = `⚠️ ADVERTENCIA CONTABLE Y OPERATIVA:\n\n` +
         `La cuenta "${acc.name}" (${acc.code}) tiene ${totalMovements} registro(s) vinculado(s):\n` +
         `• ${details.join('\n• ')}\n\n` +
-        `Si elimina esta cuenta, sus documentos históricos conservarán el nombre pero la cuenta desaparecerá del directorio comercial.\n\n` +
-        `¿Está absolutamente seguro de ELIMINAR definitivamente la cuenta "${acc.name}"?`;
+        `Si mueve esta cuenta a la papelera, sus documentos históricos conservarán el nombre. ` +
+        `El dato NO se borra de la base de datos: solo el súper usuario puede verlo, restaurarlo o purgarlo definitivamente.\n\n` +
+        `¿Desea mover a la PAPELERA la cuenta "${acc.name}"?`;
 
       if (!confirm(msg)) {
         return;
       }
     } else {
-      const msg = `¿Confirma que desea eliminar la cuenta "${acc.name}" (${acc.code}) del directorio?`;
+      const msg = `¿Confirma que desea mover a la PAPELERA la cuenta "${acc.name}" (${acc.code})?\n\n` +
+        `Dejará de verse en el sistema, pero NO se borra de la base de datos.`;
       if (!confirm(msg)) {
         return;
       }
@@ -428,20 +430,22 @@ window.accountsModule = {
       createdAt: new Date().toLocaleString()
     });
 
-    // 4. Limpiar contactos de empresa asociados
-    if (data.companyContacts && Array.isArray(data.companyContacts)) {
-      data.companyContacts = data.companyContacts.filter(c => c.companyId !== accountId);
-    }
+    // 4. Los contactos de empresa asociados se conservan (soft delete: nada se destruye)
 
-    // 5. Eliminar la cuenta del arreglo principal
-    data.accounts = (data.accounts || []).filter(a => a.id !== accountId);
+    // 5. Marcar la cuenta como eliminada (soft delete → papelera)
+    const accMark = (data.accounts || []).find(a => a.id === accountId);
+    if (accMark) {
+      accMark.deleted = true;
+      accMark.deletedAt = new Date().toLocaleString();
+      accMark.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+    }
 
     // 6. Guardar cambios en la base de datos física / localStorage
     window.db.save(data);
 
     // Cerrar modal si estaba abierto
     window.app.closeModal('modal-account');
-    window.app.showToast(`Cuenta "${acc.name}" eliminada exitosamente.`, 'success');
+    window.app.showToast(`Cuenta "${acc.name}" movida a la PAPELERA. No se borró de la base de datos.`, 'success');
 
     // 7. Refrescar vistas reactivamente
     this.render();

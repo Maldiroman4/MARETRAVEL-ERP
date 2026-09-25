@@ -1007,6 +1007,12 @@ const sqlDatabase = {
     };
   },
 
+  // Flag soft-delete: fila marcada como eliminada en raw_json (papelera) nunca se prunca
+  isSoftDeleted(rawJson) {
+    if (!rawJson) return false;
+    try { return JSON.parse(rawJson).deleted === true; } catch (_) { return false; }
+  },
+
   saveFullState(state) {
     const db = getSqlDb();
 
@@ -1131,14 +1137,15 @@ const sqlDatabase = {
         }
       }
 
-      // Sincronización bidireccional: depurar (prune) registros eliminados en el cliente
+      // Sincronización bidireccional: depurar (prune) registros eliminados en el cliente.
+      // Las filas con flag soft-delete (deleted:true en raw_json, papelera) se conservan SIEMPRE.
       const pruneMissing = (tableName, idCol, keepList) => {
         if (!Array.isArray(keepList)) return;
         const keepSet = new Set(keepList.map(item => (typeof item === 'string' ? item : item.id)).filter(Boolean));
-        const existingRows = db.prepare(`SELECT ${idCol} AS id FROM ${tableName}`).all();
+        const existingRows = db.prepare(`SELECT * FROM ${tableName}`).all();
         const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE ${idCol} = ?`);
         for (const row of existingRows) {
-          if (!keepSet.has(row.id)) {
+          if (!keepSet.has(row.id) && !this.isSoftDeleted(row.raw_json)) {
             deleteStmt.run(row.id);
           }
         }
@@ -1181,6 +1188,14 @@ const sqlDatabase = {
         subservices: db.prepare('SELECT COUNT(*) as c FROM subservices').get().c
       }
     };
+  },
+
+  // Borrado físico directo (purga definitiva de la papelera): ignora el flag soft-delete.
+  // table y whereCol deben venir de un allowlist del servidor (nunca del input del usuario).
+  deleteRow(table, whereCol, whereVal) {
+    const db = getSqlDb();
+    const result = db.prepare(`DELETE FROM ${table} WHERE ${whereCol} = ?`).run(whereVal);
+    return { deleted: result.changes };
   }
 };
 

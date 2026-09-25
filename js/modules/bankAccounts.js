@@ -352,13 +352,15 @@ window.bankAccountsModule = {
       return;
     }
 
-    if (!confirm(`¿Confirma que desea eliminar permanentemente la cuenta bancaria:\n${acc.bankName} - ${acc.accountNumber}?\n\nEsta acción no se puede deshacer.`)) {
+    if (!confirm(`¿Confirma que desea mover a la PAPELERA la cuenta bancaria:\n${acc.bankName} - ${acc.accountNumber}?\n\nDejará de verse en el sistema, pero NO se borra de la base de datos. Solo el súper usuario puede restaurarla o purgarla definitivamente.`)) {
       return;
     }
 
-    data.bankAccounts = data.bankAccounts.filter(a => a.id !== id);
+    acc.deleted = true;
+    acc.deletedAt = new Date().toLocaleString();
+    acc.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
     window.db.save(data);
-    window.app.showToast('Cuenta bancaria eliminada del sistema.', 'info');
+    window.app.showToast('Cuenta bancaria movida a la PAPELERA. No se borró de la base de datos.', 'info');
     this.render();
   },
 

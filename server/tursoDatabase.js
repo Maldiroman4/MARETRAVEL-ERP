@@ -1114,19 +1114,21 @@ const tursoDatabase = {
       }
     }
 
-    // 13. Pruning de registros eliminados (espejo fiel: lo que NO está en el estado guardado se borra)
+    // 13. Pruning de registros eliminados (espejo fiel: lo que NO está en el estado guardado se borra).
+    // Las filas con flag soft-delete (deleted:true en raw_json, papelera) se conservan SIEMPRE.
+    const SOFT_DELETED_GUARD = `COALESCE(json_extract(raw_json, '$.deleted'), 0) = 0`;
     const addPruneStmt = (tableName, idCol, keepList) => {
       if (!Array.isArray(keepList)) return;
       const ids = keepList.map(item => (typeof item === 'string' ? item : item.id)).filter(Boolean);
       if (ids.length === 0) {
         // Lista vacía = tabla vacía (mismo comportamiento que la capa SQLite local).
         // El guard anterior dejaba filas fantasma al borrar el último registro.
-        stmts.push({ sql: `DELETE FROM ${tableName}`, args: [] });
+        stmts.push({ sql: `DELETE FROM ${tableName} WHERE ${SOFT_DELETED_GUARD}`, args: [] });
         return;
       }
       const placeholders = ids.map(() => '?').join(',');
       stmts.push({
-        sql: `DELETE FROM ${tableName} WHERE ${idCol} NOT IN (${placeholders})`,
+        sql: `DELETE FROM ${tableName} WHERE ${idCol} NOT IN (${placeholders}) AND ${SOFT_DELETED_GUARD}`,
         args: ids
       });
     };
@@ -1143,6 +1145,17 @@ const tursoDatabase = {
     // Ejecución atómica en un único round-trip en Turso
     await client.batch(stmts, 'write');
     return { success: true, count: stmts.length };
+  },
+
+  // Borrado físico directo (purga definitiva de la papelera): ignora el flag soft-delete.
+  // table y whereCol deben venir de un allowlist del servidor (nunca del input del usuario).
+  async deleteRow(table, whereCol, whereVal) {
+    const client = getClient();
+    const result = await client.execute({
+      sql: `DELETE FROM ${table} WHERE ${whereCol} = ?`,
+      args: [whereVal]
+    });
+    return { deleted: Number(result.rowsAffected || 0) };
   },
 
   async getStats() {

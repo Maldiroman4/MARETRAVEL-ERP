@@ -220,28 +220,51 @@ class LocalDatabase {
     return changed;
   }
 
-  get() {
-    try {
-      if (this.cachedData) {
+  _load() {
+    if (this.cachedData) {
+      return this.cachedData;
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      const data = localStorage.getItem(DB_KEY);
+      if (data) {
+        this.cachedData = JSON.parse(data);
+        if (this.healMultiCurrencyData(this.cachedData)) {
+          localStorage.setItem(DB_KEY, JSON.stringify(this.cachedData));
+        }
         return this.cachedData;
       }
+    }
 
-      if (typeof localStorage !== 'undefined') {
-        const data = localStorage.getItem(DB_KEY);
-        if (data) {
-          this.cachedData = JSON.parse(data);
-          if (this.healMultiCurrencyData(this.cachedData)) {
-            localStorage.setItem(DB_KEY, JSON.stringify(this.cachedData));
-          }
-          return this.cachedData;
+    this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
+    this.healMultiCurrencyData(this.cachedData);
+    return this.cachedData;
+  }
+
+  // Proyección visible: oculta los registros con soft-delete (flag deleted:true, papelera).
+  // Los registros borrados siguen vivos en la BD (Turso/SQLite) y en getRaw().
+  get() {
+    try {
+      const raw = this._load();
+      const view = { ...raw };
+      for (const key of Object.keys(view)) {
+        if (Array.isArray(view[key])) {
+          view[key] = view[key].filter(x => !(x && x.deleted === true));
         }
       }
-
-      this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
-      this.healMultiCurrencyData(this.cachedData);
-      return this.cachedData;
+      return view;
     } catch (e) {
       console.error('Error leyendo base de datos:', e);
+      return JSON.parse(JSON.stringify(initialDatabase));
+    }
+  }
+
+  // Estado crudo completo (incluye registros borrados). Uso interno de la papelera.
+  getRaw() {
+    try {
+      return this._load();
+    } catch (e) {
+      console.error('Error leyendo base de datos cruda:', e);
       return JSON.parse(JSON.stringify(initialDatabase));
     }
   }

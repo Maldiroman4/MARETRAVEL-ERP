@@ -395,11 +395,19 @@ window.gdsModule = {
       return;
     }
 
-    if (confirm(`¿Estás seguro de eliminar el boleto ${tkt.ticketNumber} de ${tkt.passengerName}?`)) {
-      data.gdsTickets = data.gdsTickets.filter(t => t.id !== ticketId);
-      data.otherIncomes = (data.otherIncomes || []).filter(i => i.ticketId !== ticketId);
+    if (confirm(`¿Estás seguro de mover a la PAPELERA el boleto ${tkt.ticketNumber} de ${tkt.passengerName}?\n\nDejará de verse, pero NO se borra de la base de datos. Solo el súper usuario puede restaurarlo o purgarlo definitivamente.`)) {
+      tkt.deleted = true;
+      tkt.deletedAt = new Date().toLocaleString();
+      tkt.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+      (data.otherIncomes || []).forEach(i => {
+        if (i.ticketId === ticketId) {
+          i.deleted = true;
+          i.deletedAt = new Date().toLocaleString();
+          i.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
+        }
+      });
       window.db.save(data);
-      window.app.showToast(`Boleto ${tkt.ticketNumber} eliminado correctamente`, 'success');
+      window.app.showToast(`Boleto ${tkt.ticketNumber} movido a la PAPELERA. No se borró de la base de datos.`, 'success');
       this.render();
       if (window.operationsHubModule) window.operationsHubModule.render();
       if (window.otherIncomesModule) window.otherIncomesModule.render();

@@ -3015,15 +3015,20 @@
   <!-- Contenedor de Toasts -->
   <div id="toast-container"></div>
 
+  <!-- Acceso discreto a la Papelera (solo visible para rol ADMIN; la puerta real es el súper login) -->
+  <button id="btn-papelera" onclick="window.papeleraModule.open()" style="display:none; position:fixed; bottom:14px; right:14px; z-index:995; border-radius:999px; padding:8px 14px; background:#1e293b; color:#fff; border:1px solid #334155; font-size:0.8rem; box-shadow:0 4px 12px rgba(0,0,0,.25); cursor:pointer;">
+    🗑️ Papelera (súper)
+  </button>
+
   <!-- Contenedor de Impresión Oficial MARETRAVEL (Oculto en pantalla) -->
   <div id="print-area"></div>
 
   <!-- Scripts del Sistema ERP -->
-  <script src="js/db.js?v=20260922_v20"></script>
+  <script src="js/db.js?v=20260925_v21"></script>
   <script src="js/modules/financialGuard.js?v=20260922_v20"></script>
-  <script src="js/modules/bankAccounts.js?v=20260922_v20"></script>
-  <script src="js/modules/accounts.js?v=20260922_v20"></script>
-  <script src="js/modules/gds.js?v=20260922_v20"></script>
+  <script src="js/modules/bankAccounts.js?v=20260925_v21"></script>
+  <script src="js/modules/accounts.js?v=20260925_v21"></script>
+  <script src="js/modules/gds.js?v=20260925_v21"></script>
   <script src="js/modules/debitNotes.js?v=20260922_v20"></script>
   <script src="js/modules/creditNotes.js?v=20260922_v20"></script>
   <script src="js/modules/cashRegister.js?v=20260922_v20"></script>
@@ -3031,7 +3036,8 @@
   <script src="js/modules/reports.js?v=20260922_v20"></script>
   <script src="js/modules/calendar.js?v=20260922_v20"></script>
   <script src="js/modules/settings.js?v=20260922_v20"></script>
-  <script src="js/modules/operationsHub.js?v=20260922_v20"></script>
+  <script src="js/modules/operationsHub.js?v=20260925_v21"></script>
+  <script src="js/modules/papelera.js?v=20260925_v21"></script>
   <script src="js/app.js?v=20260922_v20"></script>
 
 
@@ -3051,6 +3057,30 @@
         <div id="pax-search-empty" style="display: none; color: #64748b; font-size: 0.82rem; padding: 12px; text-align: center;">
           Sin coincidencias en el directorio.<br>El pasajero se registrará automáticamente al guardar la operación.
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Papelera de Súper Usuario: registros con soft-delete (ocultos pero vivos en la BD) -->
+  <div class="modal-overlay" id="modal-papelera">
+    <div class="modal-box" style="max-width: 880px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i data-lucide="trash-2"></i> Papelera (Súper Usuario)</h3>
+        <button class="modal-close" data-close-modal="modal-papelera">&times;</button>
+      </div>
+      <div class="modal-content">
+        <div id="papelera-login">
+          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">Solo el súper usuario puede ver los registros eliminados, restaurarlos o purgarlos definitivamente de la base de datos.</p>
+          <input type="text" id="papelera-username" class="form-control" placeholder="Usuario súper" style="margin-bottom: 8px;">
+          <input type="password" id="papelera-password" class="form-control" placeholder="Contraseña" style="margin-bottom: 8px;">
+          <button class="btn btn-primary" onclick="window.papeleraModule.login()">Entrar</button>
+        </div>
+        <div id="papelera-content" style="display: none;">
+          <div id="papelera-list" style="max-height: 420px; overflow-y: auto;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-papelera">Cerrar</button>
       </div>
     </div>
   </div>

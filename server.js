@@ -8,6 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const crypto = require('crypto');
 const sqlDatabase = require('./server/sqlDatabase');
 const tursoDatabase = require('./server/tursoDatabase');
 
@@ -338,6 +339,56 @@ function parseRequestBody(req) {
 // SERVIDOR HTTP CON ENDPOINTS REST TRANSACCIONALES
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// SÚPER USUARIO Y PAPELERA (borrado suave + restauración + purga definitiva)
+// ----------------------------------------------------------------------------
+// El acceso a la papelera se autentica contra SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD
+// del entorno; si no están configurados, la papelera queda deshabilitada (403).
+const superTokens = new Set();
+
+function isSuperAuthorized(req) {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  return superTokens.has(token);
+}
+
+function sendJson(res, status, obj) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
+}
+
+const DELETE_FIELDS = ['deleted', 'deletedAt', 'deletedBy'];
+
+// Marca un registro como eliminado (soft delete → papelera). Devuelve true si lo marcó.
+function softDeleteRecord(record) {
+  if (!record || typeof record !== 'object') return false;
+  if (record.deleted === true) return false;
+  record.deleted = true;
+  record.deletedAt = record.deletedAt || new Date().toLocaleString();
+  record.deletedBy = record.deletedBy || 'Usuario';
+  return true;
+}
+
+// Extrae los registros con flag soft-delete del estado crudo, agrupados por tipo.
+function collectTrash(state) {
+  const items = [];
+  for (const [type, arr] of Object.entries(state)) {
+    if (!Array.isArray(arr)) continue;
+    for (const item of arr) {
+      if (item && item.deleted === true) {
+        items.push({
+          type,
+          id: item.id,
+          label: item.name || item.ndNumber || item.ticketNumber || item.accountName || item.passengerName || item.id,
+          deletedAt: item.deletedAt || null,
+          deletedBy: item.deletedBy || null
+        });
+      }
+    }
+  }
+  return items;
+}
+
 const server = http.createServer(async (req, res) => {
   // CORS universal
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -352,6 +403,115 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = new URL(req.url, 'http://' + (req.headers.host || 'localhost:3000'));
   const pathname = parsedUrl.pathname;
+
+  // --------------------------------------------------------------------------
+  // 0. SÚPER USUARIO Y PAPELERA (solo con token de súper usuario)
+  // --------------------------------------------------------------------------
+
+  // Login del súper usuario: POST /api/super/login { username, password } → { token }
+  if (pathname === '/api/super/login' && req.method === 'POST') {
+    try {
+      const body = await parseRequestBody(req);
+      const envUser = process.env.SUPER_ADMIN_USERNAME;
+      const envPass = process.env.SUPER_ADMIN_PASSWORD;
+      if (envUser && envPass && body.username === envUser && body.password === envPass) {
+        const token = crypto.randomUUID();
+        superTokens.add(token);
+        sendJson(res, 200, { success: true, token });
+      } else {
+        sendJson(res, 401, { error: 'Credenciales de súper usuario inválidas.' });
+      }
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // Listar papelera: GET /api/papelera
+  if (pathname === '/api/papelera' && req.method === 'GET') {
+    if (!isSuperAuthorized(req)) {
+      sendJson(res, 401, { error: 'Acceso denegado: se requiere súper usuario.' });
+      return;
+    }
+    try {
+      const items = collectTrash(await persistence.getFullState());
+      sendJson(res, 200, { success: true, items });
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // Restaurar: POST /api/papelera/restore { type, id } → limpia el flag, vuelve a ser visible
+  if (pathname === '/api/papelera/restore' && req.method === 'POST') {
+    if (!isSuperAuthorized(req)) {
+      sendJson(res, 401, { error: 'Acceso denegado: se requiere súper usuario.' });
+      return;
+    }
+    try {
+      const body = await parseRequestBody(req);
+      const state = await persistence.getFullState();
+      const arr = Array.isArray(state[body.type]) ? state[body.type] : null;
+      const rec = arr ? arr.find(x => x && x.id === body.id) : null;
+      if (!rec) {
+        sendJson(res, 404, { error: `Registro ${body.type}/${body.id} no encontrado en la papelera.` });
+        return;
+      }
+      DELETE_FIELDS.forEach(f => delete rec[f]);
+      await saveDb(state);
+      sendJson(res, 200, { success: true, record: rec, type: body.type });
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // Purga definitiva: POST /api/papelera/purge { type, id } → borra de DB SQL, snapshot JSON y todo
+  if (pathname === '/api/papelera/purge' && req.method === 'POST') {
+    if (!isSuperAuthorized(req)) {
+      sendJson(res, 401, { error: 'Acceso denegado: se requiere súper usuario.' });
+      return;
+    }
+    try {
+      // Allowlist de tipos → tablas (nunca se interpolan valores del usuario en SQL)
+      const TABLE_BY_TYPE = {
+        accounts: 'accounts',
+        debitNotes: 'debit_notes',
+        creditNotes: 'credit_notes',
+        gdsTickets: 'gds_tickets',
+        cashReceipts: 'cash_receipts',
+        financialAccounts: 'financial_accounts',
+        passengers: 'passengers'
+      };
+      const body = await parseRequestBody(req);
+      const state = await persistence.getFullState();
+      const arr = Array.isArray(state[body.type]) ? state[body.type] : null;
+      if (!arr) {
+        sendJson(res, 404, { error: `Tipo ${body.type} inválido.` });
+        return;
+      }
+      state[body.type] = arr.filter(x => x && x.id !== body.id);
+      // Cascada: purgar una ND también purga sus NCs vinculadas
+      if (body.type === 'debitNotes') {
+        state.creditNotes = (state.creditNotes || []).filter(nc => nc.originDebitNoteId !== body.id);
+      }
+      await saveDb(state); // snapshot JSON + upserts (el prune conserva filas con flag soft-delete)
+
+      // Borrado físico real: el prune respeta el flag deleted:true de la papelera,
+      // así que la fila se elimina directamente de SQLite/Turso.
+      const table = TABLE_BY_TYPE[body.type];
+      if (table) {
+        await persistence.deleteRow(table, 'id', body.id);
+        if (body.type === 'debitNotes') {
+          await persistence.deleteRow('credit_notes', 'origin_debit_note_id', body.id);
+        }
+      }
+      sendJson(res, 200, { success: true, purgedId: body.id });
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
 
   // --------------------------------------------------------------------------
   // 1. ENDPOINT PRINCIPAL DE BASE DE DATOS: /api/db (GET / POST)
@@ -468,8 +628,11 @@ const server = http.createServer(async (req, res) => {
     const id = pathname.replace('/api/operaciones/', '').trim();
     try {
       const db = await readDb();
-      db.debitNotes = (db.debitNotes || []).filter(n => n.id !== id);
-      db.creditNotes = (db.creditNotes || []).filter(nc => nc.originDebitNoteId !== id);
+      const nd = (db.debitNotes || []).find(n => n.id === id);
+      if (nd) softDeleteRecord(nd);
+      (db.creditNotes || []).forEach(nc => {
+        if (nc.originDebitNoteId === id) softDeleteRecord(nc);
+      });
       await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
@@ -513,8 +676,11 @@ const server = http.createServer(async (req, res) => {
     const id = pathname.replace('/api/boletos/', '').trim();
     try {
       const db = await readDb();
-      db.gdsTickets = (db.gdsTickets || []).filter(t => t.id !== id);
-      db.otherIncomes = (db.otherIncomes || []).filter(i => i.ticketId !== id);
+      const tkt = (db.gdsTickets || []).find(t => t.id === id);
+      if (tkt) softDeleteRecord(tkt);
+      (db.otherIncomes || []).forEach(i => {
+        if (i.ticketId === id) softDeleteRecord(i);
+      });
       await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
@@ -558,7 +724,8 @@ const server = http.createServer(async (req, res) => {
     const id = pathname.replace('/api/cuentas/', '').trim();
     try {
       const db = await readDb();
-      db.accounts = (db.accounts || []).filter(a => a.id !== id);
+      const acc = (db.accounts || []).find(a => a.id === id);
+      if (acc) softDeleteRecord(acc);
       await saveDb(db);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, deletedId: id }));
