@@ -225,7 +225,8 @@ window.cashRegisterModule = {
           `<option value="${a.id}">${a.name || a.bankName} (${a.currency || 'BOB'}) - ${a.accountNumber || ''}</option>`
         ).join('');
       } else {
-        accSelect.innerHTML = '<option value="CAJA_GENERAL">Caja General Central (BOB)</option><option value="BNB_MN">Banco BNB M/N (BOB)</option><option value="BCP_MN">Banco BCP M/N (BOB)</option>';
+        // Sin cuentas bancarias registradas: NO inventar cuentas fantasma.
+        accSelect.innerHTML = '<option value="">-- No hay cuentas bancarias registradas --</option>';
       }
     }
 
@@ -388,7 +389,11 @@ window.cashRegisterModule = {
     const curr = document.getElementById('pay-currency').value || 'BOB';
     const tc = parseFloat(document.getElementById('pay-exchange-rate').value) || doc.frozenExchangeRate || 6.96;
     const payMethod = document.getElementById('pay-method-select').value || 'TRANSFERENCIA';
-    const finAccountId = document.getElementById('pay-account-select').value || 'CAJA_GENERAL';
+    const finAccountId = document.getElementById('pay-account-select').value || '';
+    if (!finAccountId) {
+      window.app.showToast('Registre primero una cuenta bancaria en la sección Cuentas Bancarias para poder cobrar/pagar.', 'warning');
+      return;
+    }
     const userNotes = (document.getElementById('pay-notes-input').value || '').trim();
 
     const { totalBob, totalUsd, balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
