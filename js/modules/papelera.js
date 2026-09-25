@@ -154,34 +154,39 @@
     if (window.app && typeof window.app.updateDashboardKpis === 'function') window.app.updateDashboardKpis();
   }
 
-  function showButtonForAdmin() {
-    const btn = document.getElementById('btn-papelera');
-    if (!btn) return;
+  // El acceso discreto a la papelera depende de la SESIÓN de súper usuario
+  // (entrada por el login principal), nunca del rol de la base de datos.
+  function isSuperSession() {
     try {
-      const data = window.db.get();
-      if (data && data.currentUser && data.currentUser.role === 'ADMIN') {
-        btn.style.display = 'block';
-      }
-    } catch (e) {}
+      const key = (window.app && window.app.AUTH_KEY) || 'MARETRAVEL_AUTH_SESSION_V1';
+      const auth = localStorage.getItem(key);
+      if (!auth) return false;
+      const parsed = JSON.parse(auth);
+      return !!(parsed && parsed.isSuper === true);
+    } catch (e) { return false; }
+  }
+
+  function showButtonForSuper() {
+    const btn = document.getElementById('btn-papelera');
+    if (btn) btn.style.display = isSuperSession() ? 'block' : 'none';
   }
 
   function open() {
     window.app.openModal('modal-papelera');
     const hasToken = !!getToken();
-    document.getElementById('papelera-login').style.display = hasToken ? 'none' : 'block';
-    document.getElementById('papelera-content').style.display = hasToken ? 'block' : 'none';
+    const loginEl = document.getElementById('papelera-login');
+    const contentEl = document.getElementById('papelera-content');
+    if (loginEl) loginEl.style.display = hasToken ? 'none' : 'block';
+    if (contentEl) contentEl.style.display = hasToken ? 'block' : 'none';
     if (hasToken) load();
   }
 
   function init() {
-    showButtonForAdmin();
-    window.addEventListener('maretravel_db_updated', showButtonForAdmin);
-    if (window.db && window.db.initPromise) {
-      window.db.initPromise.then(showButtonForAdmin);
-    }
+    // El botón se refresca tras el login/logout vía window.papeleraModule.refreshAccess()
+    showButtonForSuper();
   }
 
-  window.papeleraModule = { open, login, load, restore, purge };
+  window.papeleraModule = { open, login, load, restore, purge, refreshAccess: showButtonForSuper };
 
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {

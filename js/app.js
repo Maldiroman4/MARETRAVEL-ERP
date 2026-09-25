@@ -36,25 +36,9 @@ window.app = {
       }
     } catch (e) {}
 
-    if (this.isAuthenticated()) {
-      this.showApp();
-      if (!this.initialized) {
-        try { this.init(); } catch (err) { console.error('Error init:', err); }
-      }
-    } else {
-      this.showLogin();
-    }
-  },
-
-  isAuthenticated() {
-    try {
-      const auth = localStorage.getItem(this.AUTH_KEY);
-      if (!auth) return false;
-      const parsed = JSON.parse(auth);
-      return parsed && (parsed.username === 'luis' || parsed.user === 'luis' || parsed.role === 'Administrador General');
-    } catch (e) {
-      return false;
-    }
+    // El acceso siempre pide credenciales (sin auto-sesión): el super usuario entra
+    // por el MISMO formulario con sus credenciales, sin indicios visibles.
+    this.showLogin();
   },
 
   showLogin() {
@@ -80,7 +64,14 @@ window.app = {
 
     // Actualizar nombre de usuario en la barra lateral
     const nameEl = document.getElementById('sidebar-user-name');
-    if (nameEl) nameEl.textContent = 'Luis';
+    if (nameEl) {
+      let displayName = 'Luis';
+      try {
+        const auth = JSON.parse(localStorage.getItem(this.AUTH_KEY) || '{}');
+        if (auth && auth.isSuper === true) displayName = 'Súper Usuario';
+      } catch (e) {}
+      nameEl.textContent = displayName;
+    }
 
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
@@ -117,21 +108,29 @@ window.app = {
     const username = (userEl ? userEl.value : '').trim().toLowerCase();
     const password = (passEl ? passEl.value : '').trim();
 
-    // Credenciales autorizadas oficiales: usuario: luis / contraseña: 585858
-    if ((username === 'luis' || username === 'admin') && (password === '585858')) {
-      if (errorAlert) errorAlert.style.display = 'none';
-      const sessionData = {
-        username: 'luis',
-        name: 'Luis',
-        role: 'Administrador General',
-        loginTime: new Date().toLocaleString()
-      };
+    const showError = () => {
+      if (errorAlert) {
+        errorAlert.style.display = 'flex';
+        if (errorText) {
+          errorText.textContent = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
+        }
+      }
+      if (passEl) {
+        passEl.value = '';
+        passEl.focus();
+      }
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+      } catch (e) {}
+    };
+
+    const finalizeLogin = (sessionData, greeting) => {
       try {
         localStorage.setItem(this.AUTH_KEY, JSON.stringify(sessionData));
       } catch (err) {
         console.warn('LocalStorage error:', err);
       }
-
+      if (errorAlert) errorAlert.style.display = 'none';
       if (passEl) passEl.value = '';
 
       const completeLogin = () => {
@@ -147,7 +146,10 @@ window.app = {
           this.updateExchangeRateWidget();
           if (window.operationsHubModule) window.operationsHubModule.render();
         }
-        this.showToast('¡Bienvenido al sistema MARETRAVEL ERP, Luis!', 'success');
+        this.showToast(greeting, 'success');
+        if (window.papeleraModule && typeof window.papeleraModule.refreshAccess === 'function') {
+          window.papeleraModule.refreshAccess();
+        }
       };
 
       if (window.db && typeof window.db.syncWithServerFile === 'function') {
@@ -155,33 +157,58 @@ window.app = {
       } else {
         completeLogin();
       }
-      return false;
-    } else {
-      if (errorAlert) {
-        errorAlert.style.display = 'flex';
-        if (errorText) {
-          errorText.textContent = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
-        }
-      }
-      if (passEl) {
-        passEl.value = '';
-        passEl.focus();
-      }
-      try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
-      } catch (e) {}
+    };
+
+    // Credenciales autorizadas oficiales: usuario: luis / contraseña: 585858
+    if ((username === 'luis' || username === 'admin') && (password === '585858')) {
+      finalizeLogin({
+        username: 'luis',
+        name: 'Luis',
+        role: 'Administrador General',
+        loginTime: new Date().toLocaleString()
+      }, '¡Bienvenido al sistema MARETRAVEL ERP, Luis!');
       return false;
     }
+
+    // SÚPER USUARIO: entra por el MISMO formulario de login, sin revelar su existencia.
+    // Válida contra el servidor; si no son credenciales de súper, muestra el error genérico.
+    (async () => {
+      try {
+        const res = await fetch('/api/super/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.token) {
+          try { sessionStorage.setItem('maretravel_super_token', data.token); } catch (e) {}
+          finalizeLogin({
+            username,
+            name: 'Súper Usuario',
+            role: 'Súper Usuario',
+            isSuper: true,
+            loginTime: new Date().toLocaleString()
+          }, '¡Bienvenido, Súper Usuario!');
+          return;
+        }
+      } catch (e) {}
+      showError();
+    })();
+    return false;
   },
 
   handleLogout() {
     if (confirm('¿Desea cerrar la sesión de MARETRAVEL ERP?')) {
       localStorage.removeItem(this.AUTH_KEY);
+      try { sessionStorage.removeItem('maretravel_super_token'); } catch (e) {}
       const errorAlert = document.getElementById('login-error-alert');
       if (errorAlert) errorAlert.style.display = 'none';
       const passEl = document.getElementById('login-password');
       if (passEl) passEl.value = '';
       this.showLogin();
+      if (window.papeleraModule && typeof window.papeleraModule.refreshAccess === 'function') {
+        window.papeleraModule.refreshAccess();
+      }
       this.showToast('Sesión cerrada correctamente.', 'info');
     }
   },
