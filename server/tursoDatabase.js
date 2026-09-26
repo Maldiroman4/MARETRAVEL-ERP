@@ -16,6 +16,21 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 let tursoClient = null;
 
+/**
+ * Normaliza providerServices al contrato del frontend (array).
+ * Las capas SQL lo almacenan como JSON string; se decodifica al leer.
+ */
+function parseProviderServices(v) {
+  if (Array.isArray(v)) return v;
+  if (!v) return [];
+  try {
+    const p = JSON.parse(v);
+    return Array.isArray(p) ? p : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 function isAvailable() {
   return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
 }
@@ -164,7 +179,7 @@ const tursoDatabase = {
         cellphone: r.cellphone || base.cellphone || '',
         email: r.email || base.email || '',
         webPage: r.web_page || base.webPage || '',
-        providerServices: r.provider_services || base.providerServices || '',
+        providerServices: parseProviderServices(r.provider_services || base.providerServices || ''),
         accountManager: r.account_manager || base.accountManager || '',
         status: r.status || base.status || 'ACTIVO',
         createdAt: r.created_at || base.createdAt,
