@@ -222,6 +222,9 @@ window.calendarModule = {
     const tmrw = new Date(now);
     tmrw.setDate(now.getDate() + 1);
     const tomorrow = `${tmrw.getFullYear()}-${String(tmrw.getMonth() + 1).padStart(2, '0')}-${String(tmrw.getDate()).padStart(2, '0')}`;
+    const dAnte = new Date(now);
+    dAnte.setDate(now.getDate() + 2);
+    const dayAfter = `${dAnte.getFullYear()}-${String(dAnte.getMonth() + 1).padStart(2, '0')}-${String(dAnte.getDate()).padStart(2, '0')}`;
 
     const alerts = [];
 
@@ -254,6 +257,17 @@ window.calendarModule = {
           type: 'SALIDA_MANANA',
           badge: 'badge-blue',
           title: '⚠️ VIAJA MAÑANA (24 Horas)',
+          urgency: 'MEDIA',
+          time: r.departureTime,
+          reminder: r
+        });
+      }
+      // Eventos (vuelo o cita embajada) en 2 días → aviso temprano
+      if (r.departureDate === dayAfter) {
+        alerts.push({
+          type: 'EN_DOS_DIAS',
+          badge: 'badge-slate',
+          title: '📅 EN 2 DÍAS (48 Horas)',
           urgency: 'MEDIA',
           time: r.departureTime,
           reminder: r
@@ -338,43 +352,20 @@ window.calendarModule = {
     const body = document.getElementById('reminder-detail-modal-body');
     if (!body) return;
 
-    body.innerHTML = `
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
-        <div>
-          <div style="margin-bottom: 16px;">
-            <span class="badge badge-blue" style="font-size: 0.8rem; margin-bottom: 6px;">
-              ${r.hasReturn ? 'VIAJE IDA Y VUELTA (ROUNDTRIP)' : 'SOLO IDA (ONE-WAY)'}
-            </span>
-            <h2 style="font-size: 1.3rem; font-weight: 800; color: var(--navy);">${r.passengerName}</h2>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">
-              Doc. Identidad / Pasaporte: <strong>${r.passengerDoc || 'Sin Documento'}</strong>
-            </div>
-          </div>
-
-          <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-            <h4 style="font-size: 0.82rem; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px;">
-              DATOS DEL VUELO / ITINERARIO
-            </h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.88rem;">
-              <div><strong>Ruta:</strong> <span class="font-mono">${r.route}</span></div>
-              <div><strong>Aerolínea:</strong> ${r.airline}</div>
-              <div><strong>Vuelo / Operador:</strong> ${r.flightNumber || 'Por confirmar'}</div>
-              <div><strong>Nro de Boleto:</strong> <span class="font-mono">${r.ticketNumber || 'S/N'}</span></div>
-            </div>
-          </div>
-
-          <!-- Fechas de Ida y Vuelta -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-            <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 8px; padding: 12px;">
-              <div style="font-size: 0.75rem; color: #0891b2; font-weight: 700;">🛫 FECHA DE SALIDA (IDA)</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #0e7490; font-family: monospace;">
-                ${r.departureDate}
-              </div>
-              <div style="font-size: 0.85rem; font-weight: 600; color: #155e75;">
-                Hora: ${r.departureTime || 'Por confirmar'}
-              </div>
-            </div>
-
+    const isVisa = r.kind === 'VISA';
+    const badgeText = isVisa ? 'CITA EN EMBAJADA' : (r.hasReturn ? 'VIAJE IDA Y VUELTA (ROUNDTRIP)' : 'SOLO IDA (ONE-WAY)');
+    const datosTitle = isVisa ? 'DATOS DE LA CITA EN EMBAJADA' : 'DATOS DEL VUELO / ITINERARIO';
+    const datosGrid = isVisa ? 'grid-template-columns: 1fr; gap: 10px;' : 'grid-template-columns: 1fr 1fr; gap: 10px;';
+    const info1Label = isVisa ? 'País / Embajada:' : 'Ruta:';
+    const info2Label = isVisa ? 'Tipo de Visa:' : 'Aerolínea:';
+    const info3Label = isVisa ? 'Documentos:' : 'Vuelo / Operador:';
+    const info3Value = isVisa ? 'Pasaporte vigente + documentos solicitados' : (r.flightNumber || 'Por confirmar');
+    const info4Label = isVisa ? 'Referencia:' : 'Nro de Boleto:';
+    const info4Value = isVisa ? (r.observations || '—') : (r.ticketNumber || 'S/N');
+    const fechaGrid = isVisa ? 'grid-template-columns: 1fr;' : 'grid-template-columns: 1fr 1fr;';
+    const fechaIdaTitle = isVisa ? '🛂 FECHA DE LA CITA EN EMBAJADA' : '🛫 FECHA DE SALIDA (IDA)';
+    const fechaIdaHora = isVisa ? `Hora de la cita: ${r.departureTime || 'Por confirmar'}` : `Hora: ${r.departureTime || 'Por confirmar'}`;
+    const retBoxHtml = isVisa ? '' : `
             <div style="background: ${r.hasReturn ? '#fffbeb' : '#f1f5f9'}; border: 1px solid ${r.hasReturn ? '#fde68a' : '#e2e8f0'}; border-radius: 8px; padding: 12px;">
               <div style="font-size: 0.75rem; color: ${r.hasReturn ? '#b45309' : '#64748b'}; font-weight: 700;">
                 🛬 FECHA DE RETORNO (VUELTA)
@@ -385,12 +376,56 @@ window.calendarModule = {
               <div style="font-size: 0.85rem; font-weight: 600; color: ${r.hasReturn ? '#78350f' : '#64748b'};">
                 Hora: ${r.hasReturn ? (r.returnTime || 'Por confirmar') : '-'}
               </div>
+            </div>`;
+    const printBtnHtml = isVisa ? '' : `
+            <button class="btn btn-secondary" onclick="window.calendarModule.printBoardingItinerary('${r.id}')">
+              <i data-lucide="printer"></i> Imprimir Itinerario
+            </button>`;
+    const notasLabel = isVisa ? 'Notas de la cita:' : 'Alojamiento / Hotel:';
+    const notasValue = isVisa ? 'Presentarse con la documentación requerida por la embajada.' : (r.hotelName || '-');
+
+    body.innerHTML = `
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        <div>
+          <div style="margin-bottom: 16px;">
+            <span class="badge ${isVisa ? 'badge-amber' : 'badge-blue'}" style="font-size: 0.8rem; margin-bottom: 6px;">
+              ${badgeText}
+            </span>
+            <h2 style="font-size: 1.3rem; font-weight: 800; color: var(--navy);">${r.passengerName}</h2>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">
+              Doc. Identidad / Pasaporte: <strong>${r.passengerDoc || 'Sin Documento'}</strong>
             </div>
           </div>
 
+          <div style="background: #f8fafc; border: 1px solid var(--border-light); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+            <h4 style="font-size: 0.82rem; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px;">
+              ${datosTitle}
+            </h4>
+            <div style="display: grid; ${datosGrid} font-size: 0.88rem;">
+              <div><strong>${info1Label}</strong> <span class="font-mono">${r.route}</span></div>
+              <div><strong>${info2Label}</strong> ${r.airline}</div>
+              <div><strong>${info3Label}</strong> ${info3Value}</div>
+              <div><strong>${info4Label}</strong> <span class="font-mono">${info4Value}</span></div>
+            </div>
+          </div>
+
+          <!-- Fechas de la Cita / Ida y Vuelta -->
+          <div style="display: grid; ${fechaGrid} gap: 12px; margin-bottom: 16px;">
+            <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 8px; padding: 12px;">
+              <div style="font-size: 0.75rem; color: #0891b2; font-weight: 700;">${fechaIdaTitle}</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #0e7490; font-family: monospace;">
+                ${r.departureDate}
+              </div>
+              <div style="font-size: 0.85rem; font-weight: 600; color: #155e75;">
+                ${fechaIdaHora}
+              </div>
+            </div>
+            ${retBoxHtml}
+          </div>
+
           <div style="font-size: 0.85rem; line-height: 1.4; color: #334155;">
-            <strong>Alojamiento / Hotel:</strong> ${r.hotelName || '-'}<br>
-            <strong>Observaciones de Viaje:</strong> ${r.observations || 'Sin observaciones adicionales.'}
+            <strong>${notasLabel}</strong> ${notasValue}<br>
+            <strong>Observaciones:</strong> ${r.observations || 'Sin observaciones adicionales.'}
           </div>
         </div>
 
@@ -421,9 +456,7 @@ window.calendarModule = {
             <button class="btn btn-success" onclick="window.calendarModule.sendWhatsAppReminder('${r.id}')">
               <i data-lucide="message-circle"></i> Notificar por WhatsApp
             </button>
-            <button class="btn btn-secondary" onclick="window.calendarModule.printBoardingItinerary('${r.id}')">
-              <i data-lucide="printer"></i> Imprimir Itinerario
-            </button>
+            ${printBtnHtml}
             <button class="btn btn-danger btn-sm" onclick="window.calendarModule.deleteReminder('${r.id}')">
               <i data-lucide="trash-2"></i> Eliminar Itinerario
             </button>
@@ -448,6 +481,21 @@ window.calendarModule = {
     }
 
     const fullPhone = phone.startsWith('591') ? phone : `591${phone}`;
+
+    // Cita en Embajada → mensaje propio
+    if (r.kind === 'VISA') {
+      let msg = `Hola estimado(a) *${r.passengerName}*, le saludamos cordialmente de *MARETRAVEL - Agencia de Viajes*.\n\n`;
+      msg += `Le recordamos su *cita en la Embajada de ${r.route || 'su país de destino'}* programada:\n`;
+      msg += `🛂 *Fecha:* ${r.departureDate || 'Por confirmar'}\n`;
+      msg += `🕐 *Hora:* ${r.departureTime || 'Por confirmar'}\n`;
+      if (r.airline) msg += `📄 *Tipo de Visa:* ${r.airline}\n`;
+      msg += `\nLleve su pasaporte vigente y los documentos solicitados por la embajada, preséntese con anticipación.\n\n`;
+      msg += `¡Quedamos a su disposición!`;
+
+      const urlVisa = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+      window.open(urlVisa, '_blank');
+      return;
+    }
 
     let msg = `Hola estimado(a) *${r.passengerName}*, le saludamos cordialmente de *MARETRAVEL - Agencia de Viajes*.\n\n`;
     msg += `Le recordamos los detalles de su viaje programado:\n`;

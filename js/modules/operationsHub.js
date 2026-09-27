@@ -1098,6 +1098,7 @@ class OperationsHubModule {
     }
 
     // Inicializar con 1 ítem pre-cargado exclusivamente con el servicio activo
+    this.activeNdId = 'ND-TMP-' + Date.now();
     this.activeNdItems = [ this.createDefaultItem({ serviceType: resolvedService }) ];
     this.renderItemsRepeater();
     this.calculateConsolidatedTotals();
@@ -1494,6 +1495,9 @@ class OperationsHubModule {
           <!-- Fila 3: Campos Específicos Personalizados (oculta si el servicio no tiene) -->
           ${(sp => sp ? `<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 10px;">${sp}</div>` : '')(this.renderItemSpecificFieldsHtml(idx, item))}
 
+          <!-- Alerta opcional: Check-In (vuelos) / Cita Embajada (visas) -->
+          ${this.renderAlertPanelHtml(idx, item)}
+
           <!-- Fila 4: Toggle de Moneda y Fila de Cálculos Financieros -->
           <div style="background: #f1f5f9; border-radius: 6px; padding: 12px; margin-top: 10px;">
             <!-- Selector / Toggle de Moneda -->
@@ -1580,6 +1584,17 @@ class OperationsHubModule {
             <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" ${d.soloIda ? 'disabled' : ''} oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
           </div>
         </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Hora de Salida:</label>
+            <input type="time" class="form-control font-mono" value="${d.flightDepTime || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightDepTime', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Hora de Retorno:</label>
+            <input type="time" class="form-control font-mono" value="${d.flightRetTime || ''}" ${d.soloIda ? 'disabled' : ''} oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetTime', this.value)">
+          </div>
+        </div>
+
         <div class="form-row" style="grid-template-columns: 1fr; gap: 8px; margin-top: 6px;">
           <label style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem; cursor: pointer; color: var(--text-muted);">
             <input type="checkbox" ${d.soloIda ? 'checked' : ''} onchange="const retRow=this.closest('.form-row').previousElementSibling; const dts=retRow?retRow.querySelectorAll('input[type=date]'):[]; const retInp=dts[1]||null; if(retInp){ retInp.disabled=this.checked; if(this.checked){ retInp.value=''; window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', ''); } } window.operationsHubModule.onItemDetailChange(${idx}, 'soloIda', this.checked);">
@@ -1627,7 +1642,7 @@ class OperationsHubModule {
       `;
     } else if (srv === 'ASESORAMIENTO_VISAS') {
       return `
-        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr; gap: 8px;">
+        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr 1fr; gap: 8px;">
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">País Solicitado:</label>
             <input type="text" class="form-control" placeholder="Estados Unidos / España / Canadá" value="${d.visaCountry || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'visaCountry', this.value)">
@@ -1639,6 +1654,10 @@ class OperationsHubModule {
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Cita Embajada:</label>
             <input type="date" class="form-control font-mono" value="${d.appointmentDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'appointmentDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Hora Cita Embajada:</label>
+            <input type="time" class="form-control font-mono" value="${d.appointmentTime || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'appointmentTime', this.value)">
           </div>
         </div>
       `;
@@ -1676,6 +1695,47 @@ class OperationsHubModule {
         </div>
       `;
     }
+  }
+
+  // Apartado de alerta autoguardada (solo vuelos y citas de visa): campanita + teléfono + fecha/hora
+  renderAlertPanelHtml(idx, item) {
+    const srv = (item.serviceType || '').toUpperCase();
+    const isVuelo = srv === 'BOLETO_AEREO' || srv === 'BOLETO_GDS';
+    const isVisa = srv === 'ASESORAMIENTO_VISAS';
+    if (!isVuelo && !isVisa) return '';
+    const d = item.serviceDetails || {};
+    const data = window.db ? window.db.get() : {};
+    const clientIdEl = document.getElementById ? document.getElementById('uni-client-id') : null;
+    const client = (data.accounts || []).find(a => a.id === (clientIdEl ? clientIdEl.value : '')) || {};
+    const defaultPhone = d.alertPhone || client.phone || client.cellphone || '';
+    const title = isVisa ? 'DATOS PARA RECORDATORIO DE CITA EN EMBAJADA' : 'DATOS PARA RECORDATORIO DE CHEK IN';
+    const dateVal = isVisa ? (d.appointmentDate || '') : (d.flightDepDate || item.departureDate || '');
+    const timeVal = isVisa ? (d.appointmentTime || '') : (d.flightDepTime || '');
+    const dateLabel = isVisa ? 'Fecha Cita' : 'Fecha Salida';
+    const timeLabel = isVisa ? 'Hora Cita' : 'Hora Vuelo';
+    return `
+        <div style="background: #fff7ed; border: 1px dashed #fdba74; border-radius: 8px; padding: 10px; margin-top: 10px;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
+            <span style="font-size: 1rem;">🔔</span>
+            <strong style="font-size: 0.8rem; color: #9a3412; text-transform: uppercase;">${title}</strong>
+            <span class="badge badge-amber" style="font-size: 0.65rem;">Autoguardado al Monitor de Vuelos</span>
+          </div>
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1.4fr auto; gap: 8px; align-items: end;">
+            <div>
+              <label class="form-label font-mono" style="font-size: 0.7rem;">${dateLabel}:</label>
+              <div class="font-mono" style="padding: 6px 8px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">${dateVal || '—'}</div>
+            </div>
+            <div>
+              <label class="form-label font-mono" style="font-size: 0.7rem;">${timeLabel}:</label>
+              <div class="font-mono" style="padding: 6px 8px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">${timeVal || '—'}</div>
+            </div>
+            <div>
+              <label class="form-label font-mono" style="font-size: 0.7rem;">Celular WhatsApp (autocompleta del cliente):</label>
+              <input type="tel" id="uni-item-alert-phone-${idx}" class="form-control font-mono" placeholder="Ej: 77298765" value="${defaultPhone}" oninput="window.operationsHubModule.onAlertPhoneChange(${idx}, this.value)">
+            </div>
+            <button type="button" class="btn btn-success btn-sm" style="display: flex; align-items: center; gap: 5px; white-space: nowrap;" onclick="window.operationsHubModule.generateServiceAlert(${idx})">🔔 Generar Alerta</button>
+          </div>
+        </div>`;
   }
 
   onItemFieldChange(index, field, value) {
@@ -1766,6 +1826,14 @@ class OperationsHubModule {
       this.activeNdItems[index].serviceDetails = {};
     }
     this.activeNdItems[index].serviceDetails[key] = value;
+  }
+
+  onAlertPhoneChange(index, value) {
+    if (!this.activeNdItems[index]) return;
+    if (!this.activeNdItems[index].serviceDetails) {
+      this.activeNdItems[index].serviceDetails = {};
+    }
+    this.activeNdItems[index].serviceDetails.alertPhone = value;
   }
 
   onItemServiceTypeChange(index, newType) {
@@ -2238,6 +2306,8 @@ class OperationsHubModule {
             }
           });
 
+          // TAREA 3: refrescar alertas del Monitor (vuelos + visas) al guardar edición
+          this.syncFlightRemindersToCalendar(data, existingNd);
           window.db.save(data);
           window.app.closeModal('modal-unified-operation');
           this.render();
@@ -2254,7 +2324,9 @@ class OperationsHubModule {
 
       // CREACIÓN NUEVA ND CONSOLIDADA (Nace obligatoriamente PENDIENTE con saldo_pendiente = total_venta)
       const nextNdNumber = (data.debitNotes || []).reduce((max, n) => Math.max(max, n.ndNumber || 0), 1000) + 1;
+      const prevDraftId = this.activeNdId;
       const newNdId = 'ND-' + Date.now();
+      this.activeNdId = newNdId;
 
       const mappedItems = this.activeNdItems.map((it, idx) => {
         const prov = (data.accounts || []).find(a => a.id === it.providerId) || { name: it.providerName };
@@ -2386,8 +2458,8 @@ class OperationsHubModule {
         if (window.maretravelCodes) window.maretravelCodes.registerPassenger(data, it.passengerName, it.passengerDocId || it.documentId || '');
       });
 
-      // TAREA 3: sincronizar vuelos al Calendario de Viajes (idempotente por ND)
-      this.syncFlightRemindersToCalendar(data, newNd);
+      // TAREA 3: sincronizar alertas (vuelos+visas) al Calendario de Viajes (idempotente por ND)
+      this.syncFlightRemindersToCalendar(data, newNd, { prevDocIds: prevDraftId && prevDraftId !== newNdId ? [prevDraftId] : [] });
 
       // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician PENDIENTE)
       const providerGroups = {};
@@ -2519,51 +2591,94 @@ class OperationsHubModule {
   }
 
   /**
-   * TAREA 3: Sincroniza los vuelos de una ND al Calendario de Viajes (idempotente por ND).
-   * Solo ida → solo fecha de partida. Con retorno → partida + retorno.
+   * TAREA 3: Sincroniza las alertas (vuelos → Chek-in, visas → Cita Embajada) de una ND al Calendario
+   * de Viajes (idempotente por ND). Actualiza horas/teléfono autoguardados con el botón campanita.
    */
-  syncFlightRemindersToCalendar(data, nd) {
+  generateServiceAlert(idx) {
+    if (!this.activeNdItems || !this.activeNdItems[idx]) return;
+    const item = this.activeNdItems[idx];
+    const srv = (item.serviceType || '').toUpperCase();
+    if (srv !== 'BOLETO_AEREO' && srv !== 'BOLETO_GDS' && srv !== 'ASESORAMIENTO_VISAS') return;
+
+    const data = window.db.get();
+    const clientIdEl = document.getElementById ? document.getElementById('uni-client-id') : null;
+    const client = (data.accounts || []).find(a => a.id === (clientIdEl ? clientIdEl.value : '')) || {};
+
+    const rem = this.buildServiceReminder(data, item, idx, client);
+    if (!rem) {
+      window.app.showToast('Complete la fecha (y hora si aplica) para generar la alerta', 'warning');
+      return;
+    }
+
+    // El borrador ND tiene id temporal hasta guardar; sirve de clave junto al ítem
+    if (!this.activeNdId) this.activeNdId = 'ND-TMP-' + Date.now();
+    item.alertKey = item.alertKey || ('AL-' + Date.now() + '-' + idx);
+    rem.sourceDocId = this.activeNdId;
+    rem.itemKey = item.alertKey;
+
+    data.travelReminders = (data.travelReminders || []).filter(r => !(r.sourceDocId === this.activeNdId && r.itemKey === item.alertKey));
+    data.travelReminders.push(rem);
+    window.db.save(data);
+    if (window.calendarModule && window.calendarModule.updateNotificationBadge) window.calendarModule.updateNotificationBadge();
+    window.app.showToast('🔔 Alerta guardada en el Monitor de Vuelos', 'success');
+  }
+
+  // Construye el recordatorio del Monitor (sin montos ni dinero): solo datos relevantes del evento.
+  buildServiceReminder(data, item, idx, client) {
+    const sd = item.serviceDetails || {};
+    const srv = (item.serviceType || '').toUpperCase();
+    const isVisa = srv === 'ASESORAMIENTO_VISAS';
+    const depDate = isVisa ? (sd.appointmentDate || '') : (sd.flightDepDate || item.departureDate || '');
+    const depTime = isVisa ? (sd.appointmentTime || '') : (sd.flightDepTime || '');
+    if (!depDate) return null; // el evento necesita fecha ancla
+    const retDate = isVisa ? '' : ((!sd.soloIda && !item.soloIda) ? (sd.flightRetDate || item.returnDate || '') : '');
+    const retTime = isVisa ? '' : (sd.flightRetTime || '');
+    return {
+      id: 'TRV-' + Date.now() + '-' + idx,
+      kind: isVisa ? 'VISA' : 'VUELO',
+      clientId: client.id || null,
+      clientName: client.name || '',
+      clientPhone: String(sd.alertPhone || client.phone || client.cellphone || '').trim(),
+      clientEmail: client.email || '',
+      passengerName: item.passengerName || 'Pasajero',
+      passengerDoc: item.passengerDoc || item.passengerDocId || item.documentId || '',
+      route: isVisa ? (sd.visaCountry || '').toUpperCase() : (sd.flightRoute || item.route || '').toUpperCase(),
+      airline: isVisa ? (sd.visaType || '') : '',
+      flightNumber: isVisa ? '' : (sd.flightNumber || item.flightNumber || ''),
+      ticketNumber: isVisa ? '' : (item.ticketNumber || sd.pnrCode || item.pnrCode || item.voucherNumber || ''),
+      departureDate: depDate,
+      departureTime: depTime,
+      returnDate: retDate,
+      returnTime: retTime,
+      hasReturn: Boolean(retDate),
+      hotelName: '',
+      status: 'CONFIRMADO',
+      observations: isVisa ? ('CITA EMBAJADA ' + (sd.visaCountry || '')).trim() : ((sd.soloIda || item.soloIda) ? 'SOLO IDA' : ''),
+      createdAt: new Date().toLocaleString()
+    };
+  }
+
+  syncFlightRemindersToCalendar(data, nd, opts = {}) {
     try {
       if (!data || !nd) return;
       data.travelReminders = data.travelReminders || [];
-      // Limpiar recordatorios previos generados por esta ND (evita duplicados)
-      data.travelReminders = data.travelReminders.filter(r => r.sourceDocId !== nd.id);
-      const now = new Date().toLocaleString();
+      // Limpiar recordatorios previos de esta ND (incluye id temporal del borrador) → evita duplicados
+      const rmIds = [nd.id, ...(opts.prevDocIds || [])];
+      data.travelReminders = data.travelReminders.filter(r => !rmIds.includes(r.sourceDocId));
+      const client = (data.accounts || []).find(a => a.id === nd.accountId) || {};
       (nd.items || []).forEach((it, idx) => {
-        if (it.serviceType !== 'BOLETO_AEREO' && it.serviceType !== 'BOLETO_GDS') return;
-        const sd = it.serviceDetails || {};
-        if (!sd.flightDepDate && !it.departureDate && !sd.flightRoute && !it.route) return;
-        const depDate = sd.flightDepDate || it.departureDate || '';
-        const retDate = (!sd.soloIda && !it.soloIda) ? (sd.flightRetDate || it.returnDate || '') : '';
-        const pax = it.passengerName || nd.passengerName || 'Pasajero';
-        const paxDoc = it.passengerDocId || it.documentId || '';
-        const client = (data.accounts || []).find(a => a.id === nd.accountId) || {};
-        data.travelReminders.push({
-          id: 'TRV-' + Date.now() + '-' + idx,
-          sourceDocId: nd.id,
-          clientId: nd.accountId || null,
-          clientName: nd.accountName || client.name || '',
-          clientPhone: client.phone || '',
-          clientEmail: client.email || '',
-          passengerName: pax,
-          passengerDoc: paxDoc,
-          route: (sd.flightRoute || it.route || '').toUpperCase(),
-          airline: '',
-          flightNumber: sd.flightNumber || it.flightNumber || '',
-          ticketNumber: it.ticketNumber || sd.pnrCode || it.pnrCode || '',
-          departureDate: depDate,
-          departureTime: '',
-          returnDate: retDate,
-          returnTime: '',
-          hasReturn: Boolean(retDate),
-          hotelName: '',
-          status: 'CONFIRMADO',
-          observations: (sd.soloIda || it.soloIda) ? 'SOLO IDA' : '',
-          createdAt: now
-        });
+        const srv = (it.serviceType || '').toUpperCase();
+        const isVuelo = srv === 'BOLETO_AEREO' || srv === 'BOLETO_GDS';
+        const isVisa = srv === 'ASESORAMIENTO_VISAS';
+        if (!isVuelo && !isVisa) return;
+        const rem = this.buildServiceReminder(data, it, idx, client);
+        if (!rem) return; // sin fecha ancla → sin alerta
+        rem.sourceDocId = nd.id;
+        rem.itemKey = it.alertKey || ('AL-' + Date.now() + '-' + idx);
+        data.travelReminders.push(rem);
       });
     } catch (e) {
-      console.warn('Error sincronizando vuelos al calendario:', e);
+      console.warn('Error sincronizando alertas al calendario:', e);
     }
   }
 
@@ -2604,6 +2719,20 @@ class OperationsHubModule {
     const q = String(inputEl.value || '').trim().toUpperCase();
     const acc = (window.db ? (window.db.get().accounts || []) : []).find(a => String(a.name || '').trim().toUpperCase() === q);
     el.value = acc ? acc.id : '';
+    if (hiddenId === 'uni-client-id' && acc) {
+      // Autocompletar también el celular en los apartados de alertas (Chek-in / Cita embajada)
+      const phone = String(acc.phone || acc.cellphone || '').trim();
+      if (phone) {
+        (this.activeNdItems || []).forEach((it, i) => {
+          const srv = (it.serviceType || '').toUpperCase();
+          if (srv !== 'BOLETO_AEREO' && srv !== 'BOLETO_GDS' && srv !== 'ASESORAMIENTO_VISAS') return;
+          if (!it.serviceDetails) it.serviceDetails = {};
+          it.serviceDetails.alertPhone = phone;
+          const inp = document.getElementById('uni-item-alert-phone-' + i);
+          if (inp) inp.value = phone;
+        });
+      }
+    }
   }
 
   openPassengerSearch(targetType, targetIdxOrId) {
@@ -2668,6 +2797,7 @@ class OperationsHubModule {
     }
 
     this.editingOperationId = id;
+    this.activeNdId = id;
     const opCurr = nd.currency || (nd.items && nd.items.some(i => i.currency === 'USD') ? 'USD' : 'BOB');
     this.activeCurrency = opCurr;
     this.updateGlobalCurrencyButtons(opCurr);
