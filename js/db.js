@@ -476,6 +476,19 @@ class LocalDatabase {
     return false;
   }
 
+  // El consecutivo tiene que mirar TAMBIÉN los documentos en la papelera. get() oculta los
+  // eliminados, así que al borrar una nota la app volvía a proponer su número; como
+  // nd_number/nc_number son UNIQUE, la base rechazaba la nota nueva y se perdía ENTERA
+  // (su alerta sí se guardaba, por eso el Monitor la mostraba). getRaw() trae todas.
+  siguienteNumeroDoc(tipo, base) {
+    const lista = [].concat(
+      (this.getRaw()[tipo === 'NC' ? 'creditNotes' : 'debitNotes']) || [],
+      (this.get()[tipo === 'NC' ? 'creditNotes' : 'debitNotes']) || []
+    );
+    const campo = tipo === 'NC' ? 'ncNumber' : 'ndNumber';
+    return lista.reduce((max, d) => Math.max(max, Number(d[campo]) || 0), base - 1) + 1;
+  }
+
   exportBackup() {
     // Descarga directa del volcado real y actual guardado en disco
     window.location.href = '/api/backup/download';
@@ -527,12 +540,16 @@ window.maretravelCodes = {
     };
     return map[serviceType] || 'OT';
   },
-  // Siguiente correlativo único para el prefijo dado (cuenta máx existente + 1)
+  // Siguiente correlativo único para el prefijo dado (cuenta máx existente + 1).
+  // Los callers pasan la lista visible; se le suman las de la papelera (getRaw) porque si no
+  // el código visible se repetía al borrar una nota, igual que pasaba con el número.
   nextFor(docs, type, serviceType) {
     const abbr = this.serviceAbbrev(serviceType);
     const prefix = '#' + type.toLowerCase() + abbr;
+    const crudo = (window.db && typeof window.db.getRaw === 'function') ? window.db.getRaw() : {};
+    const todos = [].concat(docs || [], crudo[type.toLowerCase() === 'nd' ? 'debitNotes' : 'creditNotes'] || []);
     let max = 0;
-    (docs || []).forEach(d => {
+    todos.forEach(d => {
       const s = String(d[type.toLowerCase() + 'Code'] || '').match(new RegExp('^' + prefix + '(\\d+)$', 'i'));
       const n = s ? parseInt(s[1], 10) : 0;
       if (n > max) max = n;

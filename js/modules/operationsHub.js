@@ -2341,7 +2341,7 @@ class OperationsHubModule {
       }
 
       // CREACIÓN NUEVA ND CONSOLIDADA (Nace obligatoriamente PENDIENTE con saldo_pendiente = total_venta)
-      const nextNdNumber = (data.debitNotes || []).reduce((max, n) => Math.max(max, n.ndNumber || 0), 1000) + 1;
+      const nextNdNumber = window.db.siguienteNumeroDoc('ND', 1001);
       const prevDraftId = this.activeNdId;
       const newNdId = 'ND-' + Date.now();
       this.activeNdId = newNdId;
@@ -2512,7 +2512,7 @@ class OperationsHubModule {
         }
       });
 
-      let nextNcNumber = (data.creditNotes || []).reduce((max, n) => Math.max(max, n.ncNumber || 0), 2000);
+      let nextNcNumber = window.db.siguienteNumeroDoc('NC', 2001) - 1; // el forEach lo incrementa por grupo
       Object.values(providerGroups).forEach((grp, gIdx) => {
         nextNcNumber++;
         const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');

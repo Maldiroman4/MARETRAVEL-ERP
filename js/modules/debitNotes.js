@@ -261,7 +261,7 @@ window.debitNotesModule = {
     if (passInput) passInput.value = '';
 
     // Siguiente número de ND correlativo
-    const nextNd = (data.debitNotes.length > 0) ? Math.max(...data.debitNotes.map(n => n.ndNumber)) + 1 : 1001;
+    const nextNd = window.db.siguienteNumeroDoc('ND', 1001);
     document.getElementById('nd-number-display').textContent = `ND #${nextNd}`;
     document.getElementById('nd-issue-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('nd-currency').value = 'BOB';
@@ -859,7 +859,7 @@ window.debitNotesModule = {
         window.app.showToast('Nota de Débito actualizada', 'success');
       }
     } else {
-      const nextNd = (data.debitNotes.length > 0) ? Math.max(...data.debitNotes.map(n => n.ndNumber)) + 1 : 1001;
+      const nextNd = window.db.siguienteNumeroDoc('ND', 1001);
       const ndServiceType = (this.activeItems[0] && (this.activeItems[0].serviceType || this.activeItems[0].serviceCategory)) || window.state?.servicioActivo || 'BOLETO_AEREO';
       const ndCode = window.maretravelCodes.nextFor(data.debitNotes, 'ND', ndServiceType);
       const newNd = {

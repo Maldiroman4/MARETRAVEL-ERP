@@ -226,7 +226,7 @@ window.creditNotesModule = {
       return;
     }
 
-    const nextNc = (data.creditNotes.length > 0) ? Math.max(...data.creditNotes.map(c => c.ncNumber)) + 1 : 501;
+    const nextNc = window.db.siguienteNumeroDoc('NC', 2001);
     const activeCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
     const srvCat = activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat));
     const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);
