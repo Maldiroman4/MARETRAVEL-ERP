@@ -1707,7 +1707,7 @@ class OperationsHubModule {
     const data = window.db ? window.db.get() : {};
     const clientIdEl = document.getElementById ? document.getElementById('uni-client-id') : null;
     const client = (data.accounts || []).find(a => a.id === (clientIdEl ? clientIdEl.value : '')) || {};
-    const defaultPhone = d.alertPhone || client.phone || client.cellphone || '';
+    const defaultPhone = d.alertPhone || this.validMobilePhone(client);
     const title = isVisa ? 'DATOS PARA RECORDATORIO DE CITA EN EMBAJADA' : 'DATOS PARA RECORDATORIO DE CHEK IN';
     const dateVal = isVisa ? (d.appointmentDate || '') : (d.flightDepDate || item.departureDate || '');
     const timeVal = isVisa ? (d.appointmentTime || '') : (d.flightDepTime || '');
@@ -2638,7 +2638,7 @@ class OperationsHubModule {
       kind: isVisa ? 'VISA' : 'VUELO',
       clientId: client.id || null,
       clientName: client.name || '',
-      clientPhone: String(sd.alertPhone || client.phone || client.cellphone || '').trim(),
+      clientPhone: String(sd.alertPhone || this.validMobilePhone(client)),
       clientEmail: client.email || '',
       passengerName: item.passengerName || 'Pasajero',
       passengerDoc: item.passengerDoc || item.passengerDocId || item.documentId || '',
@@ -2710,6 +2710,17 @@ class OperationsHubModule {
     if (docEl) docEl.value = doc;
   }
 
+  // Teléfono móvil real de la cuenta: solo números guardados que empiecen con 6 o 7.
+  // Los fijos de línea (3/4/5…) se descartan para WhatsApp; nunca se inventa un dato.
+  validMobilePhone(acc) {
+    if (!acc) return '';
+    for (const field of ['phone', 'cellphone']) {
+      const n = String(acc[field] || '').replace(/\D/g, '');
+      if (/^[67]/.test(n)) return n;
+    }
+    return '';
+  }
+
   // Buscador de cuentas (ND→clientes, NC→proveedores): al seleccionar del datalist guarda el id en el hidden
   onAccountSearchChange(inputEl) {
     const hiddenId = inputEl ? inputEl.getAttribute('data-account-id') : null;
@@ -2720,8 +2731,9 @@ class OperationsHubModule {
     const acc = (window.db ? (window.db.get().accounts || []) : []).find(a => String(a.name || '').trim().toUpperCase() === q);
     el.value = acc ? acc.id : '';
     if (hiddenId === 'uni-client-id' && acc) {
-      // Autocompletar también el celular en los apartados de alertas (Chek-in / Cita embajada)
-      const phone = String(acc.phone || acc.cellphone || '').trim();
+      // Autocompletar también el celular en los apartados de alertas (Chek-in / Cita embajada).
+      // Solo datos reales guardados y con apariencia de móvil (empiezan en 6 o 7).
+      const phone = this.validMobilePhone(acc);
       if (phone) {
         (this.activeNdItems || []).forEach((it, i) => {
           const srv = (it.serviceType || '').toUpperCase();
