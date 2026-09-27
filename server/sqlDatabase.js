@@ -10,8 +10,19 @@ const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
-const DB_SQLITE_PATH = path.join(DATA_DIR, 'maretravel.sqlite');
+// MARETRAVEL_SQLITE_PATH permite apuntar a otro archivo (tests de persistencia en un throwaway)
+const DB_SQLITE_PATH = process.env.MARETRAVEL_SQLITE_PATH || path.join(DATA_DIR, 'maretravel.sqlite');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+
+/**
+ * Colecciones SIN tabla propia: se guardan como JSON en el KV genérico `system_settings`.
+ * (Debe coincidir con la lista de server/tursoDatabase.js — si no, el test de persistencia falla.)
+ * ponytail: un JSON por colección; si alguna crece mucho, darle tabla con raw_json.
+ */
+const KV_COLLECTIONS = [
+  'travelReminders', 'bankTransactions', 'providerPayments', 'companyContacts',
+  'otherIncomes', 'cashTransactions', 'expenses', 'auditLog', 'accountingModifications'
+];
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -986,9 +997,13 @@ const sqlDatabase = {
     const financialAccounts = this.getFinancialAccounts();
     const settings = this.getSystemSettings();
 
-    // Alertas del monitor (KV genérico: sin tabla nueva)
-    const travelReminders = Array.isArray(settings.travel_reminders) ? settings.travel_reminders : [];
-    delete settings.travel_reminders;
+    // Colecciones sin tabla: se leen del KV y se sacan de systemSettings
+    const kv = {};
+    for (const k of KV_COLLECTIONS) {
+      kv[k] = Array.isArray(settings[k]) ? settings[k] : [];
+      delete settings[k];
+    }
+    delete settings.travel_reminders; // clave vieja
 
     const db = getSqlDb();
     const accountHistory = db.prepare('SELECT id, account_id as accountId, account_name as accountName, change_type as changeType, field_changed as fieldChanged, old_value as oldValue, new_value as newValue, user_id as userId, user_name as userName, created_at as createdAt FROM account_history ORDER BY created_at DESC').all();
@@ -1013,19 +1028,20 @@ const sqlDatabase = {
       bankAccounts: financialAccounts.filter(a => a.type === 'BANCO'),
       accounts,
       accountHistory,
-      companyContacts: [],
+      companyContacts: kv.companyContacts,
       gdsTickets,
       debitNotes,
       creditNotes,
       cashReceipts,
-      cashTransactions: [],
-      expenses: [],
-      travelReminders,
+      bankTransactions: kv.bankTransactions,
+      cashTransactions: kv.cashTransactions,
+      expenses: kv.expenses,
+      travelReminders: kv.travelReminders,
       passengers,
-      auditLog: [],
-      accountingModifications: [],
-      otherIncomes: [],
-      providerPayments: [],
+      auditLog: kv.auditLog,
+      accountingModifications: kv.accountingModifications,
+      otherIncomes: kv.otherIncomes,
+      providerPayments: kv.providerPayments,
       serviceTypes: serviceTypes.length > 0 ? serviceTypes : [],
       savedSubServices: subservices
     };
@@ -1047,9 +1063,12 @@ const sqlDatabase = {
         this.saveSystemSettings(state.systemSettings);
       }
 
-      // Alertas del monitor (viaja por el KV de system_settings: sin tabla nueva)
-      if (Array.isArray(state.travelReminders)) {
-        this.saveSystemSettings({ travel_reminders: state.travelReminders });
+      // Colecciones sin tabla (KV): alertas del monitor, pagos a proveedores,
+      // contactos, movimientos bancarios, comisiones de plataformas, etc.
+      if (KV_COLLECTIONS.some(k => Array.isArray(state[k]))) {
+        const kv = {};
+        for (const k of KV_COLLECTIONS) if (Array.isArray(state[k])) kv[k] = state[k];
+        this.saveSystemSettings(kv);
       }
 
       if (Array.isArray(state.financialAccounts)) {

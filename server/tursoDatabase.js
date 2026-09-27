@@ -14,6 +14,20 @@ const { createClient } = require('@libsql/client');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
+/**
+ * Colecciones SIN tabla propia: se guardan como JSON en el KV genérico `system_settings`.
+ * Sin esto el servidor las devolvía siempre vacías y la UI perdía los datos en cada guardado
+ * (alertas del monitor, pagos a proveedores, contactos de empresa, movimientos bancarios,
+ * comisiones de plataformas, etc).
+ * ponytail: un JSON por colección; si alguna crece mucho, darle tabla con raw_json.
+ * Si agregas una colección nueva a js/db.js initialDatabase, agrégala aquí y fallará
+ * el test de persistencia (test-persistencia.js) si no.
+ */
+const KV_COLLECTIONS = [
+  'travelReminders', 'bankTransactions', 'providerPayments', 'companyContacts',
+  'otherIncomes', 'cashTransactions', 'expenses', 'auditLog', 'accountingModifications'
+];
+
 let tursoClient = null;
 
 /**
@@ -127,9 +141,13 @@ const tursoDatabase = {
       }
     }
 
-    // Alertas del monitor de vuelos (vuelos y citas de embajada) guardadas como JSON
-    // en la tabla genérica system_settings: sin tabla nueva ni migración.
-    const travelReminders = Array.isArray(systemSettings.travel_reminders) ? systemSettings.travel_reminders : [];
+    // Colecciones sin tabla: se leen del KV y se sacan de systemSettings
+    const kv = {};
+    for (const k of KV_COLLECTIONS) {
+      kv[k] = Array.isArray(systemSettings[k]) ? systemSettings[k] : [];
+      delete systemSettings[k];
+    }
+    // Clave vieja (usada antes de unificar el nombre de la lista)
     delete systemSettings.travel_reminders;
 
     const parseRaw = (r) => {
@@ -483,19 +501,20 @@ const tursoDatabase = {
       bankAccounts: financialAccounts.filter(a => a.type === 'BANCO'),
       accounts,
       accountHistory,
-      companyContacts: [],
+      companyContacts: kv.companyContacts,
       gdsTickets,
       debitNotes,
       creditNotes,
       cashReceipts,
-      cashTransactions: [],
-      expenses: [],
-      travelReminders,
+      bankTransactions: kv.bankTransactions,
+      cashTransactions: kv.cashTransactions,
+      expenses: kv.expenses,
+      travelReminders: kv.travelReminders,
       passengers,
-      auditLog: [],
-      accountingModifications: [],
-      otherIncomes: [],
-      providerPayments: [],
+      auditLog: kv.auditLog,
+      accountingModifications: kv.accountingModifications,
+      otherIncomes: kv.otherIncomes,
+      providerPayments: kv.providerPayments,
       serviceTypes: serviceTypes.length > 0 ? serviceTypes : [],
       savedSubServices: subservices
     };
@@ -515,13 +534,15 @@ const tursoDatabase = {
       }
     }
 
-    // 1b. Alertas del monitor (viaja por el mismo KV para no crear tabla)
-    // ponytail: un solo JSON con todo el historial; si crece mucho, tabla propia con raw_json
-    if (Array.isArray(state.travelReminders)) {
-      stmts.push({
-        sql: 'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        args: ['travel_reminders', JSON.stringify(state.travelReminders)]
-      });
+    // 1b. Colecciones sin tabla (KV): alertas del monitor, pagos a proveedores,
+    // contactos, movimientos bancarios, comisiones de plataformas, etc.
+    for (const k of KV_COLLECTIONS) {
+      if (Array.isArray(state[k])) {
+        stmts.push({
+          sql: 'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          args: [k, JSON.stringify(state[k])]
+        });
+      }
     }
 
     // 2. Financial Accounts
