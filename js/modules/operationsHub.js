@@ -1349,7 +1349,7 @@ class OperationsHubModule {
               <div>
                 <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                  <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+                  <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" onchange="window.operationsHubModule.autofillItemFromDatalist(this, ${idx})" required>
                   <button type="button" class="btn btn-secondary btn-xs" title="Buscar en el directorio de pasajeros" style="padding: 6px 8px; flex-shrink: 0;" onclick="window.operationsHubModule.openPassengerSearch('hub', ${idx})">🔍</button>
                 </div>
               </div>
@@ -1488,13 +1488,13 @@ class OperationsHubModule {
             <div>
               <label class="form-label font-bold" style="font-size: 0.75rem;">Pasajero / Titular del Servicio:</label>
               <div style="display: flex; gap: 6px; align-items: center;">
-                <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" required>
+                <input type="text" class="form-control font-mono font-bold" list="datalist-passengers" placeholder="APELLIDO / NOMBRE" value="${item.passengerName || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerName', this.value.toUpperCase())" onchange="window.operationsHubModule.autofillItemFromDatalist(this, ${idx})" required>
                 <button type="button" class="btn btn-secondary btn-xs" title="Buscar en el directorio de pasajeros" style="padding: 6px 8px; flex-shrink: 0;" onclick="window.operationsHubModule.openPassengerSearch('hub', ${idx})">🔍</button>
               </div>
             </div>
             <div>
               <label class="form-label" style="font-size: 0.75rem;">Doc. Identidad / Pasaporte:</label>
-              <input type="text" class="form-control font-mono" placeholder="Ej: 4820192 LP" value="${item.passengerDoc || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerDoc', this.value.toUpperCase())">
+              <input type="text" id="uni-item-doc-${idx}" class="form-control font-mono" placeholder="Ej: 4820192 LP" value="${item.passengerDoc || ''}" oninput="window.operationsHubModule.onItemFieldChange(${idx}, 'passengerDoc', this.value.toUpperCase())">
             </div>
             <div>
               <label class="form-label" style="font-size: 0.75rem;">Nro Voucher / Boleto / Reserva:</label>
@@ -2588,6 +2588,24 @@ class OperationsHubModule {
       .join('');
   }
 
+  // Autofill del doc/CI al elegir un pasajero del datalist (input de nombre → cambio disparado al seleccionar)
+  autofillFromDatalist(inputEl) {
+    this._applyPassengerDoc(inputEl, inputEl.getAttribute('data-pax-doc') ? document.getElementById(inputEl.getAttribute('data-pax-doc')) : null, null);
+  }
+  autofillItemFromDatalist(inputEl, idx) {
+    this._applyPassengerDoc(inputEl, document.getElementById('uni-item-doc-' + idx), idx);
+  }
+  _applyPassengerDoc(inputEl, docEl, idx) {
+    const name = String(inputEl && inputEl.value || '').trim().toUpperCase();
+    if (!name) return;
+    const data = window.db ? window.db.get() : {};
+    const p = (data.passengers || []).find(x => String(x.name || '').trim().toUpperCase() === name);
+    if (!p) return;
+    const doc = String(p.doc || '').toUpperCase();
+    if (idx !== null && idx !== undefined) this.onItemFieldChange(idx, 'passengerDoc', doc);
+    if (docEl) docEl.value = doc;
+  }
+
   openPassengerSearch(targetType, targetIdxOrId) {
     window.__paxTarget = { type: targetType, idx: targetType === 'hub' ? targetIdxOrId : null, id: targetType === 'input' ? targetIdxOrId : null };
     const modal = document.getElementById('modal-passenger-search');
@@ -2625,10 +2643,17 @@ class OperationsHubModule {
     const t = window.__paxTarget || {};
     if (t.type === 'hub') {
       this.onItemFieldChange(t.idx, 'passengerName', String(name).toUpperCase());
-      if (doc) this.onItemFieldChange(t.idx, 'passengerDoc', String(doc).toUpperCase());
+      if (doc) {
+        this.onItemFieldChange(t.idx, 'passengerDoc', String(doc).toUpperCase());
+        const di = document.getElementById('uni-item-doc-' + t.idx);
+        if (di) di.value = String(doc).toUpperCase();
+      }
     } else if (t.type === 'input') {
       const el = document.getElementById(t.id);
       if (el) el.value = String(name).toUpperCase();
+      const docId = el ? el.getAttribute('data-pax-doc') : null;
+      const docEl = docId ? document.getElementById(docId) : null;
+      if (docEl && doc) docEl.value = String(doc).toUpperCase();
     }
     this.refreshPassengerDatalist();
     if (window.app && window.app.closeModal) window.app.closeModal('modal-passenger-search');

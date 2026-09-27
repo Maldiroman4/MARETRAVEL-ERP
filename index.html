@@ -1306,7 +1306,7 @@
           <div class="form-group" style="margin-top: 10px;">
             <label class="form-label">Nombre del Pasajero (APELLIDO/NOMBRE):</label>
             <div style="display: flex; gap: 6px; align-items: center;">
-              <input type="text" id="sim-passenger-name" class="form-control font-mono" list="datalist-passengers" placeholder="MENDOZA/CARLOS LIC" required>
+              <input type="text" id="sim-passenger-name" class="form-control font-mono" list="datalist-passengers" data-pax-doc="sim-passenger-doc" onchange="window.operationsHubModule.autofillFromDatalist(this)" placeholder="MENDOZA/CARLOS LIC" required>
               <button type="button" class="btn btn-secondary btn-sm" title="Buscar en el directorio de pasajeros" onclick="window.operationsHubModule.openPassengerSearch('input', 'sim-passenger-name')">🔍</button>
             </div>
           </div>
@@ -1585,7 +1585,7 @@
             <div>
               <label class="form-label">Nombre del Pasajero / Titular:</label>
               <div style="display: flex; gap: 6px; align-items: center;">
-                <input type="text" id="man-passenger-name" class="form-control font-mono" list="datalist-passengers" required>
+                <input type="text" id="man-passenger-name" class="form-control font-mono" list="datalist-passengers" data-pax-doc="man-passenger-doc" onchange="window.operationsHubModule.autofillFromDatalist(this)" required>
                 <button type="button" class="btn btn-secondary btn-sm" title="Buscar en el directorio de pasajeros" onclick="window.operationsHubModule.openPassengerSearch('input', 'man-passenger-name')">🔍</button>
               </div>
             </div>
@@ -2229,7 +2229,7 @@
           <div class="form-row" style="margin-top: 10px;">
             <div>
               <label class="form-label">Nombre del Pasajero:</label>
-              <input type="text" id="trv-passenger-name" class="form-control font-mono" placeholder="MENDOZA/CARLOS LIC" required>
+              <input type="text" id="trv-passenger-name" class="form-control font-mono" list="datalist-passengers" data-pax-doc="trv-passenger-doc" onchange="window.operationsHubModule.autofillFromDatalist(this)" placeholder="MENDOZA/CARLOS LIC" required>
             </div>
             <div>
               <label class="form-label">Doc. Identidad / Pasaporte:</label>
