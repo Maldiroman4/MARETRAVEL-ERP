@@ -329,6 +329,7 @@ CREATE TABLE IF NOT EXISTS passengers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     doc TEXT,
+    phone TEXT,
     count INTEGER DEFAULT 1,
     last_use TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP

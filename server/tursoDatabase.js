@@ -66,6 +66,10 @@ const tursoDatabase = {
         await client.executeMultiple(schemaSql);
         console.log('[TURSO CLOUD] Tablas e índices creados con éxito en la nube.');
       }
+      // Migración idempotente: teléfono de pasajero (BD existentes sin la columna)
+      try {
+        await client.execute('ALTER TABLE passengers ADD COLUMN phone TEXT');
+      } catch (_) { /* ya existe → OK */ }
       // Limpiar tabla de chequeo si existiera
       try {
         await client.execute('DROP TABLE IF EXISTS _turso_healthcheck');
@@ -402,6 +406,7 @@ const tursoDatabase = {
       id: r.id,
       name: r.name,
       doc: r.doc,
+      phone: r.phone || '',
       count: r.count,
       lastUse: r.last_use,
       createdAt: r.created_at
@@ -1063,13 +1068,14 @@ const tursoDatabase = {
     if (Array.isArray(state.passengers)) {
       for (const p of state.passengers) {
         stmts.push({
-          sql: `INSERT INTO passengers (id, name, doc, count, last_use, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET count = excluded.count, last_use = excluded.last_use`,
+          sql: `INSERT INTO passengers (id, name, doc, phone, count, last_use, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET phone = excluded.phone, count = excluded.count, last_use = excluded.last_use`,
           args: [
             p.id || ('PAX-' + Date.now()),
             p.name,
             p.doc || null,
+            p.phone || null,
             p.count || 1,
             p.lastUse || new Date().toLocaleString(),
             p.createdAt || new Date().toLocaleString()

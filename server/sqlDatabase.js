@@ -50,6 +50,11 @@ function getSqlDb() {
     dbInstance.exec(schemaSql);
   }
 
+  // Migración idempotente: teléfono de pasajero (BD existentes sin la columna)
+  try {
+    dbInstance.exec('ALTER TABLE passengers ADD COLUMN phone TEXT');
+  } catch (_) { /* ya existe → OK */ }
+
   return dbInstance;
 }
 
@@ -832,7 +837,7 @@ const sqlDatabase = {
   // 6. PASAJEROS (passengers)
   getPassengers() {
     const db = getSqlDb();
-    return db.prepare('SELECT id, name, doc, count, last_use as lastUse, created_at as createdAt FROM passengers ORDER BY count DESC, name ASC').all();
+    return db.prepare('SELECT id, name, doc, phone, count, last_use as lastUse, created_at as createdAt FROM passengers ORDER BY count DESC, name ASC').all();
   },
 
   registerPassenger(name, doc) {
@@ -1098,15 +1103,16 @@ const sqlDatabase = {
 
       if (Array.isArray(state.passengers)) {
         const paxStmt = db.prepare(`
-          INSERT INTO passengers (id, name, doc, count, last_use, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET count = excluded.count, last_use = excluded.last_use
+          INSERT INTO passengers (id, name, doc, phone, count, last_use, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET phone = excluded.phone, count = excluded.count, last_use = excluded.last_use
         `);
         for (const p of state.passengers) {
           paxStmt.run(
             p.id || ('PAX-' + Date.now()),
             p.name,
             p.doc || null,
+            p.phone || null,
             p.count || 1,
             p.lastUse || new Date().toLocaleString(),
             p.createdAt || new Date().toLocaleString()

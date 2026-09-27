@@ -1707,7 +1707,8 @@ class OperationsHubModule {
     const data = window.db ? window.db.get() : {};
     const clientIdEl = document.getElementById ? document.getElementById('uni-client-id') : null;
     const client = (data.accounts || []).find(a => a.id === (clientIdEl ? clientIdEl.value : '')) || {};
-    const defaultPhone = d.alertPhone || this.validMobilePhone(client);
+    // Jerarquía del celular: pasajero (dato propio guardado) → empresa/cliente → vacío (se escribe a mano)
+    const defaultPhone = d.alertPhone || this.phoneForItem(data, item, client);
     const title = isVisa ? 'DATOS PARA RECORDATORIO DE CITA EN EMBAJADA' : 'DATOS PARA RECORDATORIO DE CHEK IN';
     const dateVal = isVisa ? (d.appointmentDate || '') : (d.flightDepDate || item.departureDate || '');
     const timeVal = isVisa ? (d.appointmentTime || '') : (d.flightDepTime || '');
@@ -1718,9 +1719,9 @@ class OperationsHubModule {
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
             <span style="font-size: 1rem;">🔔</span>
             <strong style="font-size: 0.8rem; color: #9a3412; text-transform: uppercase;">${title}</strong>
-            <span class="badge badge-amber" style="font-size: 0.65rem;">Autoguardado al Monitor de Vuelos</span>
+            <span class="badge badge-amber" style="font-size: 0.65rem;">Se registra en el Monitor de Vuelos al Guardar y Emitir</span>
           </div>
-          <div class="form-row" style="grid-template-columns: 1fr 1fr 1.4fr auto; gap: 8px; align-items: end;">
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; align-items: end;">
             <div>
               <label class="form-label font-mono" style="font-size: 0.7rem;">${dateLabel}:</label>
               <div class="font-mono" style="padding: 6px 8px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">${dateVal || '—'}</div>
@@ -1730,10 +1731,9 @@ class OperationsHubModule {
               <div class="font-mono" style="padding: 6px 8px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">${timeVal || '—'}</div>
             </div>
             <div>
-              <label class="form-label font-mono" style="font-size: 0.7rem;">Celular WhatsApp (autocompleta del cliente):</label>
-              <input type="tel" id="uni-item-alert-phone-${idx}" class="form-control font-mono" placeholder="Ej: 77298765" value="${defaultPhone}" oninput="window.operationsHubModule.onAlertPhoneChange(${idx}, this.value)">
+              <label class="form-label font-mono" style="font-size: 0.7rem;">Celular WhatsApp (pasajero → cliente):</label>
+              <input type="tel" id="uni-item-alert-phone-${idx}" class="form-control font-mono" placeholder="Escriba a mano si no hay" value="${defaultPhone}" oninput="window.operationsHubModule.onAlertPhoneChange(${idx}, this.value)">
             </div>
-            <button type="button" class="btn btn-success btn-sm" style="display: flex; align-items: center; gap: 5px; white-space: nowrap;" onclick="window.operationsHubModule.generateServiceAlert(${idx})">🔔 Generar Alerta</button>
           </div>
         </div>`;
   }
@@ -2592,38 +2592,9 @@ class OperationsHubModule {
 
   /**
    * TAREA 3: Sincroniza las alertas (vuelos → Chek-in, visas → Cita Embajada) de una ND al Calendario
-   * de Viajes (idempotente por ND). Actualiza horas/teléfono autoguardados con el botón campanita.
+   * de Viajes (idempotente por ND). Se ejecuta al Guardar y Emitir (nueva o edición de ND),
+   * sin botón: la jerarquía del celular la resuelve phoneForItem (pasajero → cliente → vacío).
    */
-  generateServiceAlert(idx) {
-    if (!this.activeNdItems || !this.activeNdItems[idx]) return;
-    const item = this.activeNdItems[idx];
-    const srv = (item.serviceType || '').toUpperCase();
-    if (srv !== 'BOLETO_AEREO' && srv !== 'BOLETO_GDS' && srv !== 'ASESORAMIENTO_VISAS') return;
-
-    const data = window.db.get();
-    const clientIdEl = document.getElementById ? document.getElementById('uni-client-id') : null;
-    const client = (data.accounts || []).find(a => a.id === (clientIdEl ? clientIdEl.value : '')) || {};
-
-    const rem = this.buildServiceReminder(data, item, idx, client);
-    if (!rem) {
-      window.app.showToast('Complete la fecha (y hora si aplica) para generar la alerta', 'warning');
-      return;
-    }
-
-    // El borrador ND tiene id temporal hasta guardar; sirve de clave junto al ítem
-    if (!this.activeNdId) this.activeNdId = 'ND-TMP-' + Date.now();
-    item.alertKey = item.alertKey || ('AL-' + Date.now() + '-' + idx);
-    rem.sourceDocId = this.activeNdId;
-    rem.itemKey = item.alertKey;
-
-    data.travelReminders = (data.travelReminders || []).filter(r => !(r.sourceDocId === this.activeNdId && r.itemKey === item.alertKey));
-    data.travelReminders.push(rem);
-    window.db.save(data);
-    if (window.calendarModule && window.calendarModule.updateNotificationBadge) window.calendarModule.updateNotificationBadge();
-    window.app.showToast('🔔 Alerta guardada en el Monitor de Vuelos', 'success');
-  }
-
-  // Construye el recordatorio del Monitor (sin montos ni dinero): solo datos relevantes del evento.
   buildServiceReminder(data, item, idx, client) {
     const sd = item.serviceDetails || {};
     const srv = (item.serviceType || '').toUpperCase();
@@ -2638,7 +2609,7 @@ class OperationsHubModule {
       kind: isVisa ? 'VISA' : 'VUELO',
       clientId: client.id || null,
       clientName: client.name || '',
-      clientPhone: String(sd.alertPhone || this.validMobilePhone(client)),
+      clientPhone: String(sd.alertPhone || this.phoneForItem(data, item, client)),
       clientEmail: client.email || '',
       passengerName: item.passengerName || 'Pasajero',
       passengerDoc: item.passengerDoc || item.passengerDocId || item.documentId || '',
@@ -2703,11 +2674,34 @@ class OperationsHubModule {
     const name = String(inputEl && inputEl.value || '').trim().toUpperCase();
     if (!name) return;
     const data = window.db ? window.db.get() : {};
-    const p = (data.passengers || []).find(x => String(x.name || '').trim().toUpperCase() === name);
+    const p = this.passengerForName(data, name);
     if (!p) return;
     const doc = String(p.doc || '').toUpperCase();
     if (idx !== null && idx !== undefined) this.onItemFieldChange(idx, 'passengerDoc', doc);
     if (docEl) docEl.value = doc;
+    const phone = this.validMobilePhone(p);
+    if (phone && idx !== null && idx !== undefined) {
+      // Jerarquía: el pasajero manda sobre el número de la empresa
+      const it = this.activeNdItems && this.activeNdItems[idx];
+      if (it) {
+        if (!it.serviceDetails) it.serviceDetails = {};
+        it.serviceDetails.alertPhone = phone;
+        const inp = document.getElementById('uni-item-alert-phone-' + idx);
+        if (inp) inp.value = phone;
+      }
+    }
+  }
+
+  // Pasajero del directorio por nombre exacto (mismo criterio que el datalist)
+  passengerForName(data, name) {
+    if (!name) return null;
+    const n = String(name).trim().toUpperCase();
+    return (data.passengers || []).find(p => String(p.name || '').trim().toUpperCase() === n) || null;
+  }
+
+  // Jerarquía del celular de un ítem: pasajero (dato guardado, 6/7) → empresa/cliente → ''
+  phoneForItem(data, item, client) {
+    return this.validMobilePhone(this.passengerForName(data, item && item.passengerName)) || this.validMobilePhone(client || {});
   }
 
   // Teléfono móvil real de la cuenta: solo números guardados que empiecen con 6 o 7.
@@ -2731,19 +2725,18 @@ class OperationsHubModule {
     const acc = (window.db ? (window.db.get().accounts || []) : []).find(a => String(a.name || '').trim().toUpperCase() === q);
     el.value = acc ? acc.id : '';
     if (hiddenId === 'uni-client-id' && acc) {
-      // Autocompletar también el celular en los apartados de alertas (Chek-in / Cita embajada).
+      // Autocompletar el celular de los apartados con jerarquía pasajero → cliente.
       // Solo datos reales guardados y con apariencia de móvil (empiezan en 6 o 7).
-      const phone = this.validMobilePhone(acc);
-      if (phone) {
-        (this.activeNdItems || []).forEach((it, i) => {
-          const srv = (it.serviceType || '').toUpperCase();
-          if (srv !== 'BOLETO_AEREO' && srv !== 'BOLETO_GDS' && srv !== 'ASESORAMIENTO_VISAS') return;
-          if (!it.serviceDetails) it.serviceDetails = {};
-          it.serviceDetails.alertPhone = phone;
-          const inp = document.getElementById('uni-item-alert-phone-' + i);
-          if (inp) inp.value = phone;
-        });
-      }
+      (this.activeNdItems || []).forEach((it, i) => {
+        const srv = (it.serviceType || '').toUpperCase();
+        if (srv !== 'BOLETO_AEREO' && srv !== 'BOLETO_GDS' && srv !== 'ASESORAMIENTO_VISAS') return;
+        const phone = this.phoneForItem(window.db.get(), it, acc);
+        if (!phone) return; // sin número válido → se queda vacío para escribir a mano
+        if (!it.serviceDetails) it.serviceDetails = {};
+        it.serviceDetails.alertPhone = phone;
+        const inp = document.getElementById('uni-item-alert-phone-' + i);
+        if (inp) inp.value = phone;
+      });
     }
   }
 
@@ -2788,6 +2781,15 @@ class OperationsHubModule {
         this.onItemFieldChange(t.idx, 'passengerDoc', String(doc).toUpperCase());
         const di = document.getElementById('uni-item-doc-' + t.idx);
         if (di) di.value = String(doc).toUpperCase();
+      }
+      // Jerarquía: el pasajero seleccionado aporta su celular (si guardó uno válido)
+      const it = this.activeNdItems && this.activeNdItems[t.idx];
+      if (it && !it.serviceDetails) it.serviceDetails = {};
+      const phone = this.validMobilePhone(this.passengerForName(window.db.get(), name));
+      if (phone && it) {
+        it.serviceDetails.alertPhone = phone;
+        const inp = document.getElementById('uni-item-alert-phone-' + t.idx);
+        if (inp) inp.value = phone;
       }
     } else if (t.type === 'input') {
       const el = document.getElementById(t.id);
