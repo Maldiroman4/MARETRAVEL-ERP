@@ -142,11 +142,17 @@ class LocalDatabase {
     return this.cachedData;
   }
 
-  async syncWithServerFile() {
-    // SOLO el servidor que sirvió esta página. Si la página se abrió desde el disco
-    // (file://) o desde otro host estático, se usa explícitamente el puerto 3000.
+  // Dónde vive la base de datos: primero el MISMO servidor que sirvió la página y, si la
+  // página se abrió desde el disco (file://) o desde otro host, el ERP local. Leer y
+  // guardar usan esta misma lista: antes el guardado solo probaba '/api/db', que desde
+  // file:// se resuelve a file:///api/db y NUNCA llegaba al servidor (nada se guardaba).
+  _endpoints() {
     const esServidorLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(location.origin);
-    const endpoints = esServidorLocal ? ['/api/db'] : ['/api/db', 'http://localhost:3000/api/db'];
+    return esServidorLocal ? ['/api/db'] : ['/api/db', 'http://localhost:3000/api/db'];
+  }
+
+  async syncWithServerFile() {
+    const endpoints = this._endpoints();
     for (const endpoint of endpoints) {
       try {
         const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
@@ -322,7 +328,8 @@ class LocalDatabase {
           this._pendienteDeGuardar = false;
           this._marcarGuardado();
         } else if (!this._pendiente) {
-          this._avisarFalloGuardado('el servidor no confirmó el guardado');
+          // Se muestra el motivo REAL (código HTTP o error del servidor), no un texto genérico
+          this._avisarFalloGuardado(this._ultimoErrorGuardado || 'el servidor no confirmó el guardado');
         }
       }
     } finally {
@@ -331,28 +338,34 @@ class LocalDatabase {
     }
   }
 
-  // Reintenta fallos de red y errores 5xx (3 veces). Un 4xx (guardrail, dato invalido) no
-  // se reintenta: es determinista y solo genera ruido.
+  // Reintenta fallos de red y errores 5xx (3 veces) y prueba cada servidor disponible.
+  // Un 4xx (guardrail, dato invalido) no se reintenta: es determinista y solo genera ruido.
   async _enviarConReintentos(data) {
     const intentos = 3;
+    const endpoints = this._endpointOk ? [this._endpointOk].concat(this._endpoints().filter(e => e !== this._endpointOk)) : this._endpoints();
     for (let intento = 1; intento <= intentos; intento++) {
-      try {
-        const res = await fetch('/api/db', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) {
-          this.serverOnline = true;
-          return true;
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          if (res.ok) {
+            this._endpointOk = endpoint; // el que respondió: los siguientesguardados van directo
+            this.serverOnline = true;
+            return true;
+          }
+          const errData = await res.json().catch(() => ({}));
+          const motivo = errData.error || ('HTTP ' + res.status);
+          console.error('Servidor rechazó guardado (HTTP ' + res.status + '):', errData);
+          this._ultimoErrorGuardado = 'el servidor rechazó el guardado: ' + motivo +
+            (Array.isArray(errData.details) && errData.details.length ? ' (' + errData.details.join('; ') + ')' : '');
+          if (res.status < 500) return false;
+        } catch (err) {
+          console.error('No se pudo guardar en ' + endpoint + ' (intento ' + intento + '/' + intentos + '):', err);
+          this._ultimoErrorGuardado = 'no se pudo conectar con ' + endpoint + ' (' + (err && err.message || 'sin conexión') + ')';
         }
-        const errData = await res.json().catch(() => ({}));
-        console.error('Servidor rechazó guardado (HTTP ' + res.status + '):', errData);
-        this._ultimoErrorGuardado = 'el servidor rechazó el guardado: ' + (errData.error || res.status);
-        if (res.status < 500) return false;
-      } catch (err) {
-        console.error('Fallo de red al guardar (intento ' + intento + '/' + intentos + '):', err);
-        this._ultimoErrorGuardado = 'no hay conexión con el servidor';
       }
       if (intento < intentos) await new Promise(r => setTimeout(r, 700 * intento));
     }
@@ -380,8 +393,10 @@ class LocalDatabase {
     this.serverOnline = false;
     this.updateStoragePill(false);
     this._pendienteDeGuardar = true;
+    // Se registra en la consola para poder pegar el detalle si hace falta
+    console.error('[MARETRAVEL] Guardado NO confirmado:', motivo);
     if (window.app && typeof window.app.showToast === 'function') {
-      window.app.showToast('NO SE GUARDÓ EN LA BASE DE DATOS: ' + motivo + '. No cierres ni recargues esta página.', 'error');
+      window.app.showToast('NO SE GUARDÓ EN LA BASE DE DATOS: ' + String(motivo).slice(0, 300) + '. No cierres ni recargues esta página.', 'error');
     }
   }
 
