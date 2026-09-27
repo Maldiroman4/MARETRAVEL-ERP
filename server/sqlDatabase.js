@@ -1058,8 +1058,28 @@ const sqlDatabase = {
     try { return JSON.parse(rawJson).deleted === true; } catch (_) { return false; }
   },
 
+  // Un SOLO registro inválido ya no puede tumbar el guardado entero. Antes el primer
+  // INSERT con un dato malo (código duplicado, cliente inexistente) saltaba al ROLLBACK
+  // general y se perdía TODO lo demás que el usuario acababa de registrar. Ahora el
+  // registro problemático se anota y se sigue; el servidor avisa cuáles quedaron fuera.
+  _omitir(etiqueta, motivo) {
+    if (!this._omitidos) this._omitidos = [];
+    if (this._omitidos.length < 50) this._omitidos.push(etiqueta + ': ' + motivo); // sin inundar
+  },
+  _guardarCada(registros, etiqueta, fn) {
+    if (!Array.isArray(registros)) return;
+    for (const r of registros) {
+      try {
+        fn(r);
+      } catch (err) {
+        this._omitir(etiqueta + ' ' + ((r && (r.code || r.ndNumber || r.ncNumber || r.name || r.id)) || ''), err.message);
+      }
+    }
+  },
+
   saveFullState(state) {
     const db = getSqlDb();
+    this._omitidos = [];
 
     // Transacción atómica ACID
     db.exec('BEGIN TRANSACTION;');
@@ -1076,17 +1096,8 @@ const sqlDatabase = {
         this.saveSystemSettings(kv);
       }
 
-      if (Array.isArray(state.financialAccounts)) {
-        for (const fa of state.financialAccounts) {
-          this.saveFinancialAccount(fa);
-        }
-      }
-
-      if (Array.isArray(state.accounts)) {
-        for (const acc of state.accounts) {
-          this.saveAccount(acc);
-        }
-      }
+      this._guardarCada(state.financialAccounts, 'cuenta financiera', fa => this.saveFinancialAccount(fa));
+      this._guardarCada(state.accounts, 'cuenta', acc => this.saveAccount(acc));
 
       if (Array.isArray(state.accountHistory)) {
         const hStmt = db.prepare(`
@@ -1095,44 +1106,27 @@ const sqlDatabase = {
           ON CONFLICT(id) DO NOTHING
         `);
         for (const h of state.accountHistory) {
-          hStmt.run(
-            h.id || ('HIST-' + Date.now()),
-            h.accountId || h.account_id || '',
-            h.accountName || h.account_name || '',
-            h.changeType || h.change_type || 'UPDATE',
-            h.fieldChanged || h.field_changed || '',
-            h.oldValue || h.old_value || '',
-            h.newValue || h.new_value || '',
-            h.userId || h.user_id || 'USR-001',
-            h.userName || h.user_name || 'Luis',
-            h.createdAt || h.created_at || new Date().toLocaleString()
-          );
+          try {
+            hStmt.run(
+              h.id || ('HIST-' + Date.now()),
+              h.accountId || h.account_id || '',
+              h.accountName || h.account_name || '',
+              h.changeType || h.change_type || 'UPDATE',
+              h.fieldChanged || h.field_changed || '',
+              h.oldValue || h.old_value || '',
+              h.newValue || h.new_value || '',
+              h.userId || h.user_id || 'USR-001',
+              h.userName || h.user_name || 'Luis',
+              h.createdAt || h.created_at || new Date().toLocaleString()
+            );
+          } catch (e) { this._omitir('historial de cuenta ' + (h.id || ''), e.message); }
         }
       }
 
-      if (Array.isArray(state.debitNotes)) {
-        for (const nd of state.debitNotes) {
-          this.saveDebitNote(nd);
-        }
-      }
-
-      if (Array.isArray(state.creditNotes)) {
-        for (const nc of state.creditNotes) {
-          this.saveCreditNote(nc);
-        }
-      }
-
-      if (Array.isArray(state.cashReceipts)) {
-        for (const rcp of state.cashReceipts) {
-          this.saveCashReceipt(rcp);
-        }
-      }
-
-      if (Array.isArray(state.gdsTickets)) {
-        for (const t of state.gdsTickets) {
-          this.saveGdsTicket(t);
-        }
-      }
+      this._guardarCada(state.debitNotes, 'nota de débito', nd => this.saveDebitNote(nd));
+      this._guardarCada(state.creditNotes, 'nota de crédito', nc => this.saveCreditNote(nc));
+      this._guardarCada(state.cashReceipts, 'recibo', rcp => this.saveCashReceipt(rcp));
+      this._guardarCada(state.gdsTickets, 'billete GDS', t => this.saveGdsTicket(t));
 
       if (Array.isArray(state.passengers)) {
         const paxStmt = db.prepare(`
@@ -1141,23 +1135,21 @@ const sqlDatabase = {
           ON CONFLICT(id) DO UPDATE SET phone = excluded.phone, count = excluded.count, last_use = excluded.last_use
         `);
         for (const p of state.passengers) {
-          paxStmt.run(
-            p.id || ('PAX-' + Date.now()),
-            p.name,
-            p.doc || null,
-            p.phone || null,
-            p.count || 1,
-            p.lastUse || new Date().toLocaleString(),
-            p.createdAt || new Date().toLocaleString()
-          );
+          try {
+            paxStmt.run(
+              p.id || ('PAX-' + Date.now()),
+              p.name,
+              p.doc || null,
+              p.phone || null,
+              p.count || 1,
+              p.lastUse || new Date().toLocaleString(),
+              p.createdAt || new Date().toLocaleString()
+            );
+          } catch (e) { this._omitir('pasajero ' + (p.name || ''), e.message); }
         }
       }
 
-      if (Array.isArray(state.savedSubServices)) {
-        for (const ss of state.savedSubServices) {
-          this.saveSubservice(ss);
-        }
-      }
+      this._guardarCada(state.savedSubServices, 'subservicio', ss => this.saveSubservice(ss));
 
       if (Array.isArray(state.paymentMethods)) {
         const pmStmt = db.prepare(`
@@ -1166,17 +1158,19 @@ const sqlDatabase = {
           ON CONFLICT(id) DO UPDATE SET name = excluded.name, status = excluded.status, raw_json = excluded.raw_json
         `);
         for (const pm of state.paymentMethods) {
-          pmStmt.run(
-            pm.id,
-            pm.code || null,
-            pm.name || '',
-            pm.currency || 'BOB',
-            pm.type || null,
-            pm.bankAccount || null,
-            pm.status || 'ACTIVO',
-            pm.financialAccountId || null,
-            JSON.stringify(pm)
-          );
+          try {
+            pmStmt.run(
+              pm.id,
+              pm.code || null,
+              pm.name || '',
+              pm.currency || 'BOB',
+              pm.type || null,
+              pm.bankAccount || null,
+              pm.status || 'ACTIVO',
+              pm.financialAccountId || null,
+              JSON.stringify(pm)
+            );
+          } catch (e) { this._omitir('método de pago ' + (pm.name || pm.id || ''), e.message); }
         }
       }
 
@@ -1187,7 +1181,9 @@ const sqlDatabase = {
           ON CONFLICT(id) DO UPDATE SET name = excluded.name, category = excluded.category
         `);
         for (const st of state.serviceTypes) {
-          stStmt.run(st.id, st.code, st.name, st.category || null);
+          try {
+            stStmt.run(st.id, st.code, st.name, st.category || null);
+          } catch (e) { this._omitir('tipo de servicio ' + (st.name || st.code || ''), e.message); }
         }
       }
 
@@ -1200,7 +1196,11 @@ const sqlDatabase = {
         const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE ${idCol} = ?`);
         for (const row of existingRows) {
           if (!keepSet.has(row.id) && !this.isSoftDeleted(row.raw_json)) {
-            deleteStmt.run(row.id);
+            // Una fila en la papelera puede seguir referenciando esta cuenta (FK RESTRICT):
+            // si el borrado falla se anota y se sigue, no se pierde el guardado completo.
+            try {
+              deleteStmt.run(row.id);
+            } catch (e) { this._omitir('no se pudo borrar ' + tableName + ' ' + row.id, e.message); }
           }
         }
       };
@@ -1217,9 +1217,10 @@ const sqlDatabase = {
 
       db.exec('COMMIT;');
       try { db.exec('PRAGMA wal_checkpoint(PASSIVE);'); } catch (_) {}
-      return { success: true };
+      return { success: true, omitidos: this._omitidos || [] };
     } catch (err) {
       db.exec('ROLLBACK;');
+      err.omitidos = this._omitidos || [];
       throw err;
     }
   },

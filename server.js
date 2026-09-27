@@ -194,7 +194,11 @@ async function saveDb(data) {
     throw new Error('Datos inválidos para persistencia en base de datos.');
   }
   // 1. Persistencia transaccional (Turso nube o SQLite local según capa activa)
-  await persistence.saveFullState(data);
+  const resultado = await persistence.saveFullState(data);
+  if (resultado && resultado.omitidos && resultado.omitidos.length) {
+    console.warn('[GUARDADO PARCIAL] ' + resultado.omitidos.length + ' registro(s) con datos que la base rechaza:');
+    resultado.omitidos.forEach(o => console.warn('   - ' + o));
+  }
 
   // 2. Respaldo snapshot en JSON para redundancia
   try {
@@ -204,7 +208,7 @@ async function saveDb(data) {
   } catch (e) {
     console.warn('[AVISO] No se pudo escribir snapshot JSON de respaldo:', e.message);
   }
-  return true;
+  return resultado;
 }
 
 /**
@@ -397,6 +401,10 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Sin esto Chrome bloquea (Private Network Access) que una pagina https pida al ERP local,
+  // y el guardado se cae sin avisar. El ERP no cambia por Contest Private Network:
+  // solo acepta peticiones de paginas de la propia app (*).
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -577,7 +585,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       // PERSISTENCIA FÍSICA OBLIGATORIA
-      await saveDb(parsed);
+      const resultado = await saveDb(parsed);
 
       console.log(`[${new Date().toLocaleTimeString()}] Base de datos confirmada y persistida exitosamente.`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -585,6 +593,9 @@ const server = http.createServer(async (req, res) => {
         success: true,
         persisted: true,
         timestamp: new Date().toISOString(),
+        // Registros con datos que la base rechazó: se guardó todo lo demás, y el aviso
+        // va al cliente para que el usuario sepa exactamente qué tiene que corregir.
+        omitidos: (resultado && resultado.omitidos) || [],
         summary: {
           debitNotes: (parsed.debitNotes || []).length,
           creditNotes: (parsed.creditNotes || []).length,

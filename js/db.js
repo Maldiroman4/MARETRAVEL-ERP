@@ -343,6 +343,7 @@ class LocalDatabase {
   async _enviarConReintentos(data) {
     const intentos = 3;
     const endpoints = this._endpointOk ? [this._endpointOk].concat(this._endpoints().filter(e => e !== this._endpointOk)) : this._endpoints();
+    const fallos = []; // un registro por servidor: si se acaba, se ve el de TODOS, no solo el último
     for (let intento = 1; intento <= intentos; intento++) {
       for (const endpoint of endpoints) {
         try {
@@ -352,24 +353,51 @@ class LocalDatabase {
             body: JSON.stringify(data)
           });
           if (res.ok) {
-            this._endpointOk = endpoint; // el que respondió: los siguientesguardados van directo
+            this._endpointOk = endpoint; // el que respondió: los siguientes guardados van directo
             this.serverOnline = true;
+            const ok = await res.json().catch(() => ({}));
+            // Se guardó todo salvo lo que la base rechazó: se avisa qué falta corregir,
+            // pero NO es un "no se guardó nada".
+            if (ok && Array.isArray(ok.omitidos) && ok.omitidos.length) {
+              this._avisarGuardadoParcial(ok.omitidos);
+            }
             return true;
           }
           const errData = await res.json().catch(() => ({}));
           const motivo = errData.error || ('HTTP ' + res.status);
           console.error('Servidor rechazó guardado (HTTP ' + res.status + '):', errData);
-          this._ultimoErrorGuardado = 'el servidor rechazó el guardado: ' + motivo +
-            (Array.isArray(errData.details) && errData.details.length ? ' (' + errData.details.join('; ') + ')' : '');
-          if (res.status < 500) return false;
+          fallos.push(endpoint + ' -> ' + motivo + (Array.isArray(errData.details) && errData.details.length ? ' (' + errData.details.join('; ') + ')' : ''));
+          if (res.status < 500) {
+            this._ultimoErrorGuardado = fallos.join(' · ');
+            return false;
+          }
         } catch (err) {
           console.error('No se pudo guardar en ' + endpoint + ' (intento ' + intento + '/' + intentos + '):', err);
-          this._ultimoErrorGuardado = 'no se pudo conectar con ' + endpoint + ' (' + (err && err.message || 'sin conexión') + ')';
+          fallos.push(endpoint + ' -> ' + (err && err.message || 'sin conexión'));
         }
       }
       if (intento < intentos) await new Promise(r => setTimeout(r, 700 * intento));
     }
+    this._ultimoErrorGuardado = 'falló en ' + [...new Set(fallos)].join(' · ') +
+      ' — página: ' + (typeof location !== 'undefined' ? location.href : '?') + this._pistaDeApertura();
     return false;
+  }
+
+  // Si la app se abrió haciendo doble clic en el archivo, el navegador no puede ni leer ni
+  // guardar: se dice eso en vez de un "no se pudo conectar" sin explicación.
+  _pistaDeApertura() {
+    if (typeof location === 'undefined' || !/^file:/.test(location.href)) return '';
+    return ' | ABRISTE LA APP ABRIENDO EL ARCHIVO DEL DISCO: cerrá esa pestaña y entrá por http://localhost:3000 o por la dirección de Render.';
+  }
+
+  // Guardado PARCIAL: la base aceptó casi todo y rechazó algunos registros. Se dice cuáles
+  // (con el motivo) para que el usuario corrija ese dato; el resto ya está guardado.
+  _avisarGuardadoParcial(omitidos) {
+    const detalle = omitidos.slice(0, 3).join(' | ') + (omitidos.length > 3 ? ' (+' + (omitidos.length - 3) + ' más)' : '');
+    console.warn('[MARETRAVEL] Registros que la base rechazó:', omitidos);
+    if (window.app && typeof window.app.showToast === 'function') {
+      window.app.showToast('SE GUARDÓ TODO MENOS ' + omitidos.length + ' REGISTRO(S) con datos que la base rechaza. Corregilos: ' + detalle, 'warning');
+    }
   }
 
   // Confirmación visible: el reloj de la pastilla es la prueba de que el registro está en la BD.

@@ -1207,9 +1207,51 @@ const tursoDatabase = {
       s.args = s.args.map(a => (typeof a === 'number' && !Number.isFinite(a)) ? 0 : a);
     }
 
-    // Ejecución atómica en un único round-trip en Turso
-    await client.batch(stmts, 'write');
-    return { success: true, count: stmts.length };
+    // Ejecución atómica en un único round-trip en Turso. Si el lote falla, un solo registro
+    // con un dato que la base rechaza (código duplicado, cliente inexistente) tumbaba el
+    // guardado ENTERO y se perdía todo lo demás. Ahora se parte el lote a la mitad hasta
+    // aislar esos registros: se guarda todo lo demás y se informa lo que quedó fuera.
+    const omitidos = [];
+    try {
+      await client.batch(stmts, 'write');
+    } catch (err) {
+      console.error('[TURSO] Lote rechazado, aislando registros con datos inválidos:', err.message);
+      const sospechosos = [];
+      await this._lotePorMitades(stmts, sospechosos);
+      // 2ª pasada: con el resto ya guardado, un registro puede entrar solo (fallaba porque
+      // su cuenta, incluida en la otra mitad del corte, todavía no existía).
+      if (sospechosos.length) {
+        const definitivos = [];
+        await this._lotePorMitades(sospechosos.map(x => x.stmt), definitivos);
+        omitidos.push(...definitivos.map(d => this._describirStmt(d.stmt) + ': ' + d.motivo));
+      }
+    }
+    return { success: true, count: stmts.length - omitidos.length, omitidos };
+  },
+
+  // Parte el lote a la mitad hasta encontrar los registros que la base rechaza. Un tramo que
+  // se guarda bien se aplica entero; uno que falla se parte. Al final quedan solo los culpables.
+  async _lotePorMitades(stmts, agotados) {
+    if (!stmts.length) return;
+    try {
+      await getClient().batch(stmts, 'write');
+    } catch (err) {
+      if (stmts.length === 1) {
+        agotados.push({ stmt: stmts[0], motivo: String(err.message).slice(0, 140) });
+        return;
+      }
+      const mid = Math.floor(stmts.length / 2);
+      await this._lotePorMitades(stmts.slice(0, mid), agotados);
+      await this._lotePorMitades(stmts.slice(mid), agotados);
+    }
+  },
+
+  // Nombre legible del registro rechazado, para que el usuario sepa qué corregir.
+  _describirStmt(s) {
+    const sql = (s && s.sql) || '';
+    const tabla = (/INSERT INTO (\w+)/i.exec(sql) || /DELETE FROM (\w+)/i.exec(sql) || [])[1] || 'registro';
+    const args = (s && s.args) || [];
+    return tabla + ' ' + (args[0] || '') + (args[1] ? ' / ' + args[1] : '');
   },
 
   // Borrado físico directo (purga definitiva de la papelera): ignora el flag soft-delete.
