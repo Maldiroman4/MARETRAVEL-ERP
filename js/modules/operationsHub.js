@@ -2671,6 +2671,16 @@ class OperationsHubModule {
     }
   }
 
+  // El Monitor de vuelos/visas deja de mostrar las alertas de una ND que ya no está visible
+  // (movida a la papelera o purgada). El registro completo sigue en la papelera y al
+  // restaurar se vuelven a generar con syncFlightRemindersToCalendar (papelera.js).
+  quitarAlertasDeLaND(data, ndId) {
+    if (!data || !ndId) return 0;
+    const antes = (data.travelReminders || []).length;
+    data.travelReminders = (data.travelReminders || []).filter(r => r && r.sourceDocId !== ndId);
+    return antes - data.travelReminders.length;
+  }
+
   // TAREA 6: Directorio de pasajeros (autocompletado + lupa)
   refreshPassengerDatalist() {
     const dl = document.getElementById('datalist-passengers');
@@ -2927,10 +2937,15 @@ class OperationsHubModule {
       //    son documentos independientes que conservan su referencia al número de ND.
       markDeleted(nd);
 
-      // 3. Persistencia síncrona/asíncrona en base de datos
+      // 3. El Monitor de vuelos/visas pierde las alertas de esta ND: la operación ya no existe
+      //    para el usuario. El registro completo sigue en la papelera y al restaurar vuelve
+      //    con sus alertas (ver papelera.js).
+      const alertasFuera = this.quitarAlertasDeLaND(data, id);
+
+      // 4. Persistencia síncrona/asíncrona en base de datos
       window.db.save(data);
 
-      // 7. Borrado reactivo del nodo DOM para evitar re-renderizado masivo y lag
+      // 5. Borrado reactivo del nodo DOM para evitar re-renderizado masivo y lag
       const rowNode = document.getElementById(`row-nd-${id}`);
       if (rowNode) rowNode.remove();
       const accordionNode = document.getElementById(`accordion-nd-${id}`);
@@ -2940,7 +2955,11 @@ class OperationsHubModule {
       window.app.updateDashboardKpis();
       if (window.creditNotesModule) window.creditNotesModule.render();
       if (window.cashRegisterModule) window.cashRegisterModule.renderReceiptsHistory();
-      window.app.showToast(`Operación ND #${nd.ndNumber} movida a la PAPELERA. No se borró de la base de datos.`, 'success');
+      window.app.showToast(
+        `Operación ND #${nd.ndNumber} movida a la PAPELERA. No se borró de la base de datos.` +
+        (alertasFuera ? ` Se quitaron ${alertasFuera} alerta(s) del Monitor de vuelos/visas.` : ''),
+        'success'
+      );
     } catch (err) {
       console.error('Error en eliminación en cascada:', err);
       window.app.showToast('Error al eliminar operación: ' + (err.message || err), 'error');

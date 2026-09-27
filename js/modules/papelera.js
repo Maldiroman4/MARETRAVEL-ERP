@@ -107,6 +107,18 @@
       body: JSON.stringify({ type, id })
     });
     await afterAction(res, 'restaurado');
+    await revivirAlertasDeLaND(type, id);
+  }
+
+  // Una ND restaurada vuelve al Monitor de vuelos/visas con sus alertas (se quitaron al borrarla).
+  async function revivirAlertasDeLaND(type, id) {
+    const hub = window.operationsHubModule;
+    if (type !== 'debitNotes' || !hub || !window.db) return;
+    const data = window.db.getRaw(); // estado crudo: no tocar la papelera del resto
+    const nd = (data.debitNotes || []).find(n => n && n.id === id);
+    if (!nd) return;
+    hub.syncFlightRemindersToCalendar(data, nd);
+    window.db.save(data);
   }
 
   async function purge(type, id, label) {
