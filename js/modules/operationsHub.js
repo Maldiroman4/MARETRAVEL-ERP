@@ -1172,6 +1172,34 @@ class OperationsHubModule {
     this.calculateConsolidatedTotals();
   }
 
+  openAddServiceTypeModal() {
+    const select = document.getElementById('add-service-type-select');
+    if (select) {
+      select.innerHTML = this.getServiceTypes().map(s =>
+        `<option value="${s.code || s.id}">${s.name}</option>`
+      ).join('');
+    }
+    window.app.openModal('modal-add-service-type');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  confirmAddServiceType() {
+    const select = document.getElementById('add-service-type-select');
+    const code = select ? select.value : '';
+    if (!code) {
+      window.app.showToast('Selecciona el tipo de servicio a agregar', 'warning');
+      return;
+    }
+    if (code === '__NEW_SERVICE__') {
+      this.openNewServiceTypeModal();
+      return;
+    }
+    const srv = this.getServiceTypes().find(s => (s.code || s.id) === code);
+    this.addNewItemToNd({ serviceType: code });
+    window.app.closeModal('modal-add-service-type');
+    window.app.showToast(`Servicio "${(srv && srv.name) || code}" agregado a la ND — completa su formulario`, 'success');
+  }
+
   removeItemFromNd(index) {
     if (this.activeNdItems.length <= 1) {
       window.app.showToast('La Nota de Débito debe contener al menos un servicio.', 'warning');
@@ -2884,6 +2912,10 @@ class OperationsHubModule {
 
     const manSelect = document.getElementById('man-service-type');
     if (manSelect) manSelect.value = code;
+
+    // Si el picker de servicios adicionales está abierto, auto-seleccionar el nuevo tipo
+    const addSelect = document.getElementById('add-service-type-select');
+    if (addSelect) addSelect.value = code;
 
     window.app.closeModal('modal-new-service-type');
     

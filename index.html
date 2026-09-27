@@ -2735,7 +2735,7 @@
                 <span class="badge badge-blue" id="uni-items-count-badge">1 Servicio</span>
               </div>
               <div style="display: flex; gap: 8px;">
-                <button type="button" class="btn btn-primary btn-sm" onclick="window.operationsHubModule.addNewItemToNd()" style="font-weight: 700;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="window.operationsHubModule.openAddServiceTypeModal()" style="font-weight: 700;">
                   <i data-lucide="plus-circle"></i> + Adicionar Otro Servicio a la ND
                 </button>
               </div>
@@ -2761,6 +2761,37 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Elegir Tipo de Servicio Adicional (ND Multi-Servicio) -->
+  <div class="modal-overlay" id="modal-add-service-type">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <i data-lucide="plus-circle"></i> Añadir Otro Servicio a la ND
+        </h3>
+        <button class="modal-close" data-close-modal="modal-add-service-type">&times;</button>
+      </div>
+      <div class="modal-content">
+        <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 10px;">
+          Selecciona el tipo de servicio que deseas agregar a esta Nota de Débito.
+          Al confirmar se generará el formulario correspondiente a ese servicio.
+        </p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label class="form-label" style="margin-bottom: 0;">Tipo de Servicio:</label>
+          <button type="button" class="btn btn-secondary btn-xs" onclick="window.operationsHubModule.openNewServiceTypeModal()" title="Añadir nuevo tipo de servicio" style="padding: 1px 6px; font-size: 0.72rem;">
+            <i data-lucide="plus"></i> + Añadir Tipo
+          </button>
+        </div>
+        <select id="add-service-type-select" class="form-control"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-add-service-type">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="window.operationsHubModule.confirmAddServiceType()">
+          <i data-lucide="list-checks"></i> Generar Formulario
+        </button>
+      </div>
     </div>
   </div>
 
