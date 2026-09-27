@@ -223,15 +223,6 @@ class OperationsHubModule {
       });
     }
 
-    const uniCliSelect = document.getElementById('uni-client-select');
-    if (uniCliSelect && typeof uniCliSelect.addEventListener === 'function') {
-      uniCliSelect.addEventListener('change', (e) => {
-        if (e.target.value === '__NEW_CLIENT__') {
-          if (window.accountsModule) window.accountsModule.openNewAccountModal();
-        }
-      });
-    }
-
     const uniProvSelect = document.getElementById('uni-provider-select');
     if (uniProvSelect && typeof uniProvSelect.addEventListener === 'function') {
       uniProvSelect.addEventListener('change', (e) => {
@@ -1214,11 +1205,9 @@ class OperationsHubModule {
     const data = window.db.get();
     const clients = (data.accounts || []).filter(a => a.relationType === 'CLIENTE' || a.relationType === 'AMBOS' || a.type === 'CLIENTE' || a.type === 'AGENCIA' || a.type === 'CORPORATIVO');
 
-    const clientSelect = document.getElementById('uni-client-select');
-    if (clientSelect) {
-      clientSelect.innerHTML = `<option value="">-- Seleccionar Cliente a Facturar --</option>` +
-        clients.map(c => `<option value="${c.id}">${c.name} (${c.docNumber || c.code})</option>`).join('') +
-        `<option value="__NEW_CLIENT__">➕ + Registrar Nuevo Cliente...</option>`;
+    const dl = document.getElementById('datalist-acc-cobrar');
+    if (dl) {
+      dl.innerHTML = clients.map(c => `<option value="${(c.name || '').replace(/"/g, '&quot;')}">${(c.code || '')}${c.nit ? ' · NIT ' + c.nit : ''}</option>`).join('');
     }
 
     const depositSelect = document.getElementById('uni-deposit-account');
@@ -2073,12 +2062,12 @@ class OperationsHubModule {
 
     try {
       const data = window.db.get();
-      const clientId = document.getElementById('uni-client-select')?.value;
+      const clientId = document.getElementById('uni-client-id')?.value;
       const issueDate = document.getElementById('uni-issue-date')?.value || new Date().toISOString().split('T')[0];
       const observations = (document.getElementById('uni-observations')?.value || '').trim();
 
       // 1. Validar Cliente
-      if (!clientId || clientId === '__NEW_CLIENT__') {
+      if (!clientId) {
         window.app.showToast('Debe seleccionar un cliente a facturar para registrar la ND', 'warning');
         return;
       }
@@ -2606,6 +2595,17 @@ class OperationsHubModule {
     if (docEl) docEl.value = doc;
   }
 
+  // Buscador de cuentas (ND→clientes, NC→proveedores): al seleccionar del datalist guarda el id en el hidden
+  onAccountSearchChange(inputEl) {
+    const hiddenId = inputEl ? inputEl.getAttribute('data-account-id') : null;
+    if (!hiddenId) return;
+    const el = document.getElementById(hiddenId);
+    if (!el) return;
+    const q = String(inputEl.value || '').trim().toUpperCase();
+    const acc = (window.db ? (window.db.get().accounts || []) : []).find(a => String(a.name || '').trim().toUpperCase() === q);
+    el.value = acc ? acc.id : '';
+  }
+
   openPassengerSearch(targetType, targetIdxOrId) {
     window.__paxTarget = { type: targetType, idx: targetType === 'hub' ? targetIdxOrId : null, id: targetType === 'input' ? targetIdxOrId : null };
     const modal = document.getElementById('modal-passenger-search');
@@ -2686,8 +2686,13 @@ class OperationsHubModule {
       `;
     }
 
-    const clientSelect = document.getElementById('uni-client-select');
-    if (clientSelect) clientSelect.value = nd.accountId || '';
+    const clientIdHidden = document.getElementById('uni-client-id');
+    if (clientIdHidden) clientIdHidden.value = nd.accountId || '';
+    const clientInput = document.getElementById('uni-client-input');
+    if (clientInput && nd.accountId) {
+      const acc = (data.accounts || []).find(a => a.id === nd.accountId);
+      if (acc) clientInput.value = acc.name || '';
+    }
     const dateInput = document.getElementById('uni-issue-date');
     if (dateInput) dateInput.value = nd.issueDate || new Date().toISOString().split('T')[0];
     const termEl = document.getElementById('uni-payment-term');

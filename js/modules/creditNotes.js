@@ -196,10 +196,9 @@ window.creditNotesModule = {
 
     const data = window.db.get();
     const providers = data.accounts.filter(a => a.relationType === 'PROVEEDOR' || a.relationType === 'AMBOS');
-    const select = document.getElementById('nc-provider-select');
-    if (select) {
-      select.innerHTML = '<option value="">-- Seleccionar Proveedor --</option>' +
-        providers.map(p => `<option value="${p.id}">${p.name} (${p.code})</option>`).join('');
+    const dl = document.getElementById('datalist-acc-pagar');
+    if (dl) {
+      dl.innerHTML = providers.map(p => `<option value="${(p.name || '').replace(/"/g, '&quot;')}">${(p.code || '')}${p.nit ? ' · NIT ' + p.nit : ''}</option>`).join('');
     }
 
     const actCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
@@ -214,7 +213,7 @@ window.creditNotesModule = {
   handleSaveManualNc(e) {
     e.preventDefault();
     const data = window.db.get();
-    const providerId = document.getElementById('nc-provider-select').value;
+    const providerId = document.getElementById('nc-provider-id').value;
     const provider = data.accounts.find(a => a.id === providerId);
     if (!provider) {
       window.app.showToast('Selecciona un proveedor válido', 'warning');
