@@ -146,10 +146,11 @@ window.calendarModule = {
       const dayReminders = reminders.filter(r => {
         const matchDeparture = r.departureDate === dateStr;
         const matchReturn = r.hasReturn && r.returnDate === dateStr;
+        // Un aviso sin estos datos no puede romper el dibujado de la grilla
         const matchSearch = !search ||
-          r.passengerName.toLowerCase().includes(search) ||
-          r.clientName.toLowerCase().includes(search) ||
-          r.route.toLowerCase().includes(search);
+          (r.passengerName || '').toLowerCase().includes(search) ||
+          (r.clientName || '').toLowerCase().includes(search) ||
+          (r.route || '').toLowerCase().includes(search);
 
         return (matchDeparture || matchReturn) && matchSearch;
       });
@@ -167,7 +168,7 @@ window.calendarModule = {
             return `
               <div class="cal-event-chip chip-departure" onclick="window.calendarModule.showReminderDetails('${rem.id}', event)" title="Ida: ${rem.passengerName} (${rem.route})">
                 <div class="chip-time">🛫 ${rem.departureTime || 'S/H'}</div>
-                <div class="chip-title">${rem.passengerName.split('/')[0]} - ${rem.route}</div>
+                <div class="chip-title">${String(rem.passengerName || '').split('/')[0]} - ${rem.route || ''}</div>
               </div>
             `;
           }
@@ -176,7 +177,7 @@ window.calendarModule = {
             return `
               <div class="cal-event-chip chip-return" onclick="window.calendarModule.showReminderDetails('${rem.id}', event)" title="Retorno: ${rem.passengerName} (${rem.route})">
                 <div class="chip-time">🛬 ${rem.returnTime || 'S/H'}</div>
-                <div class="chip-title">${rem.passengerName.split('/')[0]} - RETORNO</div>
+                <div class="chip-title">${String(rem.passengerName || '').split('/')[0]} - RETORNO</div>
               </div>
             `;
           }

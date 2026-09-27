@@ -18,6 +18,7 @@ MARETRAVEL-ERP/
 # Copias de seguridad automáticas
 data/backups/*
 !data/backups/.gitkeep
+data/database.backup-*.json
 
 # Variables de entorno y secretos
 .env

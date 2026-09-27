@@ -247,9 +247,31 @@
     };
 
     document.addEventListener('DOMContentLoaded', async () => {
-      // Los avisos viven en el servidor: pintar antes del sync mostraba la lista vacía
-      try { await window.db.syncWithServerFile(); } catch (e) {}
-      window.calendarModule.init();
+      // Si algo falla al pintar, que se vea en la pagina (antes se quedaba solo el titulo)
+      const fatal = (err) => {
+        console.error('Monitor de Itinerarios:', err);
+        const g = document.getElementById('calendar-days-grid');
+        if (g && !g.children.length) {
+          g.innerHTML = `<div style="grid-column:1/-1;padding:24px;color:#b91c1c;font-size:.9rem;">
+            <strong>El Monitor no pudo iniciarse.</strong><br>
+            ${String(err && err.message || err)}<br>
+            <span style="color:#64748b;">Abre la consola (F12) para el detalle. Si dice "no hay conexión", el ERP
+            debe estar corriendo en http://localhost:3000 (no en 3001 ni en otro puerto).</span>
+          </div>`;
+        }
+        if (window.app && window.app.showToast) window.app.showToast('El Monitor no pudo iniciarse: ' + (err && err.message || err), 'error');
+      };
+
+      let sincronizado = false;
+      try {
+        sincronizado = !!(await window.db.syncWithServerFile());
+      } catch (e) { /* se reporta abajo */ }
+      if (!sincronizado && window.app && window.app.showToast) {
+        window.app.showToast('Sin conexión con la base de datos: se muestran los últimos datos guardados en este navegador. Inicia el ERP en http://localhost:3000', 'error');
+      }
+      try {
+        window.calendarModule.init();
+      } catch (e) { fatal(e); }
 
       // Renderizar panel de alertas laterales
       const renderSideAlerts = () => {
@@ -268,7 +290,7 @@
                 <div style="font-weight:700; font-size:0.85rem; color:#0f2742; margin-top:4px;">${a.reminder.passengerName}</div>
                 <div style="font-size:0.75rem; color:#64748b;">${a.reminder.route} (${a.time})</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                  <span style="font-size:0.72rem; color:#0369a1; font-weight:600;">${a.reminder.clientName.substring(0, 18)}...</span>
+                  <span style="font-size:0.72rem; color:#0369a1; font-weight:600;">${(a.reminder.clientName || '(sin cliente)').substring(0, 18)}</span>
                   <div style="display:flex; gap:4px;">
                     <button class="btn btn-secondary btn-sm" onclick="window.calendarModule.showReminderDetails('${a.reminder.id}')" title="Ver Detalle">
                       <i data-lucide="eye" style="width:12px; height:12px;"></i>

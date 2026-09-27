@@ -292,8 +292,10 @@ class LocalDatabase {
         localStorage.setItem(DB_KEY, JSON.stringify(data));
       }
 
-      // 2. Persistencia real obligatoria en el archivo físico en disco (data/database.json)
-      this.persistToFileServer(data);
+      // 2. Persistencia real obligatoria en el servidor (Turso/SQLite). Va en COLA: un solo
+      //    POST a la vez y en orden, para que el último estado sea el último en llegar.
+      this._pendiente = data;
+      this._bucleGuardado();
 
       // 3. Disparar evento de actualización reactiva en toda la app
       if (typeof window !== 'undefined') {
@@ -304,32 +306,71 @@ class LocalDatabase {
     }
   }
 
-  async persistToFileServer(data) {
-    // SOLO el mismo origen que sirvió la página. Caer a 'localhost:3000/3001' a ciegas
-    // guardaba en el servidor equivocado (otra base de datos) y se perdía todo.
-    const endpoint = '/api/db';
+  // Un SOLO POST a la vez y siempre en orden. Antes se disparaba uno por cada guardado:
+  // como cada POST tarda ~5s, dos o tres llegaban al servidor en paralelo y el estado
+  // VIEJO podia llegar el ultimo y pisar lo que acababas de registrar (registros perdidos).
+  async _bucleGuardado() {
+    if (this._guardando) return; // ya hay un POST en vuelo: este espera su turno
+    this._guardando = true;
     this._saveInFlight = (this._saveInFlight || 0) + 1;
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        this.serverOnline = true;
-        this.updateStoragePill(true);
-        return true;
+      while (this._pendiente) {
+        const data = this._pendiente;
+        this._pendiente = null;
+        const ok = await this._enviarConReintentos(data);
+        if (ok) {
+          this._pendienteDeGuardar = false;
+          this._marcarGuardado();
+        } else if (!this._pendiente) {
+          this._avisarFalloGuardado('el servidor no confirmó el guardado');
+        }
       }
-      const errData = await res.json().catch(() => ({}));
-      console.error('Servidor rechazó guardado:', errData);
-      this._avisarFalloGuardado('el servidor rechazó el guardado: ' + (errData.error || res.status));
-      return false;
-    } catch (err) {
-      console.error('No se pudo guardar en el servidor:', err);
-      this._avisarFalloGuardado('no hay conexión con el servidor (se guardó solo en este navegador)');
-      return false;
     } finally {
+      this._guardando = false;
       this._saveInFlight--;
+    }
+  }
+
+  // Reintenta fallos de red y errores 5xx (3 veces). Un 4xx (guardrail, dato invalido) no
+  // se reintenta: es determinista y solo genera ruido.
+  async _enviarConReintentos(data) {
+    const intentos = 3;
+    for (let intento = 1; intento <= intentos; intento++) {
+      try {
+        const res = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          this.serverOnline = true;
+          return true;
+        }
+        const errData = await res.json().catch(() => ({}));
+        console.error('Servidor rechazó guardado (HTTP ' + res.status + '):', errData);
+        this._ultimoErrorGuardado = 'el servidor rechazó el guardado: ' + (errData.error || res.status);
+        if (res.status < 500) return false;
+      } catch (err) {
+        console.error('Fallo de red al guardar (intento ' + intento + '/' + intentos + '):', err);
+        this._ultimoErrorGuardado = 'no hay conexión con el servidor';
+      }
+      if (intento < intentos) await new Promise(r => setTimeout(r, 700 * intento));
+    }
+    return false;
+  }
+
+  // Confirmación visible: el reloj de la pastilla es la prueba de que el registro está en la BD.
+  _marcarGuardado() {
+    this.serverOnline = true;
+    this.updateStoragePill(true);
+    const pill = typeof document !== 'undefined' ? document.getElementById('storage-status-pill') : null;
+    if (pill) {
+      const hora = new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      pill.innerHTML = '<i data-lucide="hard-drive" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i> Guardado en BD ✓ ' + hora;
+      pill.title = 'Confirmado por el servidor a las ' + hora;
+      if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     }
   }
 
