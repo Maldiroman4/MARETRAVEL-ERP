@@ -341,11 +341,19 @@ window.calendarModule = {
 
   // ==========================================================================
   // DETALLES DEL ITINERARIO Y ACCIONES DE ADMINISTRACIÓN
+  // Busca el aviso y avisa si ya no existe (antes el fallo era silencioso: el botón no hacía nada)
+  findReminder(reminderId) {
+    const r = (window.db.get().travelReminders || []).find(x => x.id === reminderId);
+    if (!r && window.app && window.app.showToast) {
+      window.app.showToast('Ese aviso ya no está en el Monitor. Recarga la ventana para ver los avisos vigentes.', 'error');
+    }
+    return r;
+  },
+
   // ==========================================================================
   showReminderDetails(reminderId, event = null) {
     if (event) event.stopPropagation();
-    const data = window.db.get();
-    const r = data.travelReminders.find(x => x.id === reminderId);
+    const r = this.findReminder(reminderId);
     if (!r) return;
 
     this.selectedReminderId = reminderId;
@@ -470,13 +478,12 @@ window.calendarModule = {
   },
 
   sendWhatsAppReminder(reminderId) {
-    const data = window.db.get();
-    const r = data.travelReminders.find(x => x.id === reminderId);
+    const r = this.findReminder(reminderId);
     if (!r) return;
 
     const phone = (r.clientPhone || '').replace(/\D/g, '');
     if (!phone) {
-      alert('Este pasajero no tiene número de celular registrado.');
+      if (window.app && window.app.showToast) window.app.showToast('Este pasajero no tiene número de celular registrado.', 'error');
       return;
     }
 

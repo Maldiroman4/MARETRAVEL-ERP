@@ -986,6 +986,10 @@ const sqlDatabase = {
     const financialAccounts = this.getFinancialAccounts();
     const settings = this.getSystemSettings();
 
+    // Alertas del monitor (KV genérico: sin tabla nueva)
+    const travelReminders = Array.isArray(settings.travel_reminders) ? settings.travel_reminders : [];
+    delete settings.travel_reminders;
+
     const db = getSqlDb();
     const accountHistory = db.prepare('SELECT id, account_id as accountId, account_name as accountName, change_type as changeType, field_changed as fieldChanged, old_value as oldValue, new_value as newValue, user_id as userId, user_name as userName, created_at as createdAt FROM account_history ORDER BY created_at DESC').all();
     const paymentMethods = db.prepare('SELECT * FROM payment_methods').all().map(r => r.raw_json ? JSON.parse(r.raw_json) : r);
@@ -1016,7 +1020,7 @@ const sqlDatabase = {
       cashReceipts,
       cashTransactions: [],
       expenses: [],
-      travelReminders: [],
+      travelReminders,
       passengers,
       auditLog: [],
       accountingModifications: [],
@@ -1041,6 +1045,11 @@ const sqlDatabase = {
     try {
       if (state.systemSettings) {
         this.saveSystemSettings(state.systemSettings);
+      }
+
+      // Alertas del monitor (viaja por el KV de system_settings: sin tabla nueva)
+      if (Array.isArray(state.travelReminders)) {
+        this.saveSystemSettings({ travel_reminders: state.travelReminders });
       }
 
       if (Array.isArray(state.financialAccounts)) {

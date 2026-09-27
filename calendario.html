@@ -246,7 +246,9 @@
       }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Los avisos viven en el servidor: pintar antes del sync mostraba la lista vacía
+      try { await window.db.syncWithServerFile(); } catch (e) {}
       window.calendarModule.init();
 
       // Renderizar panel de alertas laterales
@@ -292,6 +294,13 @@
       }
 
       renderSideAlerts();
+
+      // Al volver a esta ventana, trae los avisos nuevos del ERP (sin recargar a mano)
+      window.addEventListener('focus', async () => {
+        try { await window.db.syncWithServerFile(); } catch (e) {}
+        renderSideAlerts();
+        window.calendarModule.render();
+      });
 
       // Listeners de modales
       document.querySelectorAll('[data-close-modal]').forEach(b => {

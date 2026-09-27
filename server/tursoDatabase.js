@@ -127,6 +127,11 @@ const tursoDatabase = {
       }
     }
 
+    // Alertas del monitor de vuelos (vuelos y citas de embajada) guardadas como JSON
+    // en la tabla genérica system_settings: sin tabla nueva ni migración.
+    const travelReminders = Array.isArray(systemSettings.travel_reminders) ? systemSettings.travel_reminders : [];
+    delete systemSettings.travel_reminders;
+
     const parseRaw = (r) => {
       let base = {};
       if (r.raw_json) {
@@ -485,7 +490,7 @@ const tursoDatabase = {
       cashReceipts,
       cashTransactions: [],
       expenses: [],
-      travelReminders: [],
+      travelReminders,
       passengers,
       auditLog: [],
       accountingModifications: [],
@@ -508,6 +513,15 @@ const tursoDatabase = {
           args: [k, typeof v === 'object' ? JSON.stringify(v) : String(v)]
         });
       }
+    }
+
+    // 1b. Alertas del monitor (viaja por el mismo KV para no crear tabla)
+    // ponytail: un solo JSON con todo el historial; si crece mucho, tabla propia con raw_json
+    if (Array.isArray(state.travelReminders)) {
+      stmts.push({
+        sql: 'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        args: ['travel_reminders', JSON.stringify(state.travelReminders)]
+      });
     }
 
     // 2. Financial Accounts

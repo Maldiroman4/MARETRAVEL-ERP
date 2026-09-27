@@ -1565,8 +1565,10 @@ class OperationsHubModule {
     const d = item.serviceDetails || {};
 
     if (srv === 'BOLETO_AEREO' || srv === 'BOLETO_GDS') {
+      // Solo ida → los campos de fecha/hora de retorno no se renderizan (ni en el form ni en la alerta)
+      const soloIda = !!d.soloIda;
       return `
-        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 8px;">
+        <div class="form-row" style="grid-template-columns: ${soloIda ? '1.5fr 1fr 1fr' : '1.5fr 1fr 1fr 1fr'}; gap: 8px;">
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Ruta Aérea (Origen - Destino):</label>
             <input type="text" class="form-control font-mono font-bold" placeholder="Ej: LPB-VVI-LPB" value="${d.flightRoute || d.route || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRoute', this.value)">
@@ -1579,25 +1581,27 @@ class OperationsHubModule {
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha de Salida:</label>
             <input type="date" class="form-control font-mono" value="${d.flightDepDate || d.departureDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightDepDate', this.value)">
           </div>
+          ${soloIda ? '' : `
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha de Retorno:</label>
-            <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" ${d.soloIda ? 'disabled' : ''} oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
-          </div>
+            <input type="date" class="form-control font-mono" value="${d.flightRetDate || d.returnDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', this.value)">
+          </div>`}
         </div>
-        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+        <div class="form-row" style="grid-template-columns: ${soloIda ? '1fr' : '1fr 1fr'}; gap: 8px; margin-top: 6px;">
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Hora de Salida:</label>
             <input type="time" class="form-control font-mono" value="${d.flightDepTime || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightDepTime', this.value)">
           </div>
+          ${soloIda ? '' : `
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Hora de Retorno:</label>
-            <input type="time" class="form-control font-mono" value="${d.flightRetTime || ''}" ${d.soloIda ? 'disabled' : ''} oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetTime', this.value)">
-          </div>
+            <input type="time" class="form-control font-mono" value="${d.flightRetTime || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetTime', this.value)">
+          </div>`}
         </div>
 
         <div class="form-row" style="grid-template-columns: 1fr; gap: 8px; margin-top: 6px;">
           <label style="display: flex; gap: 8px; align-items: center; font-size: 0.72rem; cursor: pointer; color: var(--text-muted);">
-            <input type="checkbox" ${d.soloIda ? 'checked' : ''} onchange="const retRow=this.closest('.form-row').previousElementSibling; const dts=retRow?retRow.querySelectorAll('input[type=date]'):[]; const retInp=dts[1]||null; if(retInp){ retInp.disabled=this.checked; if(this.checked){ retInp.value=''; window.operationsHubModule.onItemDetailChange(${idx}, 'flightRetDate', ''); } } window.operationsHubModule.onItemDetailChange(${idx}, 'soloIda', this.checked);">
+            <input type="checkbox" ${soloIda ? 'checked' : ''} onchange="window.operationsHubModule.onItemSoloIdaChange(${idx}, this.checked)">
             Solo Ida (sin fecha de retorno)
           </label>
         </div>
@@ -1826,6 +1830,20 @@ class OperationsHubModule {
       this.activeNdItems[index].serviceDetails = {};
     }
     this.activeNdItems[index].serviceDetails[key] = value;
+  }
+
+  /** Solo ida: limpia el retorno en el estado y re-renderiza (los campos de retorno desaparecen). */
+  onItemSoloIdaChange(index, checked) {
+    const it = this.activeNdItems[index];
+    if (!it) return;
+    if (!it.serviceDetails) it.serviceDetails = {};
+    it.serviceDetails.soloIda = !!checked;
+    if (checked) {
+      it.serviceDetails.flightRetDate = '';
+      it.serviceDetails.flightRetTime = '';
+    }
+    this.renderItemsRepeater();
+    this.calculateConsolidatedTotals();
   }
 
   onAlertPhoneChange(index, value) {
@@ -2603,7 +2621,7 @@ class OperationsHubModule {
     const depTime = isVisa ? (sd.appointmentTime || '') : (sd.flightDepTime || '');
     if (!depDate) return null; // el evento necesita fecha ancla
     const retDate = isVisa ? '' : ((!sd.soloIda && !item.soloIda) ? (sd.flightRetDate || item.returnDate || '') : '');
-    const retTime = isVisa ? '' : (sd.flightRetTime || '');
+    const retTime = isVisa ? '' : ((!sd.soloIda && !item.soloIda) ? (sd.flightRetTime || '') : '');
     return {
       id: 'TRV-' + Date.now() + '-' + idx,
       kind: isVisa ? 'VISA' : 'VUELO',
