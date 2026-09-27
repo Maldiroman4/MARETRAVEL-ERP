@@ -302,6 +302,15 @@
         window.calendarModule.render();
       });
 
+      // Si el ERP guarda desde otra ventana, el Monitor se actualiza solo (así una alerta
+      // borrada o creada en index.html no queda vieja aquí)
+      window.addEventListener('storage', async (e) => {
+        if (e.key && e.key.indexOf('MARETRAVEL') === -1) return;
+        try { await window.db.syncWithServerFile(); } catch (err) {}
+        renderSideAlerts();
+        window.calendarModule.render();
+      });
+
       // Listeners de modales
       document.querySelectorAll('[data-close-modal]').forEach(b => {
         b.addEventListener('click', () => window.app.closeModal(b.dataset.closeModal));

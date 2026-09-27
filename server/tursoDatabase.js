@@ -1198,6 +1198,15 @@ const tursoDatabase = {
 
     if (stmts.length === 0) return { success: true, count: 0 };
 
+    // Un solo valor no numérico (NaN/Infinity) hace que Turso rechace el lote ENTERO y
+    // se pierda todo el guardado. Esos valores solo viven en las columnas numéricas: el
+    // raw_json conserva el dato real, así que aquí se guardan como 0 y la app sigue
+    // mostrando el valor real en la interfaz.
+    for (const s of stmts) {
+      if (!s.args) continue;
+      s.args = s.args.map(a => (typeof a === 'number' && !Number.isFinite(a)) ? 0 : a);
+    }
+
     // Ejecución atómica en un único round-trip en Turso
     await client.batch(stmts, 'write');
     return { success: true, count: stmts.length };

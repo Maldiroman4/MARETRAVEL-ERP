@@ -100,6 +100,16 @@ class LocalDatabase {
   }
 
   async init() {
+    // 0. No dejar salir con un registro a medio guardar: el POST tarda ~5s
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', (e) => {
+        if ((this._saveInFlight || 0) > 0 || this._pendienteDeGuardar) {
+          e.preventDefault();
+          e.returnValue = 'Hay un registro sin confirmar en la base de datos. ¿Salir de todos modos?';
+        }
+      });
+    }
+
     // 1. Limpiar versiones obsoletas
     try {
       if (typeof localStorage !== 'undefined') {
@@ -133,7 +143,10 @@ class LocalDatabase {
   }
 
   async syncWithServerFile() {
-    const endpoints = ['/api/db', 'http://localhost:3000/api/db', 'http://localhost:3001/api/db'];
+    // SOLO el servidor que sirvió esta página. Si la página se abrió desde el disco
+    // (file://) o desde otro host estático, se usa explícitamente el puerto 3000.
+    const esServidorLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(location.origin);
+    const endpoints = esServidorLocal ? ['/api/db'] : ['/api/db', 'http://localhost:3000/api/db'];
     for (const endpoint of endpoints) {
       try {
         const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
@@ -153,6 +166,7 @@ class LocalDatabase {
         // Servidor no disponible en este endpoint
       }
     }
+    this.serverOnline = false;
     this.updateStoragePill(false);
     return null;
   }
@@ -291,28 +305,43 @@ class LocalDatabase {
   }
 
   async persistToFileServer(data) {
-    const endpoints = ['/api/db', 'http://localhost:3000/api/db', 'http://localhost:3001/api/db'];
-    for (const endpoint of endpoints) {
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) {
-          this.serverOnline = true;
-          this.updateStoragePill(true);
-          return true;
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          console.error('Servidor rechazó guardado en disco:', errData);
-        }
-      } catch (err) {
-        // Continuar al siguiente endpoint
+    // SOLO el mismo origen que sirvió la página. Caer a 'localhost:3000/3001' a ciegas
+    // guardaba en el servidor equivocado (otra base de datos) y se perdía todo.
+    const endpoint = '/api/db';
+    this._saveInFlight = (this._saveInFlight || 0) + 1;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        this.serverOnline = true;
+        this.updateStoragePill(true);
+        return true;
       }
+      const errData = await res.json().catch(() => ({}));
+      console.error('Servidor rechazó guardado:', errData);
+      this._avisarFalloGuardado('el servidor rechazó el guardado: ' + (errData.error || res.status));
+      return false;
+    } catch (err) {
+      console.error('No se pudo guardar en el servidor:', err);
+      this._avisarFalloGuardado('no hay conexión con el servidor (se guardó solo en este navegador)');
+      return false;
+    } finally {
+      this._saveInFlight--;
     }
+  }
+
+  // Nunca perder un registro en silencio: si el servidor no lo confirmó, se avisa y queda
+  // pendiente reintentar (el dato sigue en este navegador hasta que se vuelva a guardar).
+  _avisarFalloGuardado(motivo) {
+    this.serverOnline = false;
     this.updateStoragePill(false);
-    return false;
+    this._pendienteDeGuardar = true;
+    if (window.app && typeof window.app.showToast === 'function') {
+      window.app.showToast('NO SE GUARDÓ EN LA BASE DE DATOS: ' + motivo + '. No cierres ni recargues esta página.', 'error');
+    }
   }
 
   updateStoragePill(isServerConnected) {

@@ -1063,10 +1063,14 @@ const server = http.createServer(async (req, res) => {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.warn(`[AVISO] Puerto ${PORT} ocupado. Reintentando en ${Number(PORT) + 1}...`);
-    setTimeout(() => {
-      server.listen(Number(PORT) + 1, '0.0.0.0');
-    }, 500);
+    // Que NO se corra al puerto siguiente en silencio: varios servidores con distinto
+    // código/base de datos hacen que "lo que guardas" acabe en un sitio y lo que lees en otro.
+    console.error('='.repeat(64));
+    console.error(`[FATAL] El puerto ${PORT} ya está ocupado: hay otro servidor MARETRAVEL corriendo.`);
+    console.error(`         Ábrelo en http://localhost:${PORT} o ciérralo antes de iniciar otro.`);
+    console.error(`         Puerto en uso por PID(s): ver  netstat -ano | findstr :${PORT}`);
+    console.error('='.repeat(64));
+    process.exit(1);
   } else {
     console.error('Error en el servidor:', err);
   }
