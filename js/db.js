@@ -476,6 +476,31 @@ class LocalDatabase {
     return false;
   }
 
+  // Número correlativo que PROPONE LA BASE, no el estado del navegador. nd_number/nc_number
+  // son UNIQUE: si el cliente los calcula desde su copia (pestaña vieja, sincronización
+  // fallida, dos pestañas) propone uno repetido y la nota se pierde entera —solo se guarda su
+  // alerta—. Por eso se lee del servidor, que además devuelve los documentos de la papelera.
+  // Si no hay servidor, se cae al cálculo local (siguienteNumeroDoc) para no bloquear el trabajo.
+  async numeroSiguiente(tipo, base) {
+    for (const endpoint of this._endpoints()) {
+      try {
+        const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
+        if (!res.ok) continue;
+        const remoto = await res.json();
+        const lista = tipo === 'NC' ? remoto.creditNotes : remoto.debitNotes;
+        if (!Array.isArray(lista)) continue;
+        const campo = tipo === 'NC' ? 'ncNumber' : 'ndNumber';
+        const max = lista.reduce((m, d) => Math.max(m, Number(d && d[campo]) || 0), base - 1);
+        this.serverOnline = true;
+        return max + 1;
+      } catch (err) {
+        // endpoint siguiente
+      }
+    }
+    this.serverOnline = false;
+    return this.siguienteNumeroDoc(tipo, base);
+  }
+
   // El consecutivo tiene que mirar TAMBIÉN los documentos en la papelera. get() oculta los
   // eliminados, así que al borrar una nota la app volvía a proponer su número; como
   // nd_number/nc_number son UNIQUE, la base rechazaba la nota nueva y se perdía ENTERA

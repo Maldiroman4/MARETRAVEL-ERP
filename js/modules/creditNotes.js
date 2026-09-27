@@ -210,7 +210,7 @@ window.creditNotesModule = {
     window.app.openModal('modal-nc-manual');
   },
 
-  handleSaveManualNc(e) {
+  async handleSaveManualNc(e) {
     e.preventDefault();
     const data = window.db.get();
     const providerId = document.getElementById('nc-provider-id').value;
@@ -226,7 +226,7 @@ window.creditNotesModule = {
       return;
     }
 
-    const nextNc = window.db.siguienteNumeroDoc('NC', 2001);
+    const nextNc = await window.db.numeroSiguiente('NC', 2001); // lo decide la base (nc_number es UNIQUE)
     const activeCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
     const srvCat = activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat));
     const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);

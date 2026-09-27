@@ -783,7 +783,7 @@ window.debitNotesModule = {
     window.app.showToast('Servicio manual agregado a la ND', 'success');
   },
 
-  handleSaveNd(e) {
+  async handleSaveNd(e) {
     e.preventDefault();
     if (this.activeItems.length === 0) {
       window.app.showToast('Debes agregar al menos un boleto o servicio a la Nota de Débito', 'warning');
@@ -859,7 +859,7 @@ window.debitNotesModule = {
         window.app.showToast('Nota de Débito actualizada', 'success');
       }
     } else {
-      const nextNd = window.db.siguienteNumeroDoc('ND', 1001);
+      const nextNd = await window.db.numeroSiguiente('ND', 1001); // lo decide la base (nd_number es UNIQUE)
       const ndServiceType = (this.activeItems[0] && (this.activeItems[0].serviceType || this.activeItems[0].serviceCategory)) || window.state?.servicioActivo || 'BOLETO_AEREO';
       const ndCode = window.maretravelCodes.nextFor(data.debitNotes, 'ND', ndServiceType);
       const newNd = {

@@ -2136,7 +2136,7 @@ class OperationsHubModule {
     }
   }
 
-  saveUnifiedOperation(e) {
+  async saveUnifiedOperation(e) {
     if (e && e.preventDefault) e.preventDefault();
 
     const submitBtn = e?.submitter || document.getElementById('btn-save-unified-operation') || document.querySelector('#modal-unified-operation button[type="submit"]');
@@ -2341,7 +2341,9 @@ class OperationsHubModule {
       }
 
       // CREACIÓN NUEVA ND CONSOLIDADA (Nace obligatoriamente PENDIENTE con saldo_pendiente = total_venta)
-      const nextNdNumber = window.db.siguienteNumeroDoc('ND', 1001);
+      // El correlativo lo decide la BASE (no el estado de esta pestaña): si se calculara aquí y
+      // la base ya tiene ese número, rechazaba la nota y se perdía entera con sus ítems y su NC.
+      const nextNdNumber = await window.db.numeroSiguiente('ND', 1001);
       const prevDraftId = this.activeNdId;
       const newNdId = 'ND-' + Date.now();
       this.activeNdId = newNdId;
@@ -2512,7 +2514,7 @@ class OperationsHubModule {
         }
       });
 
-      let nextNcNumber = window.db.siguienteNumeroDoc('NC', 2001) - 1; // el forEach lo incrementa por grupo
+      let nextNcNumber = (await window.db.numeroSiguiente('NC', 2001)) - 1; // el forEach lo incrementa por grupo
       Object.values(providerGroups).forEach((grp, gIdx) => {
         nextNcNumber++;
         const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
