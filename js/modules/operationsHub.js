@@ -2434,7 +2434,7 @@ class OperationsHubModule {
       const newNd = {
         id: newNdId,
         ndNumber: nextNdNumber,
-        ndCode: window.maretravelCodes.nextFor(data.debitNotes, 'ND', mappedItems[0]?.serviceType || window.state?.servicioActivo || 'BOLETO_AEREO'),
+        ndCode: await window.maretravelCodes.nextForServidor(data.debitNotes, 'ND', mappedItems[0]?.serviceType || window.state?.servicioActivo || 'BOLETO_AEREO'),
         accountId: clientId,
         accountName: client.name,
         accountNit: client.docNumber || '',
@@ -2909,17 +2909,20 @@ class OperationsHubModule {
     const reason = prompt(`Ingrese el motivo de anulación para la ND #${nd.ndNumber}:`, 'Error de emisión / cancelado por el cliente');
     if (reason === null) return;
 
-    nd.status = 'ANULADA';
-    nd.balanceBob = 0;
-    nd.balanceUsd = 0;
+    // Una sola regla de anulacion para ND y NC (reportsModule.anularSaldo): saldo en cero
+    // en todos los campos que se suman, o el documento anulado seguia contando en los totales.
+    const anularSaldo = (doc) => (window.reportsModule && typeof window.reportsModule.anularSaldo === 'function')
+      ? window.reportsModule.anularSaldo(doc)
+      : Object.assign(doc, { status: 'ANULADA', estado: 'ANULADA', balance: 0, balanceBob: 0, balanceUsd: 0, saldo_pendiente: 0 });
+    anularSaldo(nd);
     nd.voidReason = reason.trim() || 'Sin motivo especificado';
     nd.voidedAt = new Date().toLocaleString();
-    nd.voidedBy = 'Luis';
+    nd.voidedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
 
     (data.creditNotes || []).forEach(nc => {
       if (nc.originDebitNoteId === id || nc.originDebitNoteNumber === nd.ndNumber) {
-        nc.status = 'ANULADA';
-        nc.balance = 0;
+        anularSaldo(nc);
+        nc.voidReason = `Anulada automaticamente por anulacion de ND #${nd.ndNumber}`;
       }
     });
 

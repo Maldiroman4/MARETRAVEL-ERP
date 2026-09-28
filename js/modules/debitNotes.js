@@ -870,7 +870,7 @@ window.debitNotesModule = {
     } else {
       const nextNd = await window.db.numeroSiguiente('ND', 1001); // lo decide la base (nd_number es UNIQUE)
       const ndServiceType = (this.activeItems[0] && (this.activeItems[0].serviceType || this.activeItems[0].serviceCategory)) || window.state?.servicioActivo || 'BOLETO_AEREO';
-      const ndCode = window.maretravelCodes.nextFor(data.debitNotes, 'ND', ndServiceType);
+      const ndCode = await window.maretravelCodes.nextForServidor(data.debitNotes, 'ND', ndServiceType);
       const newNd = {
         id: 'ND-' + Date.now(),
         ndNumber: nextNd,

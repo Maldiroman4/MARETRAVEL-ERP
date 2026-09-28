@@ -614,6 +614,18 @@ window.reportsModule = {
     window.app.openModal('modal-accounting-void');
   },
 
+  // Anulacion contable en un solo lugar. Antes cada pantalla (esta y el HUB) ponia solo
+  // balance/balanceBob en cero y dejaba saldo_pendiente con el monto original: una nota
+  // anulada seguia sumando en los totales y las dos reglas se contradician.
+  anularSaldo(doc) {
+    doc.status = 'ANULADA';
+    doc.estado = 'ANULADA';
+    ['balance', 'balanceBob', 'balanceUsd', 'saldo_pendiente'].forEach(k => {
+      if (doc[k] !== undefined) doc[k] = 0;
+    });
+    return doc;
+  },
+
   handleConfirmVoid(e) {
     e.preventDefault();
     if (!this.currentEditingDoc) return;
@@ -629,16 +641,17 @@ window.reportsModule = {
 
     if (type === 'ND') {
       const doc = data.debitNotes.find(n => n.id === docId);
-      if (!doc) return;
+      if (!doc) {
+        window.app.showToast('No se encontro la Nota de Debito a anular (puede estar en la papelera o la pestana esta desfasada). Recarga y vuelve a intentar.', 'warning');
+        return;
+      }
 
       if (doc.paidAmountBob > 0 || doc.paidAmountUsd > 0) {
         alert('ERROR CONTABLE: No se puede anular esta Nota de Débito porque tiene cobros registrados en caja. Debe revertir los recibos de caja primero.');
         return;
       }
 
-      doc.status = 'ANULADA';
-      doc.balanceBob = 0.00;
-      doc.balanceUsd = 0.00;
+      this.anularSaldo(doc);
       doc.voidReason = reason;
       doc.voidedAt = new Date().toLocaleString();
       doc.voidedBy = data.currentUser.name;
@@ -654,9 +667,8 @@ window.reportsModule = {
       // Anular NCs automáticas originadas por esta ND
       (data.creditNotes || []).forEach(nc => {
         if (nc.originDebitNoteId === doc.id) {
-          nc.status = 'ANULADA';
-          nc.balance = 0.00;
-          nc.voidReason = `Anulada automáticamente por anulación de ND #${doc.ndNumber}`;
+          this.anularSaldo(nc);
+          nc.voidReason = `Anulada automaticamente por anulacion de ND #${doc.ndNumber}`;
         }
       });
 
@@ -677,15 +689,17 @@ window.reportsModule = {
       window.app.showToast(`Nota de Débito ND #${doc.ndNumber} ANULADA correctamente`, 'info');
     } else {
       const doc = data.creditNotes.find(n => n.id === docId);
-      if (!doc) return;
+      if (!doc) {
+        window.app.showToast('No se encontro la Nota de Credito a anular (puede estar en la papelera o la pestana esta desfasada). Recarga y vuelve a intentar.', 'warning');
+        return;
+      }
 
       if (doc.paidAmount > 0) {
         alert('ERROR CONTABLE: No se puede anular esta Nota de Crédito porque registra pagos a favor del proveedor.');
         return;
       }
 
-      doc.status = 'ANULADA';
-      doc.balance = 0.00;
+      this.anularSaldo(doc);
       doc.voidReason = reason;
       doc.voidedAt = new Date().toLocaleString();
       doc.voidedBy = data.currentUser.name;

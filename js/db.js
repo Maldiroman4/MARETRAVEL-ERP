@@ -581,6 +581,39 @@ window.maretravelCodes = {
     });
     return prefix + String(max + 1).padStart(3, '0');
   },
+  // Igual que nextFor pero preguntando a la base, que es quien tiene la verdad (incluye la
+  // papelera). nextFor mira el estado del navegador: con la pestana atrasada (otra pestana,
+  // otro equipo) el max es viejo y el codigo visible se repite (#ndBA002 en dos notas).
+  // ponytail: dos personas guardando en el mismo segundo todavía pueden pedir el mismo
+  // codigo; nc_code no es UNIQUE y la base no lo detecta. Si pasa, hace falta un endpoint
+  // que reserve el correlativo en el servidor.
+  async nextForServidor(docs, type, serviceType) {
+    const abbr = this.serviceAbbrev(serviceType);
+    const prefix = '#' + type.toLowerCase() + abbr;
+    const clave = type.toLowerCase() + 'Code';
+    const correlativoDe = (lista) => {
+      let max = 0;
+      (lista || []).forEach(d => {
+        const s = String(d[clave] || '').match(new RegExp('^' + prefix + '(\\d+)$', 'i'));
+        const n = s ? parseInt(s[1], 10) : 0;
+        if (n > max) max = n;
+      });
+      return max;
+    };
+    try {
+      const res = await fetch('/api/db', { cache: 'no-store' });
+      if (res.ok) {
+        const remoto = await res.json();
+        const lista = type.toLowerCase() === 'nd' ? remoto.debitNotes : remoto.creditNotes;
+        if (Array.isArray(lista)) {
+          const local = correlativoDe([].concat(docs || []));
+          return prefix + String(Math.max(correlativoDe(lista), local) + 1).padStart(3, '0');
+        }
+      }
+    } catch (e) { /* sin servidor: el correlativo local es lo mejor disponible */ }
+    return this.nextFor(docs, type, serviceType);
+  },
+
   // Registra/actualiza un pasajero en el directorio (data.passengers)
   registerPassenger(data, name, doc) {
     const nm = String(name || '').trim();

@@ -172,6 +172,11 @@ window.creditNotesModule = {
               <button class="btn btn-secondary btn-sm" onclick="window.reportsModule.openCorrectionModal('NC', '${nc.id}')" title="Corrección Contable">
                 <i data-lucide="edit-3"></i>
               </button>
+              ${nc.status === 'ANULADA' ? `
+                <button class="btn btn-secondary btn-sm" onclick="window.creditNotesModule.reabrirNc('${nc.id}')" title="Reabrir NC (revierte la anulación)">
+                  <i data-lucide="unlock"></i> Reabrir
+                </button>
+              ` : ''}
               ${nc.status !== 'ANULADA' ? `
                 <button class="btn btn-danger btn-sm" onclick="window.reportsModule.openVoidModal('NC', '${nc.id}')" title="Anular NC">
                   <i data-lucide="x-circle"></i>
@@ -203,7 +208,9 @@ window.creditNotesModule = {
 
     const actCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
     const srvCat = actCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (actCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (actCat === 'RENT_A_CAR' ? 'TRASLADO' : actCat));
-    document.getElementById('nc-number-display').textContent = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);
+    // El codigo que se muestra es el que se guardara: se pide a la base, no al navegador.
+    const display = document.getElementById('nc-number-display');
+    window.maretravelCodes.nextForServidor(data.creditNotes, 'NC', srvCat).then(c => { if (display) display.textContent = c; });
     document.getElementById('nc-issue-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('nc-currency').value = 'BOB';
 
@@ -229,7 +236,7 @@ window.creditNotesModule = {
     const nextNc = await window.db.numeroSiguiente('NC', 2001); // lo decide la base (nc_number es UNIQUE)
     const activeCat = window.state?.servicioActivo || window.currentServiceCategory || window.operationsHubModule?.filterService || 'BOLETO_AEREO';
     const srvCat = activeCat === 'PAQUETES' ? 'PAQUETE_TURISTICO' : (activeCat === 'HOTEL' ? 'HOTEL_HOSPEDAJE' : (activeCat === 'RENT_A_CAR' ? 'TRASLADO' : activeCat));
-    const ncCode = window.maretravelCodes.nextFor(data.creditNotes, 'NC', srvCat);
+    const ncCode = await window.maretravelCodes.nextForServidor(data.creditNotes, 'NC', srvCat);
     const newNc = {
       id: 'NC-' + Date.now(),
       ncNumber: nextNc,
@@ -348,7 +355,7 @@ window.creditNotesModule = {
         data.creditNotes.unshift({
           id: ncId,
           ncNumber: await window.db.numeroSiguiente('NC', 2001), // lo decide la base (nc_number es UNIQUE)
-          ncCode: window.maretravelCodes.nextFor(data.creditNotes, 'NC', srv),
+          ncCode: await window.maretravelCodes.nextForServidor(data.creditNotes, 'NC', srv),
           ...campos,
           paidAmount: 0,
           paidAmountBob: 0,
@@ -367,6 +374,43 @@ window.creditNotesModule = {
       ncDeLaNota++;
     }
     return ncDeLaNota;
+  },
+
+  /**
+   * Revierte la anulacion de una NC. A diferencia de reabrir una ND (que borra sus NC), esto
+   * solo devuelve el documento a su estado de cobro recalculando el saldo: el total y el
+   * numero no se tocan, asi que ni la correlatividad ni el historico se rompen.
+   */
+  reabrirNc(ncId) {
+    const data = window.db.get();
+    const nc = (data.creditNotes || []).find(n => n.id === ncId);
+    if (!nc) return;
+    if (nc.status !== 'ANULADA') {
+      window.app.showToast(`La NC ${window.maretravelCodes.showDoc(nc, 'NC')} no esta anulada`, 'info');
+      return;
+    }
+    if (!confirm(`¿Reabrir la Nota de Credito ${window.maretravelCodes.showDoc(nc, 'NC')}?\n\nVuelve a las Cuentas por Pagar con su saldo recalculado (${nc.currency} ${Number(nc.totalAmount).toLocaleString('es-BO', { minimumFractionDigits: 2 })}).`)) {
+      return;
+    }
+
+    const rate = Number(nc.frozenExchangeRate || 6.96) || 6.96;
+    const pagado = Number(nc.paidAmount || 0);
+    const saldo = Math.max(0, parseFloat((Number(nc.totalAmount || 0) - pagado).toFixed(2)));
+    nc.status = pagado > 0 ? (saldo > 0.01 ? 'PARCIAL' : 'PAGADA') : 'IMPAGA';
+    nc.estado = nc.status;
+    nc.balance = saldo;
+    nc.balanceBob = nc.currency === 'USD' ? parseFloat((saldo * rate).toFixed(2)) : saldo;
+    nc.balanceUsd = nc.currency === 'USD' ? saldo : parseFloat((saldo / rate).toFixed(2));
+    nc.saldo_pendiente = saldo;
+    nc.monto_acumulado_pagado = pagado;
+    nc.voidReason = null;
+    nc.voidedAt = null;
+    nc.voidedBy = null;
+
+    window.db.save(data);
+    this.render();
+    if (window.app && window.app.updateDashboardKpis) window.app.updateDashboardKpis();
+    window.app.showToast(`Nota de Credito ${window.maretravelCodes.showDoc(nc, 'NC')} REABIERTA (${nc.status}, saldo ${nc.currency} ${saldo.toLocaleString('es-BO', { minimumFractionDigits: 2 })})`, 'success');
   },
 
   /**
