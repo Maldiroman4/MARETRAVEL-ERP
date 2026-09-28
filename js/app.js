@@ -84,35 +84,57 @@ window.app = {
       form.addEventListener('submit', (e) => this.handleLogin(e));
     }
 
-    const btnSubmit = document.getElementById('btn-login-submit');
-    if (btnSubmit) {
-      btnSubmit.addEventListener('click', (e) => this.handleLogin(e));
-    }
-
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
       btnLogout.addEventListener('click', () => this.handleLogout());
     }
   },
 
-  handleLogin(e) {
+  async handleLogin(e) {
     if (e) {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
     }
+
+    // Candado contra doble envío / carrera de eventos
+    if (this.isLoggingIn) return false;
+
     const userEl = document.getElementById('login-username');
     const passEl = document.getElementById('login-password');
     const errorAlert = document.getElementById('login-error-alert');
     const errorText = document.getElementById('login-error-text');
+    const submitBtn = document.getElementById('btn-login-submit');
+
+    // Limpiar cualquier alerta previa de inmediato
+    if (errorAlert) errorAlert.style.display = 'none';
 
     const username = (userEl ? userEl.value : '').trim().toLowerCase();
     const password = (passEl ? passEl.value : '').trim();
 
-    const showError = () => {
+    if (!username || !password) {
+      if (errorAlert) {
+        errorAlert.style.display = 'flex';
+        if (errorText) errorText.textContent = 'Por favor ingrese su usuario y contraseña.';
+      }
+      return false;
+    }
+
+    this.isLoggingIn = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('loading');
+    }
+
+    const showError = (msg = 'Usuario o contraseña incorrectos. Verifique sus credenciales.') => {
+      this.isLoggingIn = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('loading');
+      }
       if (errorAlert) {
         errorAlert.style.display = 'flex';
         if (errorText) {
-          errorText.textContent = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
+          errorText.textContent = msg;
         }
       }
       if (passEl) {
@@ -121,10 +143,10 @@ window.app = {
       }
       try {
         if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
-      } catch (e) {}
+      } catch (err) {}
     };
 
-    const finalizeLogin = (sessionData, greeting) => {
+    const finalizeLogin = async (sessionData, greeting) => {
       try {
         localStorage.setItem(this.AUTH_KEY, JSON.stringify(sessionData));
       } catch (err) {
@@ -134,6 +156,11 @@ window.app = {
       if (passEl) passEl.value = '';
 
       const completeLogin = () => {
+        this.isLoggingIn = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('loading');
+        }
         this.showApp();
         if (!this.initialized) {
           try {
@@ -153,47 +180,54 @@ window.app = {
       };
 
       if (window.db && typeof window.db.syncWithServerFile === 'function') {
-        window.db.syncWithServerFile().then(completeLogin).catch(completeLogin);
+        try {
+          await window.db.syncWithServerFile();
+        } catch (syncErr) {
+          console.warn('[LOGIN] Sync warning:', syncErr);
+        }
+        completeLogin();
       } else {
         completeLogin();
       }
     };
 
-    // Credenciales autorizadas oficiales: usuario: luis / contraseña: 585858
-    if ((username === 'luis' || username === 'admin') && (password === '585858')) {
-      finalizeLogin({
-        username: 'luis',
-        name: 'Luis',
-        role: 'Administrador General',
-        loginTime: new Date().toLocaleString()
-      }, '¡Bienvenido al sistema MARETRAVEL ERP, Luis!');
-      return false;
+    try {
+      // Credenciales autorizadas oficiales: usuario: luis / contraseña: 585858
+      if ((username === 'luis' || username === 'admin') && (password === '585858')) {
+        await finalizeLogin({
+          username: 'luis',
+          name: 'Luis',
+          role: 'Administrador General',
+          loginTime: new Date().toLocaleString()
+        }, '¡Bienvenido al sistema MARETRAVEL ERP, Luis!');
+        return false;
+      }
+
+      // SÚPER USUARIO: entra por el MISMO formulario de login, sin revelar su existencia.
+      const res = await fetch('/api/super/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.token) {
+        try { sessionStorage.setItem('maretravel_super_token', data.token); } catch (e) {}
+        await finalizeLogin({
+          username,
+          name: 'Súper Usuario',
+          role: 'Súper Usuario',
+          isSuper: true,
+          loginTime: new Date().toLocaleString()
+        }, '¡Bienvenido, Súper Usuario!');
+        return false;
+      }
+
+      showError();
+    } catch (err) {
+      console.error('[LOGIN ERROR]:', err);
+      showError('Error de comunicación con el servidor. Intente nuevamente.');
     }
 
-    // SÚPER USUARIO: entra por el MISMO formulario de login, sin revelar su existencia.
-    // Válida contra el servidor; si no son credenciales de súper, muestra el error genérico.
-    (async () => {
-      try {
-        const res = await fetch('/api/super/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.token) {
-          try { sessionStorage.setItem('maretravel_super_token', data.token); } catch (e) {}
-          finalizeLogin({
-            username,
-            name: 'Súper Usuario',
-            role: 'Súper Usuario',
-            isSuper: true,
-            loginTime: new Date().toLocaleString()
-          }, '¡Bienvenido, Súper Usuario!');
-          return;
-        }
-      } catch (e) {}
-      showError();
-    })();
     return false;
   },
 
