@@ -320,7 +320,12 @@ window.creditNotesModule = {
         accountId: g.providerId
       };
 
+      // Una NC ANULADA es historia: no se toca ni se reutiliza. Si el proveedor ya tiene una NC
+      // vigente se actualiza en el sitio (conservando lo pagado); si no, se emite una nueva.
+      // Asi, anular una NC y volver a guardar la ND deja la Cuenta por Pagar corregida y
+      // disponible para imprimir.
       const yaExiste = (data.creditNotes || []).find(nc => !nc.deleted &&
+        nc.status !== 'ANULADA' && nc.estado !== 'ANULADA' &&
         (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) &&
         (nc.providerId || nc.accountId) === g.providerId);
       if (yaExiste) {
