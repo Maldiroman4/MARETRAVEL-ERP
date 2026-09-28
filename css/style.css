@@ -2421,6 +2421,48 @@ body {
   font-weight: 600;
 }
 
+/* --- Espera del login: el ingreso tarda ~2 s porque baja la base entera (~1,4 MB).
+       En vez de dejar la pantalla quieta, se dice que esta pasando. --- */
+.login-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.login-status-spinner {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(3, 105, 161, 0.25);
+  border-top-color: #0284c7;
+  border-radius: 50%;
+  animation: login-spin 0.7s linear infinite;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* El boton no cambia de tamano al girar: solo se le va el icono de la llave. */
+#btn-login-submit.loading svg { display: none; }
+#btn-login-submit.loading { cursor: progress; }
+
+/* La contrasena incorrecta se sacude: aparece de golpe y costaba notar que fallo. */
+@keyframes login-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+.login-shake { animation: login-shake 0.45s ease; }
+
 .input-icon-wrapper {
   position: relative;
   display: flex;

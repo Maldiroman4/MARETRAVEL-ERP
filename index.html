@@ -6,7 +6,7 @@
   <title>MARETRAVEL - Sistema ERP Contable y Comercial</title>
   <!-- BUILD: v20260917-TABS4 -->
   <!-- Estilos y Tipografía -->
-  <link rel="stylesheet" href="css/style.css?v=20260923_logo">
+  <link rel="stylesheet" href="css/style.css?v=20260928_login">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js para Gráficos Estadísticos (Local) -->
@@ -52,6 +52,11 @@
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-login-submit" style="margin-top: 22px; width: 100%; justify-content: center; padding: 12px; font-weight: 700;">
           <i data-lucide="log-in"></i> Iniciar Sesión en el ERP
         </button>
+
+        <div id="login-status" class="login-status" style="display: none;" role="status" aria-live="polite">
+          <span class="login-status-spinner" aria-hidden="true"></span>
+          <span id="login-status-text">Verificando credenciales…</span>
+        </div>
 
         <div class="login-footer-hint">
           <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: -2px; color: #10b981;"></i>
@@ -3079,7 +3084,7 @@
   <script src="js/modules/settings.js?v=20260922_v20"></script>
   <script src="js/modules/operationsHub.js?v=20260928_v24"></script>
   <script src="js/modules/papelera.js?v=20260925_v21"></script>
-  <script src="js/app.js?v=20260928_auth"></script>
+  <script src="js/app.js?v=20260928_login"></script>
 
 
 

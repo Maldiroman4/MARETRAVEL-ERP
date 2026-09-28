@@ -104,9 +104,32 @@ window.app = {
     const errorAlert = document.getElementById('login-error-alert');
     const errorText = document.getElementById('login-error-text');
     const submitBtn = document.getElementById('btn-login-submit');
+    const statusEl = document.getElementById('login-status');
+    const statusText = document.getElementById('login-status-text');
+
+    // El ingreso tarda ~2 s porque baja la base entera: en vez de dejar la pantalla quieta se
+    // dice que esta pasando. `null` la esconde.
+    const setStatus = (msg) => {
+      if (!statusEl) return;
+      if (!msg) { statusEl.style.display = 'none'; return; }
+      if (statusText) statusText.textContent = msg;
+      statusEl.style.display = 'flex';
+    };
+    // Saca la clase antes de ponerla (con un reflow) para que sacuda en cada intento
+    // fallido y no solo en el primero.
+    const shakeError = () => {
+      if (!errorAlert) return;
+      errorAlert.classList.remove('login-shake');
+      void errorAlert.offsetWidth;
+      errorAlert.classList.add('login-shake');
+    };
 
     // Limpiar cualquier alerta previa de inmediato
-    if (errorAlert) errorAlert.style.display = 'none';
+    if (errorAlert) {
+      errorAlert.style.display = 'none';
+      errorAlert.classList.remove('login-shake');
+    }
+    setStatus(null);
 
     const username = (userEl ? userEl.value : '').trim().toLowerCase();
     const password = (passEl ? passEl.value : '').trim();
@@ -124,9 +147,11 @@ window.app = {
       submitBtn.disabled = true;
       submitBtn.classList.add('loading');
     }
+    setStatus('Verificando credenciales…');
 
     const showError = (msg = 'Usuario o contraseña incorrectos. Verifique sus credenciales.') => {
       this.isLoggingIn = false;
+      setStatus(null);
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
@@ -136,6 +161,7 @@ window.app = {
         if (errorText) {
           errorText.textContent = msg;
         }
+        shakeError();
       }
       if (passEl) {
         passEl.value = '';
@@ -157,6 +183,8 @@ window.app = {
 
       const completeLogin = () => {
         this.isLoggingIn = false;
+        setStatus(null);
+        if (errorAlert) errorAlert.classList.remove('login-shake');
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.classList.remove('loading');
@@ -180,6 +208,9 @@ window.app = {
       };
 
       if (window.db && typeof window.db.syncWithServerFile === 'function') {
+        // La contrasena ya es correcta: lo que queda es la descarga. Decirlo evita que los
+        // ~2 s se lean como una app colgada.
+        setStatus('Descargando la base de datos…');
         try {
           await window.db.syncWithServerFile();
         } catch (syncErr) {
