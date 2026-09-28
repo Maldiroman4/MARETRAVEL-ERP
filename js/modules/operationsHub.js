@@ -2225,6 +2225,13 @@ class OperationsHubModule {
       totalConsolidadoBob = parseFloat(totalConsolidadoBob.toFixed(2));
       totalConsolidadoUsd = parseFloat(totalConsolidadoUsd.toFixed(2));
 
+      // Persona de la empresa que solicitó el servicio. Sin elegir, sigue el nombre de la
+      // empresa (como antes). Va en la nota: la impresión y el historial ya lo leen de ahí.
+      // Se lee UNA vez porque vale igual al crear y al editar (editar sin esto perdía el dato).
+      const solicitante = window.debitNotesModule
+        ? window.debitNotesModule.leerSolicitante(client.name, this.UNI_SOLICITANTE_IDS)
+        : { solicitanteStr: '', requesterId: null };
+
       // EDICIÓN DE OPERACIÓN EXISTENTE
       if (this.editingOperationId) {
         const existingNd = (data.debitNotes || []).find(n => n.id === this.editingOperationId);
@@ -2233,6 +2240,8 @@ class OperationsHubModule {
           existingNd.accountId = clientId;
           existingNd.accountName = client.name;
           existingNd.accountNit = client.docNumber || '';
+          existingNd.requesterId = solicitante.requesterId;
+          existingNd.solicitante = solicitante.solicitanteStr || client.name;
           existingNd.totalAmountBob = totalConsolidadoBob;
           existingNd.totalAmountUsd = totalConsolidadoUsd;
           const paidBob = existingNd.paidAmountBob || 0;
@@ -2445,12 +2454,6 @@ class OperationsHubModule {
 
       const hasUsd = mappedItems.some(it => it.currency === 'USD');
       const ndCurrency = hasUsd ? 'USD' : 'BOB';
-
-      // Persona de la empresa que solicitó el servicio. Sin elegir, sigue el nombre de la
-      // empresa (como antes). Va en la nota: la impresión y el historial ya lo leen de ahí.
-      const solicitante = window.debitNotesModule
-        ? window.debitNotesModule.leerSolicitante(client.name, this.UNI_SOLICITANTE_IDS)
-        : { solicitanteStr: '', requesterId: null };
 
       const newNd = {
         id: newNdId,
