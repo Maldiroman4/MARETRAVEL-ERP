@@ -1154,7 +1154,11 @@ window.debitNotesModule = {
     let items = (doc.items && doc.items.length > 0) ? doc.items : null;
     if (!items && isNc) {
       if (doc.originDebitNoteId) {
-        const originNd = (data.debitNotes || []).find(n => n.id === doc.originDebitNoteId || String(n.ndNumber) === String(doc.originDebitNoteNumber));
+        const originNd = (data.debitNotes || []).find(n => 
+          (doc.originDebitNoteId && n.id === doc.originDebitNoteId) || 
+          (doc.originDebitNoteCode && n.ndCode === doc.originDebitNoteCode) || 
+          (doc.originDebitNoteNumber && String(n.ndNumber) === String(doc.originDebitNoteNumber))
+        );
         if (originNd && originNd.items && originNd.items.length > 0) {
           items = originNd.items;
         }
@@ -1169,7 +1173,7 @@ window.debitNotesModule = {
           totalAmount: doc.totalAmount || 0,
           passengerName: doc.beneficiaryName || doc.passengerName || entityNameUpper,
           serviceDate: effectiveDate,
-          ticketNumber: doc.ticketNumber || (doc.originDebitNoteNumber ? `ND #${doc.originDebitNoteNumber}` : `NC #${doc.ncNumber || doc.id}`)
+          ticketNumber: doc.ticketNumber || doc.originDebitNoteCode || (doc.originDebitNoteNumber ? `ND #${doc.originDebitNoteNumber}` : `NC #${doc.ncNumber || doc.id}`)
         }];
       }
     } else if (!items) {

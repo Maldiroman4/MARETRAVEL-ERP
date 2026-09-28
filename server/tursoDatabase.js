@@ -308,6 +308,7 @@ const tursoDatabase = {
         providerNit: r.provider_nit || base.providerNit,
         originDebitNoteId: r.origin_debit_note_id,
         originDebitNoteNumber: r.origin_debit_note_number,
+        originDebitNoteCode: r.origin_debit_note_code || base.originDebitNoteCode || null,
         issueDate: r.issue_date,
         concept: r.concept || base.concept,
         currency: r.currency || 'BOB',

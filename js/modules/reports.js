@@ -363,7 +363,7 @@ window.reportsModule = {
       return `
         <tr style="${isVoid ? 'background: #fff1f2; text-decoration: line-through; opacity: 0.7;' : ''}">
           <td class="font-mono" style="text-align: center;">${index + 1}</td>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">NC #${nc.ncNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nc.ncCode || ('NC #' + nc.ncNumber)}</td>
           <td class="font-mono">${nc.issueDate}</td>
           <td>
             <strong>${nc.providerName}</strong>
@@ -371,7 +371,7 @@ window.reportsModule = {
             ${nc.correctionNote ? `<div style="font-size:0.7rem; color:#0284c7;">✎ Corregido: ${nc.correctionNote}</div>` : ''}
             ${nc.voidReason ? `<div style="font-size:0.7rem; color:#b91c1c; font-weight:700;">⚠ Anulado: ${nc.voidReason}</div>` : ''}
           </td>
-          <td class="font-mono">${nc.originDebitNoteNumber ? `ND #${nc.originDebitNoteNumber}` : 'Manual'}</td>
+          <td class="font-mono">${nc.originDebitNoteCode || (nc.originDebitNoteNumber ? `ND #${nc.originDebitNoteNumber}` : 'Manual')}</td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
             ${nc.currency} ${Number(nc.totalAmount).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
           </td>
@@ -666,9 +666,9 @@ window.reportsModule = {
 
       // Anular NCs automáticas originadas por esta ND
       (data.creditNotes || []).forEach(nc => {
-        if (nc.originDebitNoteId === doc.id) {
+        if (nc.originDebitNoteId === doc.id || (doc.ndCode && nc.originDebitNoteCode === doc.ndCode) || nc.originDebitNoteNumber === doc.ndNumber) {
           this.anularSaldo(nc);
-          nc.voidReason = `Anulada automaticamente por anulacion de ND #${doc.ndNumber}`;
+          nc.voidReason = `Anulada automaticamente por anulacion de ${doc.ndCode || ('ND #' + doc.ndNumber)}`;
         }
       });
 
@@ -744,7 +744,9 @@ window.reportsModule = {
         if (fromDate && nc.issueDate < fromDate) return;
         if (toDate && nc.issueDate > toDate) return;
 
-        csvContent += `${idx + 1};NOTA_CREDITO;${nc.ncNumber};${nc.issueDate};${nc.originDebitNoteNumber || 'MANUAL'};"${nc.providerNit || '0'}";"${nc.providerName.replace(/"/g, '""')}";${nc.totalAmount.toFixed(2)};${nc.paidAmount.toFixed(2)};${nc.balance.toFixed(2)};${nc.status};"${(nc.concept || '').replace(/"/g, '""')}"\n`;
+        const ncVisible = nc.ncCode || nc.ncNumber;
+        const originVisible = nc.originDebitNoteCode || (nc.originDebitNoteNumber ? ('ND #' + nc.originDebitNoteNumber) : 'MANUAL');
+        csvContent += `${idx + 1};NOTA_CREDITO;${ncVisible};${nc.issueDate};${originVisible};"${nc.providerNit || '0'}";"${nc.providerName.replace(/"/g, '""')}";${nc.totalAmount.toFixed(2)};${nc.paidAmount.toFixed(2)};${nc.balance.toFixed(2)};${nc.status};"${(nc.concept || '').replace(/"/g, '""')}"\n`;
       });
     } else {
       // Arqueo y Movimientos

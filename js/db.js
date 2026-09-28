@@ -216,7 +216,7 @@ class LocalDatabase {
 
         // Sincronizar NCs vinculadas
         (data.creditNotes || []).forEach(nc => {
-          if (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) {
+          if (nc.originDebitNoteId === nd.id || (nd.ndCode && nc.originDebitNoteCode === nd.ndCode) || nc.originDebitNoteNumber === nd.ndNumber) {
             if (nc.currency !== 'USD') {
               nc.currency = 'USD';
               const ncTc = nc.frozenExchangeRate || tc;

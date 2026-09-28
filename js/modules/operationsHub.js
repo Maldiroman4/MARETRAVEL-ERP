@@ -99,7 +99,7 @@ class OperationsHubModule {
 
           // Sincronizar Cuentas por Pagar (NCs) vinculadas
           (data.creditNotes || []).forEach(nc => {
-            if (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) {
+            if (nc.originDebitNoteId === nd.id || (nd.ndCode && nc.originDebitNoteCode === nd.ndCode) || nc.originDebitNoteNumber === nd.ndNumber) {
               if (nc.currency !== 'USD') {
                 nc.currency = 'USD';
                 const ncTc = nc.frozenExchangeRate || tc;
@@ -2838,7 +2838,7 @@ class OperationsHubModule {
         rec.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
       };
       (data.creditNotes || []).forEach(nc => {
-        if (nc.originDebitNoteId === id || nc.originDebitNoteNumber === nd.ndNumber) {
+        if (nc.originDebitNoteId === id || (nd && nd.ndCode && nc.originDebitNoteCode === nd.ndCode) || nc.originDebitNoteNumber === nd.ndNumber) {
           markDeleted(nc);
         }
       });
@@ -2920,9 +2920,9 @@ class OperationsHubModule {
     nd.voidedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
 
     (data.creditNotes || []).forEach(nc => {
-      if (nc.originDebitNoteId === id || nc.originDebitNoteNumber === nd.ndNumber) {
+      if (nc.originDebitNoteId === id || (nd && nd.ndCode && nc.originDebitNoteCode === nd.ndCode) || nc.originDebitNoteNumber === nd.ndNumber) {
         anularSaldo(nc);
-        nc.voidReason = `Anulada automaticamente por anulacion de ND #${nd.ndNumber}`;
+        nc.voidReason = `Anulada automaticamente por anulacion de ${nd.ndCode || ('ND #' + nd.ndNumber)}`;
       }
     });
 
