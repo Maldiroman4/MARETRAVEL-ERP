@@ -298,6 +298,17 @@ window.creditNotesModule = {
       if (total <= 0) continue;
       const prov = (data.accounts || []).find(a => a.id === g.providerId) || {};
       const srv = g.items[0]?.serviceType || window.state?.servicioActivo || 'BOLETO_AEREO';
+
+      // Una NC ANULADA es historia: no se toca ni se reutiliza. Si el proveedor ya tiene una NC
+      // vigente se actualiza en el sitio (conservando lo pagado); si no, se emite una nueva.
+      // Asi, anular una NC y volver a guardar la ND deja la Cuenta por Pagar corregida y
+      // disponible para imprimir.
+      const yaExiste = (data.creditNotes || []).find(nc => !nc.deleted &&
+        nc.status !== 'ANULADA' && nc.estado !== 'ANULADA' &&
+        (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) &&
+        (nc.providerId || nc.accountId) === g.providerId);
+      const ncId = yaExiste ? yaExiste.id : 'NC-' + Date.now() + '-' + ncDeLaNota;
+
       const campos = {
         providerId: g.providerId,
         providerName: g.providerName || prov.name || '',
@@ -316,18 +327,13 @@ window.creditNotesModule = {
         serviceCategory: srv,
         serviceType: srv,
         servicio_tipo: srv,
-        items: g.items,
+        // Las filas de la NC son suyas: si copiaran el id del item de la ND, una segunda NC de la
+        // misma nota (al anular la primera) choca con UNIQUE(credit_note_items.id) y la base le
+        // rechaza los items.
+        items: g.items.map((it, i) => ({ ...it, id: ncId + '-' + i })),
         accountId: g.providerId
       };
 
-      // Una NC ANULADA es historia: no se toca ni se reutiliza. Si el proveedor ya tiene una NC
-      // vigente se actualiza en el sitio (conservando lo pagado); si no, se emite una nueva.
-      // Asi, anular una NC y volver a guardar la ND deja la Cuenta por Pagar corregida y
-      // disponible para imprimir.
-      const yaExiste = (data.creditNotes || []).find(nc => !nc.deleted &&
-        nc.status !== 'ANULADA' && nc.estado !== 'ANULADA' &&
-        (nc.originDebitNoteId === nd.id || nc.originDebitNoteNumber === nd.ndNumber) &&
-        (nc.providerId || nc.accountId) === g.providerId);
       if (yaExiste) {
         const pagado = yaExiste.paidAmount || 0;
         const saldo = Math.max(0, parseFloat((total - pagado).toFixed(2)));
@@ -340,7 +346,7 @@ window.creditNotesModule = {
         }
       } else {
         data.creditNotes.unshift({
-          id: 'NC-' + Date.now() + '-' + ncDeLaNota,
+          id: ncId,
           ncNumber: await window.db.numeroSiguiente('NC', 2001), // lo decide la base (nc_number es UNIQUE)
           ncCode: window.maretravelCodes.nextFor(data.creditNotes, 'NC', srv),
           ...campos,
