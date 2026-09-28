@@ -2311,35 +2311,11 @@ class OperationsHubModule {
             };
           });
 
-          // Sincronizar Cuentas por Pagar (NCs) vinculadas si cambió la moneda o montos
-          (data.creditNotes || []).forEach(nc => {
-            if (nc.originDebitNoteId === existingNd.id || nc.originDebitNoteNumber === existingNd.ndNumber) {
-              nc.currency = existingNd.currency;
-              const ncTc = nc.frozenExchangeRate || sellRate;
-              const isGross = (nc.settlementModel === 'CONSOLIDADOR_BRUTO');
-              const provItem = existingNd.items.find(i => i.operatorId === nc.accountId || i.operatorName === nc.accountName) || existingNd.items[0];
-              if (provItem) {
-                const provAmount = (existingNd.currency === 'USD')
-                  ? (isGross ? (provItem.grossCost || provItem.fareAmount) : provItem.netCostToProvider)
-                  : (isGross ? (provItem.grossCostBob || provItem.fareAmountBob) : provItem.netCostToProviderBob);
-                nc.totalAmount = parseFloat(provAmount.toFixed(2));
-                nc.balance = parseFloat(provAmount.toFixed(2));
-                nc.total_documento = nc.totalAmount;
-                nc.saldo_pendiente = nc.balance;
-                if (existingNd.currency === 'USD') {
-                  nc.totalAmountUsd = nc.totalAmount;
-                  nc.totalAmountBob = parseFloat((provAmount * ncTc).toFixed(2));
-                  nc.balanceUsd = nc.balance;
-                  nc.balanceBob = nc.totalAmountBob;
-                } else {
-                  nc.totalAmountBob = nc.totalAmount;
-                  nc.totalAmountUsd = parseFloat((provAmount / ncTc).toFixed(2));
-                  nc.balanceBob = nc.balance;
-                  nc.balanceUsd = nc.totalAmountUsd;
-                }
-              }
-            }
-          });
+          // La Cuenta por Pagar se (re)genera igual que al crear: si a la nota le falta la NC de
+          // un proveedor se emite, y si ya la tiene se actualiza conservando lo pagado. Antes solo
+          // se ajustaban las que ya existian, y con el proveedor de items[0] de respaldo: por eso
+          // una nota re-guardada desde el HUB se quedaba sin Cuenta por Pagar.
+          await window.creditNotesModule.generarCuentasPorPagar(data, existingNd, existingNd.items, sellRate);
 
           // TAREA 3: refrescar alertas del Monitor (vuelos + visas) al guardar edición
           this.syncFlightRemindersToCalendar(data, existingNd);
@@ -2498,111 +2474,11 @@ class OperationsHubModule {
       // TAREA 3: sincronizar alertas (vuelos+visas) al Calendario de Viajes (idempotente por ND)
       this.syncFlightRemindersToCalendar(data, newNd, { prevDocIds: prevDraftId && prevDraftId !== newNdId ? [prevDraftId] : [] });
 
-      // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician PENDIENTE)
-      const providerGroups = {};
-      mappedItems.forEach(item => {
-        const pId = item.operatorId;
-        const isItemUsd = (item.currency === 'USD');
-        if (!providerGroups[pId]) {
-          providerGroups[pId] = {
-            providerId: pId,
-            providerName: item.operatorName,
-            items: [],
-            currency: item.currency || 'BOB',
-            totalGrossBob: 0,
-            totalNetBob: 0,
-            totalCommBob: 0,
-            totalGrossUsd: 0,
-            totalNetUsd: 0,
-            totalCommUsd: 0,
-            settlementModel: item.settlementModel || 'DEDUCCION_DIRECTA'
-          };
-        }
-        if (isItemUsd) providerGroups[pId].currency = 'USD';
-        providerGroups[pId].items.push(item);
-        providerGroups[pId].totalGrossBob += (item.grossCostBob || item.fareAmountBob || 0);
-        providerGroups[pId].totalNetBob += (item.netCostToProviderBob || 0);
-        providerGroups[pId].totalCommBob += (item.providerCommissionAmountBob || 0);
-        providerGroups[pId].totalGrossUsd += isItemUsd ? (item.grossCost || item.fareAmount || 0) : ((item.grossCostBob || 0) / sellRate);
-        providerGroups[pId].totalNetUsd += isItemUsd ? (item.netCostToProvider || 0) : ((item.netCostToProviderBob || 0) / sellRate);
-        providerGroups[pId].totalCommUsd += isItemUsd ? (item.providerCommissionAmount || 0) : ((item.providerCommissionAmountBob || 0) / sellRate);
-        if (item.settlementModel === 'CONSOLIDADOR_BRUTO') {
-          providerGroups[pId].settlementModel = 'CONSOLIDADOR_BRUTO';
-        }
-      });
-
-      let nextNcNumber = (await window.db.numeroSiguiente('NC', 2001)) - 1; // el forEach lo incrementa por grupo
-      Object.values(providerGroups).forEach((grp, gIdx) => {
-        nextNcNumber++;
-        const isGross = (grp.settlementModel === 'CONSOLIDADOR_BRUTO');
-        const ncCurrency = grp.currency || 'BOB';
-        const isNcUsd = (ncCurrency === 'USD');
-        const provAmountBob = isGross ? grp.totalGrossBob : grp.totalNetBob;
-        const provAmountUsd = isGross ? grp.totalGrossUsd : grp.totalNetUsd;
-        const provAmount = isNcUsd ? provAmountUsd : provAmountBob;
-        const provAcc = (data.accounts || []).find(a => a.id === grp.providerId) || {};
-
-        if (provAmount > 0) {
-          data.creditNotes.push({
-            id: 'NC-' + Date.now() + '-' + gIdx,
-            ncNumber: nextNcNumber,
-            ncCode: window.maretravelCodes.nextFor(data.creditNotes, 'NC', grp.items[0]?.serviceType || 'BOLETO_AEREO'),
-            providerId: grp.providerId,
-            providerName: grp.providerName,
-            providerNit: provAcc.docNumber || '',
-            originDebitNoteId: newNdId,
-            originDebitNoteNumber: nextNdNumber,
-            issueDate: issueDate,
-            concept: isGross
-              ? `Liquidación Bruta Consolidador por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Proveedor Bruto]`
-              : `Liquidación Directa Neta por ND #${nextNdNumber} (Servicios: ${grp.items.map(i => i.serviceType).join(', ')}) [Modelo: Deducción Directa / Neto]`,
-            currency: ncCurrency,
-            frozenExchangeRate: sellRate,
-            settlementModel: grp.settlementModel,
-            totalAmount: parseFloat(provAmount.toFixed(2)),
-            totalAmountBob: parseFloat(provAmountBob.toFixed(2)),
-            totalAmountUsd: parseFloat(provAmountUsd.toFixed(2)),
-            paidAmount: 0,
-            paidAmountBob: 0,
-            paidAmountUsd: 0,
-            balance: parseFloat(provAmount.toFixed(2)),
-            balanceBob: parseFloat(provAmountBob.toFixed(2)),
-            balanceUsd: parseFloat(provAmountUsd.toFixed(2)),
-            total_documento: parseFloat(provAmount.toFixed(2)),
-            saldo_pendiente: parseFloat(provAmount.toFixed(2)),
-            monto_acumulado_pagado: 0,
-            status: 'IMPAGA',
-            estado: 'IMPAGA',
-            serviceCategory: grp.items[0]?.serviceType || this.filterService || window.state?.servicioActivo || 'BOLETO_AEREO',
-            serviceType: grp.items[0]?.serviceType || this.filterService || window.state?.servicioActivo || 'BOLETO_AEREO',
-            servicio_tipo: grp.items[0]?.serviceType || this.filterService || window.state?.servicioActivo || 'BOLETO_AEREO',
-            items: grp.items,
-            accountId: grp.providerId,
-            createdById: 'USR-001',
-            createdAt: new Date().toLocaleString()
-          });
-        }
-
-        // Si el modelo es Consolidador Bruto y hay comisión, registrarla como Comisión por Cobrar diferida
-        const totalCommVal = grp.totalCommBob || grp.totalCommUsd || 0;
-        if (isGross && totalCommVal > 0) {
-          data.otherIncomes.push({
-            id: 'INC-' + Date.now() + '-' + gIdx,
-            originType: 'COMISION_PLATAFORMA',
-            operatorId: grp.providerId,
-            operatorName: grp.providerName,
-            issueDate: issueDate,
-            passengerName: grp.items[0]?.passengerName || 'Pax',
-            route: `Comisión diferida por ND #${nextNdNumber}`,
-            amount: parseFloat(grp.totalComm.toFixed(2)),
-            currency: 'BOB',
-            frozenExchangeRate: sellRate,
-            description: `Comisión por Cobrar a Proveedor Consolidador ${grp.providerName} por ND #${nextNdNumber}`,
-            status: 'PENDIENTE',
-            createdAt: new Date().toLocaleString()
-          });
-        }
-      });
+      // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician IMPAGA)
+      // Una NC por proveedor, por el COSTO BRUTO. La misma regla al crear y al editar, asi que
+      // va en el módulo de Cuentas por Pagar y no duplicada aqui.
+      const ncCreadas = await window.creditNotesModule.generarCuentasPorPagar(
+        data, { id: newNdId, ndNumber: nextNdNumber, issueDate }, mappedItems, sellRate);
 
       window.db.save(data);
       window.app.closeModal('modal-unified-operation');
@@ -2614,8 +2490,7 @@ class OperationsHubModule {
       if (window.otherIncomesModule) window.otherIncomesModule.render();
       if (window.cashRegisterModule) window.cashRegisterModule.render();
 
-      const providerCount = Object.keys(providerGroups).length;
-      window.app.showToast(`¡ND ${window.maretravelCodes.showDoc(newNd, 'ND')} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${providerCount} Cuentas por Pagar (NCs).`, 'success');
+      window.app.showToast(`¡ND ${window.maretravelCodes.showDoc(newNd, 'ND')} emitida con éxito (${mappedItems.length} servicios)! Estado: PENDIENTE. Se bifurcaron ${ncCreadas} Cuentas por Pagar (NCs).`, 'success');
     } catch (err) {
       console.error('Error al procesar y guardar la operación:', err);
       window.app.showToast('Error al guardar la operación: ' + (err.message || err), 'error');
