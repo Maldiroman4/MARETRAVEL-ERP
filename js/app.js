@@ -397,7 +397,7 @@ window.app = {
   },
 
   navigateTo(viewName) {
-    if (viewName === 'caja' || viewName === 'reportes' || viewName === 'arqueo') {
+    if (viewName === 'caja' || viewName === 'arqueo') {
       this.navigateTo('operaciones');
       if (window.operationsHubModule) {
         window.operationsHubModule.switchTab('cash');
@@ -452,7 +452,7 @@ window.app = {
       'calendario': 'Calendario de Itinerarios y Fechas de Vuelo',
       'caja': 'Caja, Cobranzas y Pagos Multimoneda',
       'otros-ingresos': 'Otros Ingresos Operativos (Comisiones de Plataforma)',
-      'reportes': 'Reportes y Contabilidad de la Empresa',
+      'reportes': 'Reportes Consolidados y Exportación Excel',
       'cuentas-bancarias': 'Gestión de Cuentas Bancarias Oficiales',
       'configuracion': 'Configuración del Sistema y Parámetros'
     };
@@ -469,7 +469,10 @@ window.app = {
     if (viewName === 'calendario' && window.calendarModule) window.calendarModule.render();
     if (viewName === 'caja' && window.cashRegisterModule) window.cashRegisterModule.render();
     if (viewName === 'otros-ingresos' && window.otherIncomesModule) window.otherIncomesModule.render();
-    if (viewName === 'reportes' && window.reportsModule) window.reportsModule.render();
+    if (viewName === 'reportes') {
+      if (window.excelReportsModule) window.excelReportsModule.init();
+      else if (window.reportsModule) window.reportsModule.render();
+    }
     if (viewName === 'cuentas-bancarias' && window.bankAccountsModule) window.bankAccountsModule.render();
     if (viewName === 'configuracion' && window.settingsModule) window.settingsModule.render();
 
