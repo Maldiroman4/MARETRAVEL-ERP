@@ -1111,6 +1111,22 @@ window.debitNotesModule = {
 
     const data = window.db.get();
     
+    // Codigo visible de la ND de referencia. En una NC el documento de origen es la ND que la
+    // genero (no la propia NC), y el concepto automatico trae "ND #<nro>" en vez del codigo.
+    const ndRef = isNc
+      ? (data.debitNotes || []).find(n =>
+          (doc.originDebitNoteId && n.id === doc.originDebitNoteId) ||
+          (doc.originDebitNoteNumber && String(n.ndNumber) === String(doc.originDebitNoteNumber)))
+      : doc;
+    const refOrigen = ndRef
+      ? (window.maretravelCodes && typeof window.maretravelCodes.showDoc === 'function'
+          ? window.maretravelCodes.showDoc(ndRef, 'ND')
+          : ('ND #' + ndRef.ndNumber))
+      : '';
+    const conceptoDoc = (refOrigen && doc.concept)
+      ? String(doc.concept).replace(/ND\s*#\s*\d+/g, refOrigen)
+      : doc.concept;
+
     // Cuenta asociada (Cliente para ND, Proveedor/Cliente para NC)
     let account = null;
     if (isNc) {
@@ -2002,7 +2018,7 @@ window.debitNotesModule = {
     if (isCommissionNd) {
       obsText = (doc.manualObservations || (doc.observations && !doc.observations.includes('Boletos incluidos:') ? doc.observations : `LIQUIDACIÓN OFICIAL DE COMISIONES DE PLATAFORMA - ${dateRange}`)).toUpperCase();
     } else {
-      obsText = (doc.observations || doc.concept || (doc.items && doc.items[0] && doc.items[0].description) || 'OPERACIÓN REGISTRADA').toUpperCase();
+      obsText = (doc.observations || conceptoDoc || (doc.items && doc.items[0] && doc.items[0].description) || 'OPERACIÓN REGISTRADA').toUpperCase();
     }
 
     // Carga e inyección dinámica del logo en Base64 para vista de impresión / PDF
@@ -2027,7 +2043,7 @@ window.debitNotesModule = {
               ${isTransaction ? `
               <tr>
                 <td class="nd-lbl-cell">Documento Origen :</td>
-                <td class="nd-val-cell font-mono font-bold" style="color: #0284c7;">${docType} #${doc.ndNumber || doc.ncNumber || doc.id}</td>
+                <td class="nd-val-cell font-mono font-bold" style="color: #0284c7;">${refOrigen || (docType + ' #' + (doc.ndNumber || doc.ncNumber || doc.id))}</td>
               </tr>` : ''}
               <tr>
                 <td class="nd-lbl-cell">Fecha de Emisión :</td>

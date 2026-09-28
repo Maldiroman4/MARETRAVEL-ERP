@@ -2434,14 +2434,17 @@ window.cashRegisterModule = {
             </tr>
           </thead>
           <tbody>
-            ${r.details.map(d => `
+            ${r.details.map(d => {
+              const ndDet = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+              const refDet = ndDet ? (ndDet.ndCode || ('ND #' + ndDet.ndNumber)) : ('ND #' + d.ndNumber);
+              return `
               <tr>
-                <td class="font-mono"><strong>ND #${d.ndNumber}</strong></td>
+                <td class="font-mono"><strong>${refDet}</strong></td>
                 <td class="font-mono" style="text-align: right;">${Number(d.previousBalanceBob).toFixed(2)}</td>
                 <td class="font-mono" style="text-align: right; font-weight: 700; color: #0369a1;">${Number(d.amountPaidBob).toFixed(2)}</td>
                 <td class="font-mono" style="text-align: right; color: #b91c1c;">${Number(d.remainingBalanceBob).toFixed(2)}</td>
-              </tr>
-            `).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
 
@@ -2586,14 +2589,18 @@ window.cashRegisterModule = {
             </tr>
           </thead>
           <tbody>
-            ${(p.details || []).map(d => `
+            ${(p.details || []).map(d => {
+              const ncDet = (data.creditNotes || []).find(c => c.id === (d.creditNoteId || d.id) || c.ncNumber === d.ncNumber);
+              const ndDet = ncDet && (data.debitNotes || []).find(n => n.id === ncDet.originDebitNoteId || n.ndNumber === ncDet.originDebitNoteNumber);
+              const refDet = ncDet ? (ncDet.ncCode || ('NC #' + ncDet.ncNumber)) : ('NC #' + (d.ncNumber || d.creditNoteId));
+              return `
               <tr>
-                <td class="font-mono"><strong>NC #${d.ncNumber || d.creditNoteId}</strong></td>
+                <td class="font-mono"><strong>${refDet}</strong>${ndDet && ndDet.ndCode ? `<div style="font-size: 7.5pt; color: #0284c7;">Origen: ${ndDet.ndCode}</div>` : ''}</td>
                 <td class="font-mono" style="text-align: right;">${Number(d.previousBalance || 0).toFixed(2)}</td>
                 <td class="font-mono" style="text-align: right; font-weight: 700; color: #b45309;">${Number(d.amountPaid || 0).toFixed(2)}</td>
                 <td class="font-mono" style="text-align: right; color: #059669;">${Number(d.remainingBalance || 0).toFixed(2)}</td>
-              </tr>
-            `).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
 

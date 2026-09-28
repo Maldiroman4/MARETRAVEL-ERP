@@ -148,6 +148,10 @@ window.creditNotesModule = {
         (nc.originDebitNoteId && n.id === nc.originDebitNoteId) ||
         (nc.originDebitNoteNumber && n.ndNumber === nc.originDebitNoteNumber));
       const ref = nc.originDebitNoteCode || (ndOrigen && ndOrigen.ndCode) || ('Nro ' + nc.originDebitNoteNumber);
+      // El concepto automatico se escribio con "ND #<nro>"; se muestra con el codigo visible.
+      const concepto = nc.originDebitNoteNumber
+        ? String(nc.concept || '').replace(/ND\s*#\s*\d+/g, ref)
+        : (nc.concept || '');
       const originBadge = (nc.originDebitNoteId || nc.originDebitNoteNumber) ?
         `<span class="badge badge-indigo" title="Generada automáticamente al emitir la ND ${ref}">Auto ND (${ref})</span>` :
         `<span class="badge badge-slate" title="Creada a mano, sin nota de débito de origen">Manual</span>`;
@@ -158,7 +162,7 @@ window.creditNotesModule = {
           <td class="font-mono">${nc.issueDate}</td>
           <td>
             <div style="font-weight: 600;">${nc.providerName}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">${nc.concept}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">${concepto}</div>
           </td>
           <td>${originBadge}</td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
