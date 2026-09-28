@@ -1172,8 +1172,9 @@ window.debitNotesModule = {
       account = (data.accounts || []).find(a => a.id === doc.accountId);
     }
 
-    // Solicitante
-    let solicitanteUpper = (doc.solicitante || doc.requestedBy || 'MARCO ANTONIO GARCIA').toUpperCase();
+    // Solicitante: el que se registro. Si no hay ninguno se cae al nombre de la empresa (no se
+    // inventa un nombre de persona) y la NC no lleva solicitante porque el cliente no lo pide.
+    let solicitanteUpper = (doc.solicitante || doc.requestedBy || doc.accountName || '').toUpperCase();
     if (doc.requesterId) {
       const req = (data.companyContacts || []).find(c => c.id === doc.requesterId);
       if (req) solicitanteUpper = req.fullName.toUpperCase();
@@ -2081,10 +2082,10 @@ window.debitNotesModule = {
                 <td class="nd-lbl-cell">Fecha de Emisión :</td>
                 <td class="nd-val-cell">${emissionDateFormatted}</td>
               </tr>
-              <tr>
+              ${isNc ? '' : `<tr>
                 <td class="nd-lbl-cell">Solicitado Por :</td>
                 <td class="nd-val-cell font-bold">${solicitanteUpper}</td>
-              </tr>
+              </tr>`}
               <tr>
                 <td class="nd-lbl-cell">${isNc ? 'Código Proveedor :' : 'Código Cliente :'}</td>
                 <td class="nd-val-cell font-mono font-bold">${entityCode}</td>
