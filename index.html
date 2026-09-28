@@ -2700,13 +2700,22 @@
               1. Cabecera Corporativa de la Operación (Cliente y Términos)
             </div>
 
-            <div class="form-row" style="grid-template-columns: 2fr 1.1fr 1.2fr; gap: 12px; align-items: flex-end;">
+            <div class="form-row" style="grid-template-columns: 2fr 1.5fr 1fr 1.2fr; gap: 12px; align-items: flex-end;">
               <div>
                 <label class="form-label" style="font-weight: 700;">Cliente / Empresa a Facturar (Cuentas por Cobrar):</label>
                 <div style="display: flex; gap: 6px; align-items: center;">
                   <input type="text" id="uni-client-input" class="form-control font-mono" list="datalist-acc-cobrar" data-account-id="uni-client-id" onchange="window.operationsHubModule.onAccountSearchChange(this)" placeholder="Escriba para buscar el cliente..." required>
                   <input type="hidden" id="uni-client-id">
                   <button type="button" class="btn btn-secondary btn-xs" style="padding: 7px 8px; flex-shrink: 0;" onclick="if (window.accountsModule) window.accountsModule.openNewAccountModal()" title="Registrar nuevo cliente">➕</button>
+                </div>
+              </div>
+              <div>
+                <label class="form-label" style="font-weight: 700;">Solicitado Por (persona de la empresa):</label>
+                <select id="uni-solicitante-select" class="form-control" onchange="window.operationsHubModule.onSolicitanteChange(this)">
+                  <option value="">-- Primero seleccione la Empresa --</option>
+                </select>
+                <div id="uni-solicitante-manual-wrap" style="display: none; margin-top: 6px;">
+                  <input type="text" id="uni-solicitante-manual" class="form-control" placeholder="Nombre y cargo de quien solicitó...">
                 </div>
               </div>
               <div>

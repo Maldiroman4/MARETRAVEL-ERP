@@ -309,12 +309,15 @@ window.debitNotesModule = {
   /**
    * Carga dinámica de Solicitantes / Contactos Autorizados al seleccionar una Empresa
    */
-  onClientChange(clientId, preselectVal = '', preselectReqId = '') {
+  // ids permite que otra pantalla (la Operación Unificada del hub) reutilice esta misma lista de
+  // Solicitantes Autorizados en vez de duplicarla. quick:false = sin botón "+ Nuevo" (el hub no lo
+  // tiene, y no debe tocar el botón del módulo ND).
+  onClientChange(clientId, preselectVal = '', preselectReqId = '', ids = {}) {
     const data = window.db.get();
-    const selectSol = document.getElementById('nd-solicitante-select');
-    const manualWrap = document.getElementById('nd-solicitante-manual-wrap');
-    const manualInput = document.getElementById('nd-solicitante-manual');
-    const btnQuick = document.getElementById('btn-quick-new-contact');
+    const selectSol = document.getElementById(ids.sel || 'nd-solicitante-select');
+    const manualWrap = document.getElementById(ids.wrap || 'nd-solicitante-manual-wrap');
+    const manualInput = document.getElementById(ids.input || 'nd-solicitante-manual');
+    const btnQuick = ids.quick === false ? null : document.getElementById(ids.quick || 'btn-quick-new-contact');
 
     if (!selectSol) return;
 
@@ -357,6 +360,26 @@ window.debitNotesModule = {
         if (manualInput && preselectVal) manualInput.value = preselectVal;
       }
     }
+  },
+
+  // Devuelve el solicitante elegido en el formulario: el contacto del registro o el nombre
+  // escrito a mano. Lo usa el hub, que guarda el mismo dato en su nota.
+  leerSolicitante(defaultName = '', ids = {}) {
+    const sel = document.getElementById(ids.sel || 'nd-solicitante-select');
+    let solicitanteStr = '';
+    let requesterId = null;
+    if (sel) {
+      if (sel.value === 'OTRO_MANUAL') {
+        solicitanteStr = document.getElementById(ids.input || 'nd-solicitante-manual')?.value.trim() || 'General';
+      } else if (sel.value === 'DEFAULT') {
+        solicitanteStr = defaultName;
+      } else if (sel.value) {
+        requesterId = sel.value;
+        const opt = sel.options[sel.selectedIndex];
+        solicitanteStr = opt ? (opt.getAttribute('data-desc') || opt.getAttribute('data-name') || opt.textContent) : 'General';
+      }
+    }
+    return { solicitanteStr, requesterId };
   },
 
   /**
@@ -816,21 +839,7 @@ window.debitNotesModule = {
     totalBob = parseFloat(totalBob.toFixed(2));
     totalUsd = parseFloat(totalUsd.toFixed(2));
 
-    const solSelect = document.getElementById('nd-solicitante-select');
-    let solicitanteStr = '';
-    let requesterId = null;
-
-    if (solSelect) {
-      if (solSelect.value === 'OTRO_MANUAL') {
-        solicitanteStr = document.getElementById('nd-solicitante-manual')?.value.trim() || 'General';
-      } else if (solSelect.value === 'DEFAULT') {
-        solicitanteStr = client.name;
-      } else if (solSelect.value) {
-        requesterId = solSelect.value;
-        const opt = solSelect.options[solSelect.selectedIndex];
-        solicitanteStr = opt ? (opt.getAttribute('data-desc') || opt.getAttribute('data-name') || opt.textContent) : 'General';
-      }
-    }
+    const { solicitanteStr, requesterId } = this.leerSolicitante(client.name);
 
     const passengerName = document.getElementById('nd-passenger-name')?.value.trim() || '';
 

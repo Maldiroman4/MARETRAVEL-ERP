@@ -6,6 +6,10 @@
  */
 
 class OperationsHubModule {
+  // Ids del selector "Solicitado Por" del modal unificado. La lista de Solicitantes
+  // Autorizados y su lectura las aporta el módulo de Notas de Débito (mismo registro).
+  UNI_SOLICITANTE_IDS = { sel: 'uni-solicitante-select', wrap: 'uni-solicitante-manual-wrap', input: 'uni-solicitante-manual', quick: false };
+
   constructor() {
     this.currentTab = 'nds'; // 'nds', 'ncs', 'cash'
     this.editingOperationId = null;
@@ -1085,6 +1089,10 @@ class OperationsHubModule {
 
     const form = document.getElementById('unified-operation-form');
     if (form) form.reset();
+
+    const solManual = document.getElementById('uni-solicitante-manual');
+    if (solManual) solManual.value = '';
+    this.onSolicitanteRefresh();
 
     const dateInput = document.getElementById('uni-issue-date');
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
@@ -2438,6 +2446,12 @@ class OperationsHubModule {
       const hasUsd = mappedItems.some(it => it.currency === 'USD');
       const ndCurrency = hasUsd ? 'USD' : 'BOB';
 
+      // Persona de la empresa que solicitó el servicio. Sin elegir, sigue el nombre de la
+      // empresa (como antes). Va en la nota: la impresión y el historial ya lo leen de ahí.
+      const solicitante = window.debitNotesModule
+        ? window.debitNotesModule.leerSolicitante(client.name, this.UNI_SOLICITANTE_IDS)
+        : { solicitanteStr: '', requesterId: null };
+
       const newNd = {
         id: newNdId,
         ndNumber: nextNdNumber,
@@ -2445,8 +2459,8 @@ class OperationsHubModule {
         accountId: clientId,
         accountName: client.name,
         accountNit: client.docNumber || '',
-        requesterId: null,
-        solicitante: client.name,
+        requesterId: solicitante.requesterId,
+        solicitante: solicitante.solicitanteStr || client.name,
         passengerName: paxSummary,
         issueDate: issueDate,
         paymentTerm: 'PENDIENTE',
@@ -2745,6 +2759,21 @@ class OperationsHubModule {
     return '';
   }
 
+  // "Solicitado Por": la lista de Solicitantes Autorizados la arma el módulo de ND; aquí solo
+  // se le pasan los ids de este modal. refreshAndPreselect permite dejar uno ya elegido (editar).
+  onSolicitanteRefresh(preselectVal = '', preselectReqId = '') {
+    const el = document.getElementById('uni-client-id');
+    if (window.debitNotesModule) {
+      window.debitNotesModule.onClientChange(el ? el.value : '', preselectVal, preselectReqId, this.UNI_SOLICITANTE_IDS);
+    }
+  }
+
+  // Muestra el campo de texto solo cuando se elige "Otro / Escribir manualmente".
+  onSolicitanteChange(selectEl) {
+    const wrap = document.getElementById('uni-solicitante-manual-wrap');
+    if (wrap) wrap.style.display = selectEl && selectEl.value === 'OTRO_MANUAL' ? 'block' : 'none';
+  }
+
   // Buscador de cuentas (ND→clientes, NC→proveedores): al seleccionar del datalist guarda el id en el hidden
   onAccountSearchChange(inputEl) {
     const hiddenId = inputEl ? inputEl.getAttribute('data-account-id') : null;
@@ -2755,6 +2784,7 @@ class OperationsHubModule {
     const acc = (window.db ? (window.db.get().accounts || []) : []).find(a => String(a.name || '').trim().toUpperCase() === q);
     el.value = acc ? acc.id : '';
     if (hiddenId === 'uni-client-id' && acc) {
+      this.onSolicitanteRefresh();
       // Autocompletar el celular de los apartados con jerarquía pasajero → cliente.
       // Solo datos reales guardados y con apariencia de móvil (empiezan en 6 o 7).
       (this.activeNdItems || []).forEach((it, i) => {
@@ -2867,6 +2897,7 @@ class OperationsHubModule {
       const acc = (data.accounts || []).find(a => a.id === nd.accountId);
       if (acc) clientInput.value = acc.name || '';
     }
+    this.onSolicitanteRefresh(nd.solicitante || '', nd.requesterId || '');
     const dateInput = document.getElementById('uni-issue-date');
     if (dateInput) dateInput.value = nd.issueDate || new Date().toISOString().split('T')[0];
     const termEl = document.getElementById('uni-payment-term');
