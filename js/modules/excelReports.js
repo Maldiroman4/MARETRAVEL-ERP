@@ -493,18 +493,54 @@ window.excelReportsModule = {
     const wsGastos = this.buildGastosSheet();
     window.XLSX.utils.book_append_sheet(wb, wsGastos, 'GASTOS ');
 
+    // 6. Hoja: HOJA INTEGRADA (Los 5 bloques apilados verticalmente en 1 sola hoja como en la plantilla)
+    const wsIntegrada = this.buildIntegratedSheet();
+    window.XLSX.utils.book_append_sheet(wb, wsIntegrada, 'HOJA INTEGRADA');
+
     const srvTag = (this.filterService || 'TODOS').replace(/[^a-zA-Z0-9]/g, '_');
     const filename = `Reporte_Consolidado_${srvTag}_${this.startDate}_a_${this.endDate}.xlsx`;
     window.XLSX.writeFile(wb, filename);
 
-    window.app.showToast(`Reporte Excel descargado con 5 hojas: ${filename}`, 'success');
+    window.app.showToast(`Reporte Excel descargado (${wb.SheetNames.length} hojas): ${filename}`, 'success');
   },
 
-  buildCuentasPorPagarSheet() {
+  getCuentasPorPagarRows() {
     const data = window.db ? window.db.get() : {};
     const fromDate = this.startDate || '1900-01-01';
     const toDate = this.endDate || '2099-12-31';
 
+    const ncs = (data.creditNotes || []).filter(nc => {
+      if (nc.deleted === true) return false;
+      const date = nc.issueDate || (nc.createdAt ? nc.createdAt.split('T')[0] : '');
+      if (date < fromDate || date > toDate) return false;
+      const srv = nc.serviceCategory || nc.serviceType || 'BOLETO_AEREO';
+      return this.matchService(srv);
+    });
+
+    ncs.sort((a, b) => (a.issueDate || '').localeCompare(b.issueDate || ''));
+
+    return ncs.map(nc => {
+      const isUsd = (nc.currency === 'USD');
+      const totalAmount = Number(nc.totalAmount !== undefined ? nc.totalAmount : (isUsd ? (nc.totalAmountUsd || 0) : (nc.totalAmountBob || 0)));
+      const paid = Number(nc.paidAmount !== undefined ? nc.paidAmount : (isUsd ? (nc.paidAmountUsd || 0) : (nc.paidAmountBob || 0)));
+      const balance = Number(isUsd ? (nc.balanceUsd !== undefined ? nc.balanceUsd : (nc.balance || 0)) : (nc.balanceBob !== undefined ? nc.balanceBob : (nc.balance || 0)));
+
+      return [
+        nc.ncCode || (window.maretravelCodes && window.maretravelCodes.showDoc ? window.maretravelCodes.showDoc(nc, 'NC') : ('NC #' + nc.ncNumber)),
+        nc.issueDate || (nc.createdAt ? nc.createdAt.split('T')[0] : ''),
+        this.formatServiceName(nc.serviceCategory || nc.serviceType),
+        nc.providerName || '-',
+        isUsd ? '' : totalAmount,
+        isUsd ? '' : paid,
+        isUsd ? '' : balance,
+        isUsd ? totalAmount : '',
+        isUsd ? paid : '',
+        isUsd ? balance : ''
+      ];
+    });
+  },
+
+  buildCuentasPorPagarSheet() {
     const headers = [
       'NC',
       'FECHA',
@@ -518,37 +554,7 @@ window.excelReportsModule = {
       'PENDIENTE PAGO $'
     ];
 
-    const matrix = [headers];
-    const ncs = (data.creditNotes || []).filter(nc => {
-      if (nc.deleted === true) return false;
-      const date = nc.issueDate || (nc.createdAt ? nc.createdAt.split('T')[0] : '');
-      if (date < fromDate || date > toDate) return false;
-      const srv = nc.serviceCategory || nc.serviceType || 'BOLETO_AEREO';
-      return this.matchService(srv);
-    });
-
-    ncs.sort((a, b) => (a.issueDate || '').localeCompare(b.issueDate || ''));
-
-    ncs.forEach(nc => {
-      const isUsd = (nc.currency === 'USD');
-      const totalAmount = Number(nc.totalAmount !== undefined ? nc.totalAmount : (isUsd ? (nc.totalAmountUsd || 0) : (nc.totalAmountBob || 0)));
-      const paid = Number(nc.paidAmount !== undefined ? nc.paidAmount : (isUsd ? (nc.paidAmountUsd || 0) : (nc.paidAmountBob || 0)));
-      const balance = Number(isUsd ? (nc.balanceUsd !== undefined ? nc.balanceUsd : (nc.balance || 0)) : (nc.balanceBob !== undefined ? nc.balanceBob : (nc.balance || 0)));
-
-      matrix.push([
-        nc.ncCode || (window.maretravelCodes && window.maretravelCodes.showDoc ? window.maretravelCodes.showDoc(nc, 'NC') : ('NC #' + nc.ncNumber)),
-        nc.issueDate || (nc.createdAt ? nc.createdAt.split('T')[0] : ''),
-        this.formatServiceName(nc.serviceCategory || nc.serviceType),
-        nc.providerName || '-',
-        isUsd ? '' : totalAmount,
-        isUsd ? '' : paid,
-        isUsd ? '' : balance,
-        isUsd ? totalAmount : '',
-        isUsd ? paid : '',
-        isUsd ? balance : ''
-      ]);
-    });
-
+    const matrix = [headers, ...this.getCuentasPorPagarRows()];
     const ws = window.XLSX.utils.aoa_to_sheet(matrix);
     ws['!cols'] = [
       { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 28 },
@@ -558,37 +564,11 @@ window.excelReportsModule = {
     return ws;
   },
 
-  buildIngresosPagosSheet() {
+  getIngresosPagosRows() {
     const data = window.db ? window.db.get() : {};
     const fromDate = this.startDate || '1900-01-01';
     const toDate = this.endDate || '2099-12-31';
-
-    const headers = [
-      'TIPO DE SERVICIO',
-      'NOTA DEBITO',
-      'CODIDO DE RESERVA',
-      'TRAMO',
-      'OPERADOR',
-      'PASAJERO',
-      'EMPRESA/CLIENTE',
-      'FECHA DE COMPRA',
-      'FECHA DE SALIDA',
-      'FECHA DE RETORNO',
-      '',
-      'PRECIO BS',
-      'PRECIO $',
-      'FEE BS',
-      'FEE $',
-      'COMISION BS',
-      'COMISION $',
-      'FECHA DE PAGO',
-      'QR BS',
-      'EFECTIVO BS',
-      'QR $ ',
-      'EFECTIVO $'
-    ];
-
-    const matrix = [headers];
+    const rows = [];
 
     (data.debitNotes || []).forEach(nd => {
       if (nd.deleted === true) return;
@@ -624,7 +604,7 @@ window.excelReportsModule = {
 
         const sDetails = item.serviceDetails || {};
 
-        matrix.push([
+        rows.push([
           this.formatServiceName(srvType),
           nd.ndCode || (window.maretravelCodes && window.maretravelCodes.showDoc ? window.maretravelCodes.showDoc(nd, 'ND') : ('ND #' + nd.ndNumber)),
           item.pnr || item.ticketNumber || sDetails.pnr || sDetails.ticketNumber || '-',
@@ -651,56 +631,157 @@ window.excelReportsModule = {
       });
     });
 
+    return rows;
+  },
+
+  buildIngresosPagosSheet() {
+    const headers = [
+      'TIPO DE SERVICIO',
+      'NOTA DEBITO',
+      'CODIDO DE RESERVA',
+      'TRAMO',
+      'OPERADOR',
+      'PASAJERO',
+      'EMPRESA/CLIENTE',
+      'FECHA DE COMPRA',
+      'FECHA DE SALIDA',
+      'FECHA DE RETORNO',
+      '',
+      'PRECIO BS',
+      'PRECIO $',
+      'FEE BS',
+      'FEE $',
+      'COMISION BS',
+      'COMISION $',
+      'FECHA DE PAGO',
+      'QR BS',
+      'EFECTIVO BS',
+      'QR $ ',
+      'EFECTIVO $'
+    ];
+
+    const matrix = [headers, ...this.getIngresosPagosRows()];
     const ws = window.XLSX.utils.aoa_to_sheet(matrix);
     return ws;
   },
 
-  buildEgresosSheet() {
+  getEgresosRows() {
     const data = window.db ? window.db.get() : {};
     const fromDate = this.startDate || '1900-01-01';
     const toDate = this.endDate || '2099-12-31';
 
-    const matrix = [
-      ['', '', 'GASTOS ADMINISTRATIVO (FIJOS, VARIABLES)'],
-      [],
-      ['FECHA', 'DETALLE GASTO', 'PROVEEDOR', 'MONTO BS', 'MONTO $']
-    ];
-
-    (data.expenses || []).filter(e => e.type !== 'PERSONAL').forEach(e => {
+    return (data.expenses || []).filter(e => e.type !== 'PERSONAL').map(e => {
       const d = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
-      if (d < fromDate || d > toDate) return;
+      if (d < fromDate || d > toDate) return null;
       const isUsd = (e.currency === 'USD');
       const amt = Number(e.amount || 0);
-      matrix.push([
+      return [
         d,
         e.concept || e.description || '-',
         e.providerName || e.beneficiary || '-',
         isUsd ? '' : amt,
         isUsd ? amt : ''
-      ]);
-    });
+      ];
+    }).filter(Boolean);
+  },
+
+  buildEgresosSheet() {
+    const matrix = [
+      ['', '', 'GASTOS ADMINISTRATIVO (FIJOS, VARIABLES)'],
+      [],
+      ['FECHA', 'DETALLE GASTO', 'PROVEEDOR', 'MONTO BS', 'MONTO $'],
+      ...this.getEgresosRows()
+    ];
 
     const ws = window.XLSX.utils.aoa_to_sheet(matrix);
     return ws;
   },
 
-  buildGastosSheet() {
+  getGastosRows() {
     const data = window.db ? window.db.get() : {};
     const fromDate = this.startDate || '1900-01-01';
     const toDate = this.endDate || '2099-12-31';
 
-    const matrix = [
-      ['', 'GASTOS PERSONALES'],
-      ['FECHA', 'DETALLE DE GASTO', 'MONTO QR BS']
-    ];
-
-    (data.expenses || []).filter(e => e.type === 'PERSONAL').forEach(e => {
+    return (data.expenses || []).filter(e => e.type === 'PERSONAL').map(e => {
       const d = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
-      if (d < fromDate || d > toDate) return;
-      matrix.push([
+      if (d < fromDate || d > toDate) return null;
+      return [
         d,
         e.concept || e.description || '-',
         Number(e.amount || 0)
+      ];
+    }).filter(Boolean);
+  },
+
+  buildGastosSheet() {
+    const matrix = [
+      ['', 'GASTOS PERSONALES'],
+      ['FECHA', 'DETALLE DE GASTO', 'MONTO QR BS'],
+      ...this.getGastosRows()
+    ];
+
+    const ws = window.XLSX.utils.aoa_to_sheet(matrix);
+    return ws;
+  },
+
+  /**
+   * Construye una sola hoja integrada que apila exactamente los 5 bloques
+   * tal como en el formato de la plantilla unificada
+   */
+  buildIntegratedSheet() {
+    const matrix = [];
+
+    // 1. REPORTE INGRESOS Y PAGOS
+    const headersIngresos = [
+      'TIPO DE SERVICIO', 'NOTA DEBITO', 'CODIDO DE RESERVA', 'TRAMO', 'OPERADOR', 'PASAJERO',
+      'EMPRESA/CLIENTE', 'FECHA DE COMPRA', 'FECHA DE SALIDA', 'FECHA DE RETORNO', '',
+      'PRECIO BS', 'PRECIO $', 'FEE BS', 'FEE $', 'COMISION BS', 'COMISION $',
+      'FECHA DE PAGO', 'QR BS', 'EFECTIVO BS', 'QR $ ', 'EFECTIVO $'
+    ];
+    matrix.push(headersIngresos);
+    this.getIngresosPagosRows().forEach(r => matrix.push(r));
+
+    matrix.push([]);
+    matrix.push(['', '', 'GASTOS ADMINISTRATIVO (FIJOS, VARIABLES)']);
+    matrix.push([]);
+
+    // 2. REPORTE EGRESOS
+    matrix.push(['', 'FECHA', 'DETALLE GASTO', 'PROVEEDOR', 'MONTO BS', 'MONTO $']);
+    this.getEgresosRows().forEach(r => matrix.push(['', ...r]));
+
+    matrix.push([]);
+    matrix.push(['', '', 'GASTOS PERSONALES']);
+
+    // 3. GASTOS PERSONALES
+    matrix.push(['', 'FECHA', 'DETALLE DE GASTO', 'MONTO QR BS']);
+    this.getGastosRows().forEach(r => matrix.push(['', ...r]));
+
+    matrix.push([]);
+    matrix.push([]);
+
+    // 4. CUENTAS POR PAGAR
+    matrix.push(['', 'NC', 'FECHA', 'TIPO DE SERVICIO', 'OPERADOR', 'TOTAL DEUDA BS', 'PAGO PARCIAL BS', 'PENDIENTE PAGO BS', 'TOTAL DEUDA $', 'PAGO PARCIAL $', 'PENDIENTE PAGO $']);
+    this.getCuentasPorPagarRows().forEach(r => matrix.push(['', ...r]));
+
+    matrix.push([]);
+
+    // 5. CTAS POR COBRAR (Bloque C)
+    matrix.push(['', 'TIPO', 'codigo ', 'FECHA', 'TIPO DE SERVICIO', 'EMPRESA/CLIENTE', 'cliente o proveedor', 'TOTAL DEUDA BS', 'PAGO PARCIAL BS', 'PENDIENTE PAGO BS', 'TOTAL DEUDA $', 'PAGO PARCIAL $', 'PENDIENTE PAGO $']);
+    this.getConsolidatedData().forEach(r => {
+      matrix.push([
+        '',
+        r.tipo,
+        r.codigo,
+        r.fecha,
+        r.tipoServicio,
+        r.empresaCliente,
+        r.rol,
+        (typeof r.deudaBob === 'number') ? r.deudaBob : '',
+        (typeof r.pagoBob === 'number') ? r.pagoBob : '',
+        (typeof r.pendienteBob === 'number') ? r.pendienteBob : '',
+        (typeof r.deudaUsd === 'number') ? r.deudaUsd : '',
+        (typeof r.pagoUsd === 'number') ? r.pagoUsd : '',
+        (typeof r.pendienteUsd === 'number') ? r.pendienteUsd : ''
       ]);
     });
 
