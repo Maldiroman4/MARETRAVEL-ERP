@@ -1320,8 +1320,10 @@ window.debitNotesModule = {
             const srvRoute = (sd.flightRoute || it.route || it.description || 'VVI-LPB-VVI').toUpperCase();
             let srvDates = sd.travelDates || '';
             const soloIda = Boolean(sd.soloIda || it.soloIda);
+            // Ida y vuelta el mismo día siguen siendo ida y vuelta: se imprimen las dos
+            // fechas. "SOLO IDA" solo cuando no se marcó ese casillero o no hay fecha de vuelta.
             const buildFecha = (dep, ret) => {
-              if (soloIda || !ret || ret === dep) return `DEL ${this.formatSlashDate(dep)} SOLO IDA`;
+              if (soloIda || !ret) return `DEL ${this.formatSlashDate(dep)} SOLO IDA`;
               return `DEL ${this.formatSlashDate(dep)} AL ${this.formatSlashDate(ret)}`;
             };
             if (!srvDates && sd.flightDepDate) {
