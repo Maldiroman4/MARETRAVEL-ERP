@@ -50,7 +50,9 @@ window.creditNotesModule = {
       if (srv === 'ASESORAMIENTO_VISAS' && (v.includes('VISA') || v.includes('ASESORAMIENTO'))) return true;
       if (srv === 'PAQUETES' && (v.includes('PAQUETE'))) return true;
       if (srv === 'HOTEL' && (v.includes('HOTEL') || v.includes('HOSPEDAJE'))) return true;
-      if (srv === 'RENT_A_CAR' && (v.includes('RENT') || v.includes('CAR') || v.includes('TRASLADO') || v.includes('AUTO'))) return true;
+      // Sin 'AUTO': "AUTOMATICA" (de "Liquidación automática") lo contiene, y como TODA NC
+      // dice eso, la regla metía las 10 NCs en RENT_A_CAR.
+      if (srv === 'RENT_A_CAR' && (v.includes('RENT') || v.includes('CAR') || v.includes('TRASLADO'))) return true;
       return false;
     };
 

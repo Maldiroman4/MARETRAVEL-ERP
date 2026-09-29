@@ -359,6 +359,13 @@ class OperationsHubModule {
       titleEl.textContent = `Servicios: ${this.formatServiceName(serviceCode)}`;
     }
 
+    // La lista de Notas de Crédito se filtra por el servicio activo, pero nadie la volvía a
+    // dibujar al cambiar de servicio: quedaba con el filtro anterior, y por eso se veían NCs
+    // del servicio equivocado (las de boleto al entrar a hotel, y al revés).
+    if (window.creditNotesModule && typeof window.creditNotesModule.render === 'function') {
+      window.creditNotesModule.render();
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
