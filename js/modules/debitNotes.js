@@ -1189,7 +1189,7 @@ window.debitNotesModule = {
           totalAmount: doc.totalAmount || 0,
           passengerName: doc.beneficiaryName || doc.passengerName || entityNameUpper,
           serviceDate: effectiveDate,
-          ticketNumber: doc.ticketNumber || doc.originDebitNoteCode || (doc.originDebitNoteNumber ? `ND #${doc.originDebitNoteNumber}` : `NC #${doc.ncNumber || doc.id}`)
+          ticketNumber: doc.ticketNumber || window.maretravelCodes.refNd(data, doc) || (`NC #${doc.ncNumber || doc.id}`)
         }];
       }
     } else if (!items) {

@@ -632,5 +632,23 @@ window.maretravelCodes = {
   showDoc(doc, type) {
     if (!doc) return '';
     return doc[type.toLowerCase() + 'Code'] || (type + ' #' + doc[type.toLowerCase() + 'Number']);
+  },
+
+  // Código visible de la ND a la que apunta una NC (#ndHO001). Un solo lugar para resolverlo:
+  // antes cada pantalla repetía su propia cadena de respaldos y quedaban desincronizadas.
+  // Un originDebitNoteCode guardado que NO empieza con # es el placeholder "ND #1007" que se
+  // horneó cuando el generador recibía una ND sin ndCode; como era truthy le ganaba al código
+  // real y salía el número en la lista, en el concepto y en las impresiones. Se lo ignora y se
+  // resuelve desde la ND referenciada, asi que las NC ya emitidas se muestran bien sin tocar la
+  // base. ponytail: si alguna vez hay que mostrar otro tipo de codigo, se cambia el fallback de
+  // abajo; no volver a repetir `originDebitNoteCode || ...` en cada pantalla.
+  refNd(data, nc) {
+    const guardado = String((nc && nc.originDebitNoteCode) || '');
+    if (guardado.startsWith('#')) return guardado;
+    const nd = ((data && data.debitNotes) || []).find(n => nc &&
+      ((nc.originDebitNoteId && n.id === nc.originDebitNoteId) ||
+       (nc.originDebitNoteNumber && n.ndNumber === nc.originDebitNoteNumber)));
+    if (nd && nd.ndCode) return nd.ndCode;
+    return nc && nc.originDebitNoteNumber ? 'ND #' + nc.originDebitNoteNumber : '';
   }
 };

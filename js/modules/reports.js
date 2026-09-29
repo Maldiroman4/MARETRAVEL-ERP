@@ -371,7 +371,7 @@ window.reportsModule = {
             ${nc.correctionNote ? `<div style="font-size:0.7rem; color:#0284c7;">✎ Corregido: ${nc.correctionNote}</div>` : ''}
             ${nc.voidReason ? `<div style="font-size:0.7rem; color:#b91c1c; font-weight:700;">⚠ Anulado: ${nc.voidReason}</div>` : ''}
           </td>
-          <td class="font-mono">${nc.originDebitNoteCode || (nc.originDebitNoteNumber ? `ND #${nc.originDebitNoteNumber}` : 'Manual')}</td>
+          <td class="font-mono">${window.maretravelCodes.refNd(data, nc) || 'Manual'}</td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
             ${nc.currency} ${Number(nc.totalAmount).toLocaleString('es-BO', { minimumFractionDigits: 2 })}
           </td>
@@ -745,7 +745,7 @@ window.reportsModule = {
         if (toDate && nc.issueDate > toDate) return;
 
         const ncVisible = nc.ncCode || nc.ncNumber;
-        const originVisible = nc.originDebitNoteCode || (nc.originDebitNoteNumber ? ('ND #' + nc.originDebitNoteNumber) : 'MANUAL');
+        const originVisible = window.maretravelCodes.refNd(data, nc) || 'MANUAL';
         csvContent += `${idx + 1};NOTA_CREDITO;${ncVisible};${nc.issueDate};${originVisible};"${nc.providerNit || '0'}";"${nc.providerName.replace(/"/g, '""')}";${nc.totalAmount.toFixed(2)};${nc.paidAmount.toFixed(2)};${nc.balance.toFixed(2)};${nc.status};"${(nc.concept || '').replace(/"/g, '""')}"\n`;
       });
     } else {

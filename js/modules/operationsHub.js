@@ -2477,8 +2477,10 @@ class OperationsHubModule {
       // BIFURCACIÓN AUTOMÁTICA POR PROVEEDOR (Cuentas por Pagar / NCs - Inician IMPAGA)
       // Una NC por proveedor, por el COSTO BRUTO. La misma regla al crear y al editar, asi que
       // va en el módulo de Cuentas por Pagar y no duplicada aqui.
+      // Se pasa `newNd` y no un {id, ndNumber, issueDate} armado a mano: sin ndCode el generador
+      // cae en "ND #1007" y ese texto queda guardado como si fuera el codigo.
       const ncCreadas = await window.creditNotesModule.generarCuentasPorPagar(
-        data, { id: newNdId, ndNumber: nextNdNumber, issueDate }, mappedItems, sellRate);
+        data, newNd, mappedItems, sellRate);
 
       window.db.save(data);
       window.app.closeModal('modal-unified-operation');

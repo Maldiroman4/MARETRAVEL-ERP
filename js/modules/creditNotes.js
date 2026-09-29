@@ -142,12 +142,9 @@ window.creditNotesModule = {
       const statusBadge = isPaid ? 'badge-emerald' : (isPartial ? 'badge-blue' : 'badge-amber');
       const statusText = isPaid ? 'PAGADA' : (isPartial ? 'PARCIAL' : 'IMPAGA');
 
-      // Codigo visible de la ND a la que hace referencia (#ndBA001). El campo originDebitNoteCode
-      // llega vacio desde la base, asi que se resuelve desde la ND referenciada.
-      const ndOrigen = (debitNotes || []).find(n =>
-        (nc.originDebitNoteId && n.id === nc.originDebitNoteId) ||
-        (nc.originDebitNoteNumber && n.ndNumber === nc.originDebitNoteNumber));
-      const ref = nc.originDebitNoteCode || (ndOrigen && ndOrigen.ndCode) || ('Nro ' + nc.originDebitNoteNumber);
+      // Codigo visible de la ND a la que hace referencia (#ndBA001). refNd() ignora el
+      // placeholder "ND #1007" que dejaron NCs viejas y resuelve contra la ND real.
+      const ref = window.maretravelCodes.refNd({ debitNotes }, nc);
       // El concepto automatico se escribio con "ND #<nro>"; se muestra con el codigo visible.
       const concepto = nc.originDebitNoteNumber
         ? String(nc.concept || '').replace(/ND\s*#\s*\d+/g, ref)
@@ -329,8 +326,12 @@ window.creditNotesModule = {
       const prov = (data.accounts || []).find(a => a.id === g.providerId) || {};
       const srv = g.items[0]?.serviceType || nd.serviceType || nd.serviceCategory || window.state?.servicioActivo || 'OTRO';
 
-      // Código visible de la ND origen (ej: #ndBA001) para mostrar en la NC
-      const originCode = nd.ndCode || (window.maretravelCodes && typeof window.maretravelCodes.showDoc === 'function' ? window.maretravelCodes.showDoc(nd, 'ND') : ('#nd' + nd.ndNumber));
+      // Codigo visible de la ND origen (ej: #ndBA001) para mostrar en la NC. showDoc devuelve
+      // "ND #<nro>" cuando la ND todavia no tiene codigo, y ese placeholder quedaba guardado en
+      // la NC como si fuera el codigo (era lo que salia en listados e impresiones). Sin codigo
+      // real se deja null: refNd() lo resuelve contra la ND al mostrar, y la NC ya nace limpia.
+      const shown = String(nd.ndCode || (window.maretravelCodes && typeof window.maretravelCodes.showDoc === 'function' ? window.maretravelCodes.showDoc(nd, 'ND') : ''));
+      const originCode = shown.startsWith('#') ? shown : null;
 
       // Numeración espejo 1 a 1: la NC toma el mismo correlativo de la ND (#ndBA001 -> #ncBA001)
       let mirrorNcCode = null;
@@ -357,7 +358,9 @@ window.creditNotesModule = {
         originDebitNoteNumber: nd.ndNumber,
         originDebitNoteCode: originCode,
         issueDate: nd.issueDate,
-        concept: `Liquidación automática por ${originCode} (Servicios: ${g.items.map(i => i.serviceType).filter(Boolean).join(', ')}) [${g.sinCostoBruto ? 'Total del servicio: el item no trae costo de proveedor' : 'Costo bruto del proveedor'}]`,
+        // El concepto se escribe con el código si ya existe; si no, con el número, que las
+        // pantallas reemplazan por el código al mostrar (mismo regex que usa la lista de NCs).
+        concept: `Liquidación automática por ${originCode || ('ND #' + nd.ndNumber)} (Servicios: ${g.items.map(i => i.serviceType).filter(Boolean).join(', ')}) [${g.sinCostoBruto ? 'Total del servicio: el item no trae costo de proveedor' : 'Costo bruto del proveedor'}]`,
         currency: ncCurrency,
         frozenExchangeRate: sellRate,
         settlementModel: 'CONSOLIDADOR_BRUTO',
