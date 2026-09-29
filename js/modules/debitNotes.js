@@ -1366,7 +1366,6 @@ window.debitNotesModule = {
           case 'HOTEL':
           case 'HOTEL_HOSPEDAJE': {
             const hotelName = (sd.hotelName || opName).toUpperCase();
-            const hotelCity = (sd.hotelCity || it.city || '').toUpperCase();
             const rawCheckIn = sd.checkIn || it.checkIn || '';
             const checkIn = rawCheckIn ? this.formatSlashDate(rawCheckIn) : '-';
             const rawCheckOut = sd.checkOut || it.checkOut || '';
@@ -1387,7 +1386,7 @@ window.debitNotesModule = {
                   <div class="nd-kv-row nd-service-row" style="margin-top: 6px; align-items: flex-start;">
                     <span class="nd-k" style="width: 100px;">Servicio :</span>
                     <div class="nd-v nd-service-details font-bold">
-                      <div class="nd-srv-line" style="color: #059669;">HOSPEDAJE EN HOTEL ${hotelCity ? `(${hotelCity})` : ''}</div>
+                      <div class="nd-srv-line" style="color: #059669;">HOSPEDAJE</div>
                       ${roomType ? `<div class="nd-srv-line">HABITACIÓN: ${roomType}</div>` : ''}
                     </div>
                   </div>
