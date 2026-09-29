@@ -303,11 +303,19 @@ window.creditNotesModule = {
       const g = grupos[pId];
       g.hayUsd = g.hayUsd || esUsd;
       g.items.push(item);
-      if (esUsd) g.brutoUsd += (item.grossCost || item.fareAmount || 0);
-      else g.brutoBob += (item.grossCostBob || item.grossCost || item.fareAmountBob || item.fareAmount || 0);
+      // Costo del proveedor cuando el servicio lo carga. Si el servicio NO lo carga (visas,
+      // hotel, paquete...) se usa el total del item: asi TODOS los servicios con proveedor
+      // dejan su Cuenta por Pagar en vez de evaporarse en el `continue` de mas abajo.
+      const bruto = esUsd
+        ? (item.grossCost || item.fareAmount || 0)
+        : (item.grossCostBob || item.grossCost || item.fareAmountBob || item.fareAmount || 0);
+      if (!bruto) g.sinCostoBruto = true;
+      if (esUsd) g.brutoUsd += (bruto || item.totalAmountUsd || item.totalAmount || 0);
+      else g.brutoBob += (bruto || item.totalAmountBob || item.totalAmount || 0);
     });
 
     let ncDeLaNota = 0;
+    const sinMonto = [];
     for (const g of Object.values(grupos)) {
       // la NC va en la moneda del grupo (USD si algún servicio fue en dólares) y se trae lo
       // del otro lado al tipo de cambio congelado de la nota
@@ -315,9 +323,11 @@ window.creditNotesModule = {
       const total = parseFloat((ncCurrency === 'USD'
         ? (g.brutoUsd + (g.brutoBob / sellRate))
         : (g.brutoBob + (g.brutoUsd * sellRate))).toFixed(2));
-      if (total <= 0) continue;
+      // Nada se pierde en silencio: un proveedor al que habria que deberle y cuyo servicio no
+      // trae ningun monto se avisa en vez de desaparecer.
+      if (total <= 0) { sinMonto.push(g.providerName || g.providerId); continue; }
       const prov = (data.accounts || []).find(a => a.id === g.providerId) || {};
-      const srv = g.items[0]?.serviceType || window.state?.servicioActivo || 'BOLETO_AEREO';
+      const srv = g.items[0]?.serviceType || nd.serviceType || nd.serviceCategory || window.state?.servicioActivo || 'OTRO';
 
       // Código visible de la ND origen (ej: #ndBA001) para mostrar en la NC
       const originCode = nd.ndCode || (window.maretravelCodes && typeof window.maretravelCodes.showDoc === 'function' ? window.maretravelCodes.showDoc(nd, 'ND') : ('#nd' + nd.ndNumber));
@@ -347,7 +357,7 @@ window.creditNotesModule = {
         originDebitNoteNumber: nd.ndNumber,
         originDebitNoteCode: originCode,
         issueDate: nd.issueDate,
-        concept: `Liquidación automática por ${originCode} (Servicios: ${g.items.map(i => i.serviceType).join(', ')}) [Costo bruto del proveedor]`,
+        concept: `Liquidación automática por ${originCode} (Servicios: ${g.items.map(i => i.serviceType).filter(Boolean).join(', ')}) [${g.sinCostoBruto ? 'Total del servicio: el item no trae costo de proveedor' : 'Costo bruto del proveedor'}]`,
         currency: ncCurrency,
         frozenExchangeRate: sellRate,
         settlementModel: 'CONSOLIDADOR_BRUTO',
@@ -401,6 +411,9 @@ window.creditNotesModule = {
         });
       }
       ncDeLaNota++;
+    }
+    if (sinMonto.length) {
+      window.app.showToast(`${sinMonto.length} proveedor(es) sin Cuenta por Pagar porque sus servicios no traen monto: ${sinMonto.join(', ')}`, 'warning');
     }
     return ncDeLaNota;
   },

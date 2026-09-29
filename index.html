@@ -131,6 +131,14 @@
           </ul>
         </li>
 
+        <!-- Ítem Independiente de Nivel Superior: REPORTES -->
+        <li>
+          <a class="nav-item" data-view="reportes" id="nav-item-reportes">
+            <i data-lucide="file-spreadsheet"></i>
+            <span>Reportes</span>
+          </a>
+        </li>
+
         <!-- Ítem Independiente de Nivel Superior: DIRECTORIO DE CUENTAS -->
         <li>
           <a class="nav-item" data-view="cuentas" id="nav-item-cuentas">
@@ -900,10 +908,152 @@
         </section>
 
         <!-- ======================================================================
-             VISTA 7: REPORTES Y CONTABILIDAD (REEMPLAZADA POR MÓDULO INTEGRADO Y ARQUEO DIARIO EN CAJA)
+             VISTA 7: REPORTES Y EXPORTACIÓN EXCEL (FORMATO BLOQUE C)
              ====================================================================== -->
-        <section id="view-reportes" class="view-section" style="display: none;">
-          <!-- Arqueo Diario de Caja conservado y centralizado en #cash-view-arqueo dentro de Ventas & Emisiones -->
+        <section id="view-reportes" class="view-section">
+          <!-- Tarjeta de Filtros y Configuración -->
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div class="card-title">
+                <i data-lucide="file-spreadsheet"></i> Reportes Consolidados y Exportación Excel
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" class="btn btn-secondary" id="btn-export-csv-report" title="Exportar formato CSV">
+                  <i data-lucide="download"></i> Descargar CSV
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-export-excel-report" style="background: #107c41; border-color: #0e6b37; font-weight: 700;">
+                  <i data-lucide="file-spreadsheet"></i> Descargar Excel (.xlsx)
+                </button>
+              </div>
+            </div>
+
+            <!-- Panel de Filtros -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; padding: 6px 0 16px 0;">
+              <!-- 1. Selector de Servicio -->
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; font-size: 0.82rem;">
+                  <i data-lucide="briefcase" style="width: 14px; height: 14px; vertical-align: middle;"></i> Tipo de Servicio:
+                </label>
+                <select id="report-service-filter" class="form-control" style="font-weight: 600;">
+                  <option value="TODOS">TODOS LOS SERVICIOS (Consolidado)</option>
+                  <option value="BOLETO_AEREO">Boletos Aéreos</option>
+                  <option value="SEGURO_VIAJE">Seguro de Viaje</option>
+                  <option value="CERTIFICACION_FA">Certificado IFA</option>
+                  <option value="ASESORAMIENTO_VISAS">EA Visa</option>
+                  <option value="PAQUETES">Paquetes Turísticos</option>
+                  <option value="HOTEL">Hospedaje</option>
+                  <option value="RENT_A_CAR">Traslado / Rent a Car</option>
+                </select>
+              </div>
+
+              <!-- 2. Fecha Desde -->
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; font-size: 0.82rem;">
+                  <i data-lucide="calendar" style="width: 14px; height: 14px; vertical-align: middle;"></i> Fecha Desde:
+                </label>
+                <input type="date" id="report-start-date" class="form-control" style="font-weight: 600;">
+              </div>
+
+              <!-- 3. Fecha Hasta -->
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-weight: 600; font-size: 0.82rem;">
+                  <i data-lucide="calendar" style="width: 14px; height: 14px; vertical-align: middle;"></i> Fecha Hasta:
+                </label>
+                <input type="date" id="report-end-date" class="form-control" style="font-weight: 600;">
+              </div>
+            </div>
+
+            <!-- Accesos rápidos de rango de fechas -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+              <span style="font-size: 0.78rem; font-weight: 600; color: #64748b; margin-right: 4px;">Rango rápido:</span>
+              <button type="button" class="btn btn-sm btn-secondary" data-quick-range="hoy">Hoy</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-quick-range="semana">Esta Semana</button>
+              <button type="button" class="btn btn-sm btn-secondary active" data-quick-range="mes">Este Mes</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-quick-range="mes_anterior">Mes Anterior</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-quick-range="anio">Este Año</button>
+            </div>
+          </div>
+
+          <!-- Tarjetas KPI Resumen -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+            <div class="card" style="padding: 14px; border-left: 4px solid #3b82f6;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Total Registros</div>
+              <div id="kpi-rep-count" style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 4px;">0</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">ND, NC, RCP y PGP</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #0f172a;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Deuda Total (BOB)</div>
+              <div id="kpi-rep-deuda-bob" style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-top: 4px;">BOB 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Facturación en Bolivianos</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #10b981;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Pagado / Cobrado (BOB)</div>
+              <div id="kpi-rep-pago-bob" style="font-size: 1.25rem; font-weight: 800; color: #10b981; margin-top: 4px;">BOB 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Abonos en Bolivianos</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #ef4444;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Saldo Pendiente (BOB)</div>
+              <div id="kpi-rep-pend-bob" style="font-size: 1.25rem; font-weight: 800; color: #ef4444; margin-top: 4px;">BOB 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Por cobrar / por pagar</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #0284c7;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Deuda Total ($ USD)</div>
+              <div id="kpi-rep-deuda-usd" style="font-size: 1.25rem; font-weight: 800; color: #0284c7; margin-top: 4px;">USD 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Facturación en Dólares</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #059669;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Pagado / Cobrado ($ USD)</div>
+              <div id="kpi-rep-pago-usd" style="font-size: 1.25rem; font-weight: 800; color: #059669; margin-top: 4px;">USD 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Abonos en Dólares</div>
+            </div>
+
+            <div class="card" style="padding: 14px; border-left: 4px solid #dc2626;">
+              <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Saldo Pendiente ($ USD)</div>
+              <div id="kpi-rep-pend-usd" style="font-size: 1.25rem; font-weight: 800; color: #dc2626; margin-top: 4px;">USD 0.00</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">Por cobrar / por pagar</div>
+            </div>
+          </div>
+
+          <!-- Previsualización de la Tabla Exacta Bloque C -->
+          <div class="card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="card-title">
+                <i data-lucide="table"></i> Previsualización de Datos para Excel (Formato Bloque C)
+              </div>
+              <span style="font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 6px;">
+                Ordenado cronológicamente por Fecha
+              </span>
+            </div>
+
+            <div class="table-container" style="max-height: 580px; overflow: auto;">
+              <table class="erp-table" style="font-size: 0.8rem; width: 100%;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                  <tr>
+                    <th>TIPO</th>
+                    <th>CODIGO</th>
+                    <th>FECHA</th>
+                    <th>TIPO DE SERVICIO</th>
+                    <th>EMPRESA/CLIENTE</th>
+                    <th style="text-align: center;">CLIENTE O PROVEEDOR</th>
+                    <th style="text-align: right;">TOTAL DEUDA BS</th>
+                    <th style="text-align: right;">PAGO PARCIAL BS</th>
+                    <th style="text-align: right;">PENDIENTE PAGO BS</th>
+                    <th style="text-align: right;">TOTAL DEUDA $</th>
+                    <th style="text-align: right;">PAGO PARCIAL $</th>
+                    <th style="text-align: right;">PENDIENTE PAGO $</th>
+                  </tr>
+                </thead>
+                <tbody id="report-preview-tbody">
+                  <!-- Dinámico generado por excelReportsModule -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
         <!-- ======================================================================
@@ -3076,7 +3226,7 @@
   <script src="js/modules/accounts.js?v=20260925_v21"></script>
   <script src="js/modules/gds.js?v=20260925_v21"></script>
   <script src="js/modules/debitNotes.js?v=20260928_v27"></script>
-  <script src="js/modules/creditNotes.js?v=20260928_v27"></script>
+  <script src="js/modules/creditNotes.js?v=20260928_v28"></script>
   <script src="js/modules/cashRegister.js?v=20260928_v27"></script>
   <script src="js/modules/otherIncomes.js?v=20260922_v20"></script>
   <script src="js/modules/reports.js?v=20260928_v24"></script>
@@ -3084,6 +3234,8 @@
   <script src="js/modules/settings.js?v=20260922_v20"></script>
   <script src="js/modules/operationsHub.js?v=20260928_v24"></script>
   <script src="js/modules/papelera.js?v=20260925_v21"></script>
+  <script src="js/xlsx.full.min.js"></script>
+  <script src="js/modules/excelReports.js?v=20260928_v29"></script>
   <script src="js/app.js?v=20260928_login"></script>
 
 

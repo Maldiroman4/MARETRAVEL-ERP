@@ -28,3 +28,6 @@ data/database.backup-*.json
 # SQLite temporary WAL and SHM files
 *.sqlite-wal
 *.sqlite-shm
+
+# Cloudflare Tunnel Binary
+cloudflared.exe
