@@ -1368,30 +1368,10 @@ window.debitNotesModule = {
             const hotelName = (sd.hotelName || opName).toUpperCase();
             const hotelCity = (sd.hotelCity || it.city || '').toUpperCase();
             const rawCheckIn = sd.checkIn || it.checkIn || '';
-            const checkIn = rawCheckIn ? this.formatSlashDate(rawCheckIn) : '';
+            const checkIn = rawCheckIn ? this.formatSlashDate(rawCheckIn) : '-';
             const rawCheckOut = sd.checkOut || it.checkOut || '';
-            const checkOut = rawCheckOut ? this.formatSlashDate(rawCheckOut) : '';
-
-            // Estadía: calcular solo si fue ingresada o derivable de checkIn y checkOut válidos
-            let nights = sd.nights || it.nights || '';
-            if (!nights && rawCheckIn && rawCheckOut) {
-              const dIn = new Date(rawCheckIn);
-              const dOut = new Date(rawCheckOut);
-              if (!isNaN(dIn) && !isNaN(dOut) && dOut > dIn) {
-                nights = Math.round((dOut - dIn) / (1000 * 60 * 60 * 24));
-              }
-            }
-
-            // Habitación y Régimen: solo si fueron ingresados por el usuario
+            const checkOut = rawCheckOut ? this.formatSlashDate(rawCheckOut) : '-';
             const roomType = (sd.roomType || it.roomType || '').trim().toUpperCase();
-            const boardBasis = (sd.boardBasis || it.boardBasis || '').trim().toUpperCase();
-
-            // Huéspedes: solo si fue ingresado por el usuario (no quemar '1 HUÉSPED')
-            const rawGuests = (sd.guestsCount || it.guests || '').trim();
-
-            // Confirmación: solo si fue ingresado (no quemar ticketNum si es '-' o vacío)
-            const rawConfirm = (sd.confirmationNumber || it.confirmationNumber || it.voucherNumber || it.ticketNumber || it.bookingCode || '').trim();
-            const hasConfirm = rawConfirm && rawConfirm !== '-';
 
             return `
               <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
@@ -1409,7 +1389,6 @@ window.debitNotesModule = {
                     <div class="nd-v nd-service-details font-bold">
                       <div class="nd-srv-line" style="color: #059669;">HOSPEDAJE EN HOTEL ${hotelCity ? `(${hotelCity})` : ''}</div>
                       ${roomType ? `<div class="nd-srv-line">HABITACIÓN: ${roomType}</div>` : ''}
-                      ${boardBasis ? `<div class="nd-srv-line">RÉGIMEN: ${boardBasis}</div>` : ''}
                     </div>
                   </div>
                 </div>
@@ -1431,33 +1410,16 @@ window.debitNotesModule = {
                     <span class="nd-k" style="width: 105px;">Doc. Identidad:</span>
                     <span class="nd-v font-mono">${passDoc}</span>
                   </div>` : ''}
-                  ${rawGuests ? `
-                  <div class="nd-kv-row" style="margin-top: 2px;">
-                    <span class="nd-k" style="width: 105px;">Huéspedes :</span>
-                    <span class="nd-v">${rawGuests.toUpperCase()}</span>
-                  </div>` : ''}
                 </div>
                 <div class="nd-item-col nd-col-right">
-                  ${checkIn ? `
                   <div class="nd-kv-row">
                     <span class="nd-k" style="width: 120px;">Check-In :</span>
                     <span class="nd-v font-bold font-mono">${checkIn}</span>
-                  </div>` : ''}
-                  ${checkOut ? `
+                  </div>
                   <div class="nd-kv-row" style="margin-top: 3px;">
                     <span class="nd-k" style="width: 120px;">Check-Out :</span>
                     <span class="nd-v font-bold font-mono">${checkOut}</span>
-                  </div>` : ''}
-                  ${nights ? `
-                  <div class="nd-kv-row" style="margin-top: 3px;">
-                    <span class="nd-k" style="width: 120px;">Estadía :</span>
-                    <span class="nd-v font-bold" style="color: #059669;">${nights} ${nights == 1 ? 'NOCHE' : 'NOCHES'}</span>
-                  </div>` : ''}
-                  ${hasConfirm ? `
-                  <div class="nd-kv-row" style="margin-top: 3px;">
-                    <span class="nd-k" style="width: 120px;">No. Confirmación:</span>
-                    <span class="nd-v font-mono font-bold">${rawConfirm}</span>
-                  </div>` : ''}
+                  </div>
                 </div>
               </div>
             `;
