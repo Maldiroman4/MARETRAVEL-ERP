@@ -650,5 +650,15 @@ window.maretravelCodes = {
        (nc.originDebitNoteNumber && n.ndNumber === nc.originDebitNoteNumber)));
     if (nd && nd.ndCode) return nd.ndCode;
     return nc && nc.originDebitNoteNumber ? 'ND #' + nc.originDebitNoteNumber : '';
-  }
+  },
+
+  // El concepto automatico se guardo con "ND #<nro>"; al mostrarlo se reemplaza por el codigo
+  // visible de esa ND (#ndHO001). Un solo lugar para el reemplazo: antes el `replace` estaba
+  // copiado en la lista de NCs y en la impresion oficial, y faltaba en la glosa de IMP
+  // PAGOS-COBROS, que por eso seguia mostrando el numero. ponytail: si el concepto cambia de
+  // formato, se ajusta la regex aqui y no en cada pantalla.
+  conceptoConCodigo(texto, codigo) {
+    const t = String(texto == null ? '' : texto);
+    return codigo ? t.replace(/ND\s*#\s*\d+/g, codigo) : t;
+  },
 };

@@ -1123,9 +1123,7 @@ window.debitNotesModule = {
           ? window.maretravelCodes.showDoc(ndRef, 'ND')
           : ('ND #' + ndRef.ndNumber))
       : '';
-    const conceptoDoc = (refOrigen && doc.concept)
-      ? String(doc.concept).replace(/ND\s*#\s*\d+/g, refOrigen)
-      : doc.concept;
+    const conceptoDoc = window.maretravelCodes.conceptoConCodigo(doc.concept, refOrigen);
 
     // Cuenta asociada (Cliente para ND, Proveedor/Cliente para NC)
     let account = null;

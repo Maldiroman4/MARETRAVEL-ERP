@@ -1545,7 +1545,7 @@ window.cashRegisterModule = {
           <td class="font-mono">${nc.issueDate || '-'}</td>
           <td>
             <div style="font-weight: 600;">${nc.providerName}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">${nc.concept || 'Servicio'}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">${window.maretravelCodes.conceptoConCodigo(nc.concept, originDocCode) || 'Servicio'}</div>
           </td>
           <td>${originBadge}</td>
           <td class="font-mono" style="text-align: right; font-weight: 700;">
@@ -1619,7 +1619,7 @@ window.cashRegisterModule = {
         </td>
         <td class="font-mono" style="font-weight: 700; color: var(--navy);">NC #${nc.ncNumber}</td>
         <td class="font-mono">${nc.issueDate}</td>
-        <td>${nc.concept}</td>
+        <td>${window.maretravelCodes.conceptoConCodigo(nc.concept, window.maretravelCodes.refNd(data, nc))}</td>
         <td class="font-mono" style="text-align: right;">${nc.currency} ${Number(nc.totalAmount).toFixed(2)}</td>
         <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 700;">
           ${nc.currency} ${Number(nc.balance).toFixed(2)}
@@ -1932,7 +1932,11 @@ window.cashRegisterModule = {
         isInitialDocument: false,
         servicio: r.serviceCategory || (linkedNd.items && linkedNd.items[0]?.serviceType) || 'GENERAL',
         serviceCategory: r.serviceCategory || (linkedNd.items && linkedNd.items[0]?.serviceType) || 'GENERAL',
-        glosa: r.glosa || r.concept || '',
+        // Mismo criterio que la fila NC, pero acá el codigo es el de la ND del propio recibo (no
+        // el de la ND de origen de una NC): en produccion hay recibos con glosa "Abono a ND #1006
+        // - <cliente> - Cobro total ND", que mostraba el numero al lado de la ND que si sale con
+        // su codigo (#ndVI001).
+        glosa: window.maretravelCodes.conceptoConCodigo(r.glosa || r.concept || '', linkedNd.ndCode || ''),
         amountBob: amtBob,
         amountUsd: Number(r.monto_transaccion_usd ?? r.totalPaidUsd ?? (tc > 0 ? amtBob / tc : 0)),
         estado: isPartial ? 'PENDIENTE' : 'PAGADA',
@@ -2085,7 +2089,10 @@ window.cashRegisterModule = {
         isInitialDocument: true,
         servicio: nc.serviceCategory || 'GENERAL',
         serviceCategory: nc.serviceCategory || 'GENERAL',
-        glosa: nc.concept || 'Registro inicial a proveedor',
+        // La glosa es lo que sale bajo "Cliente / Proveedor" en IMP PAGOS-COBROS. Venia con el
+        // concepto crudo, asi que ahi se leia "Liquidación automática por ND #1007" mientras en
+        // la NC decia #ndHO001. Mismo helper que la lista y la impresión.
+        glosa: window.maretravelCodes.conceptoConCodigo(nc.concept, window.maretravelCodes.refNd(data, nc)) || 'Registro inicial a proveedor',
         amountBob: amtBob,
         amountUsd: amtUsd,
         estado: estadoDoc,

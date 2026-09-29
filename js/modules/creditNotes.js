@@ -148,9 +148,7 @@ window.creditNotesModule = {
       // placeholder "ND #1007" que dejaron NCs viejas y resuelve contra la ND real.
       const ref = window.maretravelCodes.refNd({ debitNotes }, nc);
       // El concepto automatico se escribio con "ND #<nro>"; se muestra con el codigo visible.
-      const concepto = nc.originDebitNoteNumber
-        ? String(nc.concept || '').replace(/ND\s*#\s*\d+/g, ref)
-        : (nc.concept || '');
+      const concepto = window.maretravelCodes.conceptoConCodigo(nc.concept, ref);
       const originBadge = (nc.originDebitNoteId || nc.originDebitNoteNumber) ?
         `<span class="badge badge-indigo" title="Generada automáticamente al emitir la ND ${ref}">Auto ND (${ref})</span>` :
         `<span class="badge badge-slate" title="Creada a mano, sin nota de débito de origen">Manual</span>`;
