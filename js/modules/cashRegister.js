@@ -37,6 +37,7 @@ window.cashRegisterModule = {
         type: type,
         amount: Number(receipt.monto_transaccion) || Number(receipt.totalPaidBob) || Number(receipt.totalPaid) || 0,
         medio: this.mapMedio(receipt.paymentMethod || 'TRANSFERENCIA'),
+        date: receipt.receiptDate || receipt.paymentDate || new Date().toISOString().split('T')[0],
         reference: reference,
         description: type === 'EGRESO' ? 'Pago a proveedor' : 'Cobranza a cliente'
       });
@@ -161,6 +162,11 @@ window.cashRegisterModule = {
 
     document.getElementById('pay-doc-type').value = isNd ? 'ND' : 'NC';
     document.getElementById('pay-doc-id').value = doc.id;
+
+    const dateInput = document.getElementById('pay-date-input');
+    if (dateInput) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
 
     const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
     const sellRate = doc.frozenExchangeRate || rates.sellRate || 6.96;
@@ -395,6 +401,7 @@ window.cashRegisterModule = {
       return;
     }
     const userNotes = (document.getElementById('pay-notes-input').value || '').trim();
+    const paymentDate = document.getElementById('pay-date-input')?.value || new Date().toISOString().split('T')[0];
 
     const { totalBob, totalUsd, balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
 
@@ -509,7 +516,7 @@ window.cashRegisterModule = {
         id: 'RCP-' + Date.now(),
         receiptNumber: nextReceiptNum,
         receiptCode: receiptCode,
-        receiptDate: new Date().toISOString().split('T')[0],
+        receiptDate: paymentDate,
         tipo: 'ND',
         tipoTransaccion: 'RECIBO DE PAGO',
         subTipoTransaccion: isFullyPaid ? 'COBRO TOTAL ND' : 'ABONO PARCIAL ND',
@@ -554,6 +561,7 @@ window.cashRegisterModule = {
           financialAccountName: finAccountId,
           titularName: 'MARETRAVEL SRL',
           reference: userNotes || 'Pago en Caja',
+          date: paymentDate,
           currency: curr,
           amount: inputAmount
         }]
@@ -566,7 +574,8 @@ window.cashRegisterModule = {
         id: 'PAY-' + Date.now(),
         receiptNumber: nextReceiptNum,
         receiptCode: receiptCode,
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: paymentDate,
+        receiptDate: paymentDate,
         tipo: 'NC',
         tipoTransaccion: 'PAGO A PROVEEDOR',
         subTipoTransaccion: isFullyPaid ? 'PAGO TOTAL NC' : 'ABONO PARCIAL NC',
