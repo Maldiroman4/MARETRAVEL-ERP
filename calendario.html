@@ -222,7 +222,7 @@
 
   <!-- Scripts -->
   <script src="js/db.js"></script>
-  <script src="js/modules/calendar.js"></script>
+  <script src="js/modules/calendar.js?v=20261001_v21"></script>
   <script>
     // Inicializador para la ventana independiente
     window.app = {
@@ -274,7 +274,7 @@
       } catch (e) { fatal(e); }
 
       // Renderizar panel de alertas laterales
-      const renderSideAlerts = () => {
+      window.renderSideAlerts = () => {
         const alerts = window.calendarModule.getUrgentReminders();
         const list = document.getElementById('side-alerts-list');
         const countBadge = document.getElementById('side-alerts-count');
@@ -289,6 +289,7 @@
                 <span class="badge ${a.badge}" style="font-size:0.65rem;">${a.title}</span>
                 <div style="font-weight:700; font-size:0.85rem; color:#0f2742; margin-top:4px;">${a.reminder.passengerName}</div>
                 <div style="font-size:0.75rem; color:#64748b;">${a.reminder.route} (${a.time})</div>
+                <div style="font-size:0.72rem; color:#475569; margin-top:2px;">📱 Tel: ${a.reminder.clientPhone ? `<strong>+591 ${a.reminder.clientPhone}</strong>` : '<span style="color:#dc2626; font-weight:600;">Sin celular</span>'}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                   <span style="font-size:0.72rem; color:#0369a1; font-weight:600;">${(a.reminder.clientName || '(sin cliente)').substring(0, 18)}</span>
                   <div style="display:flex; gap:4px;">
@@ -306,6 +307,7 @@
         }
         if (window.lucide) window.lucide.createIcons();
       };
+      const renderSideAlerts = window.renderSideAlerts;
 
       const nowCal = new Date();
       const popDateEl = document.getElementById('cal-popout-date-text');

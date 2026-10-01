@@ -448,11 +448,26 @@ window.calendarModule = {
               <strong>Cliente / Empresa:</strong><br>
               ${r.clientName}
             </div>
-            <div style="font-size: 0.88rem; margin-bottom: 10px;">
-              <strong>Celular / WhatsApp:</strong><br>
-              <a href="tel:${r.clientPhone}" style="color: #0369a1; font-weight: 700; text-decoration: none;">
-                📞 +591 ${r.clientPhone || 'Sin teléfono'}
-              </a>
+            <div style="font-size: 0.88rem; margin-bottom: 12px;">
+              <label for="reminder-detail-phone-input" style="font-weight: 700; display: block; margin-bottom: 4px; color: #0f2742;">
+                📱 Celular / WhatsApp Pasajero:
+              </label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="text" id="reminder-detail-phone-input" class="form-control font-mono font-bold" 
+                  value="${r.clientPhone || ''}" 
+                  placeholder="Ej: 77298765" 
+                  style="font-size: 0.88rem; height: 34px; padding: 4px 8px; flex: 1; border: 1.5px solid #cbd5e1;"
+                  title="Editar número de teléfono del pasajero">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-save-reminder-phone"
+                  onclick="window.calendarModule.saveReminderPhone('${r.id}')" 
+                  title="Guardar teléfono corregido" 
+                  style="height: 34px; padding: 0 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="save" style="width: 14px; height: 14px;"></i> Guardar
+                </button>
+              </div>
+              <div id="reminder-phone-save-msg" style="font-size: 0.72rem; color: #16a34a; font-weight: 600; margin-top: 3px; display: none;">
+                ✓ Teléfono guardado correctamente
+              </div>
             </div>
             <div style="font-size: 0.88rem; margin-bottom: 14px;">
               <strong>Correo Electrónico:</strong><br>
@@ -478,14 +493,87 @@ window.calendarModule = {
     window.app.openModal('modal-reminder-detail');
   },
 
+  saveReminderPhone(reminderId, newPhone = null, showNotification = true) {
+    const data = window.db ? window.db.get() : null;
+    if (!data) return;
+    const r = (data.travelReminders || []).find(x => x.id === reminderId);
+    if (!r) return;
+
+    if (newPhone === null) {
+      const input = document.getElementById('reminder-detail-phone-input');
+      newPhone = input ? input.value.trim() : '';
+    } else {
+      newPhone = String(newPhone).trim();
+    }
+
+    r.clientPhone = newPhone;
+
+    // 1. Sincronizar en la ND de origen si existe
+    if (r.sourceDocId && data.debitNotes) {
+      const nd = data.debitNotes.find(n => n.id === r.sourceDocId);
+      if (nd && Array.isArray(nd.items)) {
+        const it = nd.items.find(item => 
+          item.alertKey === r.itemKey || 
+          (item.passengerName && r.passengerName && item.passengerName.trim().toUpperCase() === r.passengerName.trim().toUpperCase())
+        );
+        if (it) {
+          if (!it.serviceDetails) it.serviceDetails = {};
+          it.serviceDetails.alertPhone = newPhone;
+          it.passengerPhone = newPhone;
+        }
+      }
+    }
+
+    // 2. Sincronizar en el directorio de pasajeros si coincide
+    if (data.passengers && r.passengerName) {
+      const p = data.passengers.find(x => (x.name || '').trim().toUpperCase() === r.passengerName.trim().toUpperCase());
+      if (p) {
+        p.phone = newPhone;
+        p.cellphone = newPhone;
+      }
+    }
+
+    window.db.save(data);
+
+    // Mensaje de guardado en el modal
+    const msgEl = document.getElementById('reminder-phone-save-msg');
+    if (msgEl) {
+      msgEl.style.display = 'block';
+      setTimeout(() => { if (msgEl) msgEl.style.display = 'none'; }, 3000);
+    }
+
+    if (showNotification && window.app && window.app.showToast) {
+      window.app.showToast(`Teléfono actualizado a "${newPhone || 'S/N'}" para ${r.passengerName}`, 'success');
+    }
+
+    // Refrescar grilla del calendario y panel de alertas
+    this.render();
+    if (typeof window.renderSideAlerts === 'function') {
+      window.renderSideAlerts();
+    }
+  },
+
   sendWhatsAppReminder(reminderId) {
     const r = this.findReminder(reminderId);
     if (!r) return;
 
-    const phone = (r.clientPhone || '').replace(/\D/g, '');
+    // Si el usuario modificó el campo de teléfono en el modal de detalle, sincronizarlo y guardarlo antes de enviar
+    const phoneInput = document.getElementById('reminder-detail-phone-input');
+    if (phoneInput && phoneInput.value.trim() && phoneInput.value.trim() !== (r.clientPhone || '').trim()) {
+      r.clientPhone = phoneInput.value.trim();
+      this.saveReminderPhone(reminderId, r.clientPhone, false);
+    }
+
+    let phone = (r.clientPhone || '').replace(/\D/g, '');
     if (!phone) {
-      if (window.app && window.app.showToast) window.app.showToast('Este pasajero no tiene número de celular registrado.', 'error');
-      return;
+      const promptPhone = prompt(`El pasajero "${r.passengerName || 'este itinerario'}" no tiene número de WhatsApp registrado o está incompleto.\n\nPor favor, ingresa el número de teléfono celular (ej: 77298765):`, '');
+      if (!promptPhone || !promptPhone.trim()) {
+        if (window.app && window.app.showToast) window.app.showToast('No se ingresó ningún número de WhatsApp.', 'warning');
+        return;
+      }
+      r.clientPhone = promptPhone.trim();
+      this.saveReminderPhone(reminderId, r.clientPhone);
+      phone = promptPhone.replace(/\D/g, '');
     }
 
     const fullPhone = phone.startsWith('591') ? phone : `591${phone}`;
