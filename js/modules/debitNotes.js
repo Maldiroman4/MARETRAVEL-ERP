@@ -1046,15 +1046,19 @@ window.debitNotesModule = {
     return `Son: ${texto} ${centavos}/100 ${sufijoMoneda}`;
   },
 
-  formatEmissionDate(dateStr, timeStr) {
-    if (!dateStr) return '17/07/2026 10:41';
+  // defaultTime se puede pasar vacio ('': sin hora) cuando la fecha viene de una transaccion
+  // que solo guarda el dia, como el recibo de pago. Las ND siguen con el 10:41 de siempre.
+  formatEmissionDate(dateStr, timeStr, defaultTime = '10:41') {
+    const hora = timeStr || defaultTime;
+    const conHora = (s) => (hora ? s + ' ' + hora : s);
+    if (!dateStr) return conHora('17/07/2026');
     try {
       const parts = dateStr.split('-');
       if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]} ${timeStr || '10:41'}`;
+        return conHora(`${parts[2]}/${parts[1]}/${parts[0]}`);
       }
     } catch(e) {}
-    return dateStr + ' ' + (timeStr || '10:41');
+    return conHora(dateStr);
   },
 
   formatServiceDate(dateStr) {
@@ -1151,9 +1155,15 @@ window.debitNotesModule = {
     ).toUpperCase();
 
     // Fecha y hora de emisión (permite personalización antes de imprimir)
-    const effectiveDate = customEmissionDate || doc.issueDate || new Date().toISOString().split('T')[0];
-    const effectiveTime = customEmissionTime || doc.issueTime || '10:41';
-    const emissionDateFormatted = this.formatEmissionDate(effectiveDate, effectiveTime);
+    // Si el documento se imprime como TRANSACCION (recibo de pago a cliente o pago a proveedor),
+    // manda la fecha de la transaccion: la ND se emitió antes y el pago pudo hacerse dias
+    // despues. Antes salia la fecha de emision de la ND de origen, asi que un recibo del 16/10
+    // se imprimia como 01/10 con la hora de la ND. Y en una transaccion no hay hora que
+    // inventar (el recibo solo guarda el dia), asi que sale sin reloj en vez del 10:41 fijo.
+    const txDate = (isTransaction && (tx.receiptDate || tx.paymentDate || tx.date)) || '';
+    const effectiveDate = customEmissionDate || txDate || doc.issueDate || new Date().toISOString().split('T')[0];
+    const effectiveTime = customEmissionTime || (txDate ? '' : (doc.issueTime || '10:41'));
+    const emissionDateFormatted = this.formatEmissionDate(effectiveDate, effectiveTime, txDate ? '' : '10:41');
 
     // Detección si es Nota de Débito por comisiones de plataforma
     const isCommissionNd = !isNc && Boolean(
@@ -2025,7 +2035,7 @@ window.debitNotesModule = {
                 <td class="nd-val-cell font-mono font-bold" style="color: #0284c7;">${refOrigen || (docType + ' #' + (doc.ndNumber || doc.ncNumber || doc.id))}</td>
               </tr>` : ''}
               <tr>
-                <td class="nd-lbl-cell">Fecha de Emisión :</td>
+                <td class="nd-lbl-cell">${isTransaction ? 'Fecha de Pago :' : 'Fecha de Emisión :'}</td>
                 <td class="nd-val-cell">${emissionDateFormatted}</td>
               </tr>
               ${isNc ? '' : `<tr>
