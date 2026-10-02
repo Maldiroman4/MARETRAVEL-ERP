@@ -395,7 +395,12 @@ window.creditNotesModule = {
           yaExiste.balanceUsd = parseFloat((ncCurrency === 'USD' ? saldo : saldo / sellRate).toFixed(2));
         }
       } else {
-        const finalNcCode = mirrorNcCode || (await window.maretravelCodes.nextForServidor(data.creditNotes, 'NC', srv));
+        // El codigo espejo no puede pisar el de otra NC. En produccion hay #ncBA004 a #ncBA007
+        // repetidos porque al CREAR una NC nunca se miro si el codigo ya estaba tomado (solo al
+        // actualizar, unas lineas mas arriba). Si esta ocupado se cae al correlativo, que si
+        // revisa los codigos en uso.
+        const espejoOcupado = mirrorNcCode && (data.creditNotes || []).some(o => !o.deleted && o.ncCode === mirrorNcCode);
+        const finalNcCode = (!espejoOcupado && mirrorNcCode) || (await window.maretravelCodes.nextForServidor(data.creditNotes, 'NC', srv));
         data.creditNotes.unshift({
           id: ncId,
           ncNumber: await window.db.numeroSiguiente('NC', 2001), // lo decide la base (nc_number es UNIQUE)
