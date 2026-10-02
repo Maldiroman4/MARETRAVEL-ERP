@@ -301,14 +301,16 @@ window.creditNotesModule = {
       g.hayUsd = g.hayUsd || esUsd;
       g.items.push(item);
       // Costo del proveedor cuando el servicio lo carga. Si el servicio NO lo carga (visas,
-      // hotel, paquete...) se usa el total del item: asi TODOS los servicios con proveedor
-      // dejan su Cuenta por Pagar en vez de evaporarse en el `continue` de mas abajo.
+      // hotel, paquete...) se usa el total del item MENOS el fee: asi TODOS los servicios con
+      // proveedor dejan su Cuenta por Pagar en vez de evaporarse en el `continue` de mas abajo,
+      // pero una operacion 100% fee no inventa una deuda. El fee es margen de la agencia:
+      // no se le debe a nadie, asi que nunca puede ser el monto de la Cuenta por Pagar.
       const bruto = esUsd
         ? (item.grossCost || item.fareAmount || 0)
         : (item.grossCostBob || item.grossCost || item.fareAmountBob || item.fareAmount || 0);
       if (!bruto) g.sinCostoBruto = true;
-      if (esUsd) g.brutoUsd += (bruto || item.totalAmountUsd || item.totalAmount || 0);
-      else g.brutoBob += (bruto || item.totalAmountBob || item.totalAmount || 0);
+      if (esUsd) g.brutoUsd += (bruto || Math.max(0, (item.totalAmountUsd || item.totalAmount || 0) - (item.feeAmountUsd || item.feeAmount || 0)));
+      else g.brutoBob += (bruto || Math.max(0, (item.totalAmountBob || item.totalAmount || 0) - (item.feeAmountBob || item.feeAmount || 0)));
     });
 
     let ncDeLaNota = 0;
