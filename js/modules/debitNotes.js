@@ -2097,7 +2097,7 @@ window.debitNotesModule = {
           <div class="nd-obs-row">
             <span class="nd-obs-badge">Observaciones ${isTransaction ? 'Recibo' : docType}:</span>
             <span class="nd-obs-content font-bold">
-              ${isTransaction && tx.glosa ? tx.glosa : obsText}
+              ${window.maretravelCodes && typeof window.maretravelCodes.conceptoConCodigo === 'function' ? window.maretravelCodes.conceptoConCodigo(isTransaction && tx.glosa ? tx.glosa : obsText, refOrigen) : (isTransaction && tx.glosa ? tx.glosa : obsText)}
               ${isPartialPayment ? ` | Total: ${currencyStr} ${(isDocUsd ? totalDocUsd : totalDocBob).toFixed(2)} | Abonado: ${currencyStr} ${(isDocUsd ? montoTransaccionUsd : montoTransaccionBob).toFixed(2)} | Saldo: ${currencyStr} ${(isDocUsd ? saldoRemanenteUsd : saldoRemanenteBob).toFixed(2)}` : ''}
             </span>
           </div>

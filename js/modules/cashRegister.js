@@ -173,7 +173,7 @@ window.cashRegisterModule = {
     const tcInput = document.getElementById('pay-exchange-rate');
     if (tcInput) tcInput.value = sellRate.toFixed(2);
 
-    const docNumLabel = isNd ? `ND #${doc.ndNumber}` : `NC #${doc.ncNumber}`;
+    const docNumLabel = isNd ? (doc.ndCode || `ND #${doc.ndNumber}`) : (doc.ncCode || `NC #${doc.ncNumber}`);
     const entityName = isNd ? (doc.accountName || 'Cliente General') : (doc.providerName || 'Proveedor');
 
     document.getElementById('pay-doc-label').textContent = docNumLabel;
@@ -502,7 +502,7 @@ window.cashRegisterModule = {
       serviceCategory = doc.serviceType;
     }
 
-    const docNumLabel = isNd ? `ND #${doc.ndNumber}` : `NC #${doc.ncNumber}`;
+    const docNumLabel = isNd ? (doc.ndCode || `ND #${doc.ndNumber}`) : (doc.ncCode || `NC #${doc.ncNumber}`);
     const glosaFinal = userNotes ? `${userNotes} - ${reciboGlosa}` : reciboGlosa;
 
     const saldoPendiente = doc.saldo_pendiente;
@@ -791,7 +791,7 @@ window.cashRegisterModule = {
 
       return `
         <tr>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nd.ndCode || ('ND #' + nd.ndNumber)}</td>
           <td class="font-mono">${nd.issueDate || '-'}</td>
           <td>
             <div style="font-weight: 600;">${nd.accountName}</div>
@@ -888,7 +888,7 @@ window.cashRegisterModule = {
         <td style="text-align: center;">
           <input type="checkbox" class="nd-collect-check" value="${nd.id}" onchange="window.cashRegisterModule.onPaymentAmountChange()" checked style="width: 16px; height: 16px; cursor: pointer;">
         </td>
-        <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
+        <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nd.ndCode || ('ND #' + nd.ndNumber)}</td>
         <td class="font-mono">${nd.issueDate}</td>
         <td class="font-mono" style="text-align: right;">${totalDisplay}</td>
         <td class="font-mono" style="text-align: right; color: #b91c1c; font-weight: 700;" id="nd-bal-${nd.id}">
@@ -1626,7 +1626,7 @@ window.cashRegisterModule = {
         <td style="text-align: center;">
           <input type="checkbox" class="nc-pay-check" value="${nc.id}" checked style="width: 16px; height: 16px; cursor: pointer;">
         </td>
-        <td class="font-mono" style="font-weight: 700; color: var(--navy);">NC #${nc.ncNumber}</td>
+        <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nc.ncCode || ('NC #' + nc.ncNumber)}</td>
         <td class="font-mono">${nc.issueDate}</td>
         <td>${window.maretravelCodes.conceptoConCodigo(nc.concept, window.maretravelCodes.refNd(data, nc))}</td>
         <td class="font-mono" style="text-align: right;">${nc.currency} ${Number(nc.totalAmount).toFixed(2)}</td>
@@ -1936,7 +1936,7 @@ window.cashRegisterModule = {
         number: r.receiptCode || ('RCP-' + String(r.receiptNumber).padStart(5, '0')),
         date: r.receiptDate || r.date || (r.createdAt ? r.createdAt.split(',')[0] : '-'),
         party: linkedNd.accountName || r.accountName || 'Cliente General',
-        documentoOrigen: r.documentoOrigen || (linkedNd ? `ND #${linkedNd.ndNumber}` : ''),
+        documentoOrigen: linkedNd.ndCode || r.documentoOrigen || (linkedNd ? `ND #${linkedNd.ndNumber}` : ''),
         tipoTransaccion: 'RECIBO DE PAGO',
         isInitialDocument: false,
         servicio: r.serviceCategory || (linkedNd.items && linkedNd.items[0]?.serviceType) || 'GENERAL',
@@ -1986,10 +1986,10 @@ window.cashRegisterModule = {
       transaccionesCaja.push({
         tipo: 'ND',
         id: nd.id,
-        number: 'ND #' + (nd.ndNumber || nd.id),
+        number: nd.ndCode || ('ND #' + (nd.ndNumber || nd.id)),
         date: nd.issueDate || (nd.createdAt ? nd.createdAt.split(',')[0] : '-'),
         party: nd.accountName || 'Cliente General',
-        documentoOrigen: `ND #${nd.ndNumber || nd.id}`,
+        documentoOrigen: nd.ndCode || `ND #${nd.ndNumber || nd.id}`,
         tipoTransaccion: 'NOTA DE DÉBITO',
         isInitialDocument: true,
         servicio: (nd.items && nd.items[0]?.serviceType) || nd.serviceType || 'GENERAL',
@@ -2046,7 +2046,7 @@ window.cashRegisterModule = {
         number: p.receiptCode || ('RCP-' + String(p.receiptNumber).padStart(5, '0')),
         date: p.paymentDate || (p.createdAt ? p.createdAt.split(',')[0] : '-'),
         party: linkedNc.providerName || p.providerName || 'Proveedor',
-        documentoOrigen: p.documentoOrigen || (linkedNc ? `NC #${linkedNc.ncNumber}` : ''),
+        documentoOrigen: linkedNc.ncCode || p.documentoOrigen || (linkedNc ? `NC #${linkedNc.ncNumber}` : ''),
         tipoTransaccion: 'PAGO A PROVEEDOR',
         isInitialDocument: false,
         servicio: p.serviceCategory || linkedNc.serviceCategory || 'GENERAL',
@@ -2090,10 +2090,10 @@ window.cashRegisterModule = {
       transaccionesCaja.push({
         tipo: 'NC',
         id: nc.id,
-        number: 'NC #' + (nc.ncNumber || nc.id),
+        number: nc.ncCode || ('NC #' + (nc.ncNumber || nc.id)),
         date: nc.issueDate || (nc.createdAt ? nc.createdAt.split(',')[0] : '-'),
         party: nc.providerName || 'Proveedor',
-        documentoOrigen: `NC #${nc.ncNumber || nc.id}`,
+        documentoOrigen: nc.ncCode || `NC #${nc.ncNumber || nc.id}`,
         tipoTransaccion: 'NOTA DE CRÉDITO',
         isInitialDocument: true,
         servicio: nc.serviceCategory || 'GENERAL',
@@ -2762,9 +2762,11 @@ window.cashRegisterModule = {
 
         details.forEach(d => {
           const isTotal = Number(d.remainingBalanceBob || 0) <= 0.05;
+          const linkedNd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+          const ndLabel = (linkedNd && linkedNd.ndCode) ? linkedNd.ndCode : (d.ndCode || (d.ndNumber ? ('ND #' + d.ndNumber) : (r.documentoOrigen || '-')));
           movements.push({
             receiptNumber: r.receiptNumber,
-            ndNumber: d.ndNumber || '-',
+            ndLabel: ndLabel,
             date: r.receiptDate || r.date || '-',
             client: r.accountName || '-',
             solicitante: r.solicitante || '-',
@@ -2782,7 +2784,7 @@ window.cashRegisterModule = {
         detailTbody.innerHTML = movements.map(m => `
           <tr>
             <td class="font-mono" style="font-weight: 700; color: var(--navy);">REC #${m.receiptNumber}</td>
-            <td class="font-mono" style="color: #0369a1; font-weight: 600;">ND #${m.ndNumber}</td>
+            <td class="font-mono" style="color: #0369a1; font-weight: 600;">${m.ndLabel}</td>
             <td class="font-mono" style="font-size: 0.75rem;">${m.date}</td>
             <td>
               <strong>${m.client}</strong>

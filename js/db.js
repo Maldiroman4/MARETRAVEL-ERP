@@ -659,6 +659,10 @@ window.maretravelCodes = {
   // formato, se ajusta la regex aqui y no en cada pantalla.
   conceptoConCodigo(texto, codigo) {
     const t = String(texto == null ? '' : texto);
-    return codigo ? t.replace(/ND\s*#\s*\d+/g, codigo) : t;
+    if (!codigo) return t;
+    if (String(codigo).toLowerCase().includes('nc')) {
+      return t.replace(/NC\s*#\s*\d+/gi, codigo);
+    }
+    return t.replace(/ND\s*#\s*\d+/gi, codigo);
   },
 };

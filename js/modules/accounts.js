@@ -813,7 +813,7 @@ window.accountsModule = {
 
       return `
         <tr>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nd.ndCode || ('ND #' + nd.ndNumber)}</td>
           <td class="font-mono">${nd.issueDate}</td>
           <td>
             <div style="font-weight: 600; color: #0369a1;">${nd.solicitante || 'General'}</div>

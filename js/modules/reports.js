@@ -166,9 +166,12 @@ window.reportsModule = {
         r.details.forEach(d => {
           const pmNames = r.payments.map(p => p.paymentMethodName).join(' + ');
           const isTotal = d.remainingBalanceBob <= 0.05;
+          const linkedNd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+          const ndLabel = (linkedNd && linkedNd.ndCode) ? linkedNd.ndCode : (d.ndCode || (d.ndNumber ? ('ND #' + d.ndNumber) : (r.documentoOrigen || '-')));
           movements.push({
             receiptNumber: r.receiptNumber,
             ndNumber: d.ndNumber,
+            ndLabel: ndLabel,
             date: r.receiptDate,
             client: r.accountName,
             solicitante: r.solicitante,
@@ -186,7 +189,7 @@ window.reportsModule = {
         detailTbody.innerHTML = movements.map(m => `
           <tr>
             <td class="font-mono" style="font-weight: 700;">REC #${m.receiptNumber}</td>
-            <td class="font-mono" style="color: #0369a1; font-weight: 600;">ND #${m.ndNumber}</td>
+            <td class="font-mono" style="color: #0369a1; font-weight: 600;">${m.ndLabel}</td>
             <td class="font-mono" style="font-size: 0.75rem;">${m.date}</td>
             <td>
               <strong>${m.client}</strong>
@@ -266,7 +269,7 @@ window.reportsModule = {
       return `
         <tr style="${isVoid ? 'background: #fff1f2; text-decoration: line-through; opacity: 0.7;' : ''}">
           <td class="font-mono" style="text-align: center;">${index + 1}</td>
-          <td class="font-mono" style="font-weight: 700; color: var(--navy);">ND #${nd.ndNumber}</td>
+          <td class="font-mono" style="font-weight: 700; color: var(--navy);">${nd.ndCode || ('ND #' + nd.ndNumber)}</td>
           <td class="font-mono">${nd.issueDate}</td>
           <td class="font-mono"><strong>${nd.accountNit || 'S/N'}</strong></td>
           <td>
@@ -442,6 +445,7 @@ window.reportsModule = {
 
         rows.push({
           ndNumber: nd.ndNumber,
+          ndCode: nd.ndCode || ('ND #' + nd.ndNumber),
           date: nd.issueDate,
           client: nd.accountName,
           service: `${item.serviceType} - ${item.passengerName}`,
@@ -461,7 +465,7 @@ window.reportsModule = {
 
     tbody.innerHTML = rows.map(r => `
       <tr>
-        <td class="font-mono" style="font-weight: 700;">ND #${r.ndNumber}</td>
+        <td class="font-mono" style="font-weight: 700;">${r.ndCode || ('ND #' + r.ndNumber)}</td>
         <td class="font-mono">${r.date}</td>
         <td><strong>${r.client}</strong></td>
         <td><span style="font-size: 0.78rem;">${r.service}</span></td>
@@ -894,9 +898,12 @@ window.reportsModule = {
 
       r.details.forEach(d => {
         const pmNames = r.payments.map(p => `${p.paymentMethodName} (${p.currency} ${Number(p.amount).toFixed(2)})`).join(' + ');
+        const linkedNd = (data.debitNotes || []).find(n => n.id === d.debitNoteId || n.ndNumber === d.ndNumber);
+        const ndLabel = (linkedNd && linkedNd.ndCode) ? linkedNd.ndCode : (d.ndCode || (d.ndNumber ? ('ND #' + d.ndNumber) : (r.documentoOrigen || '-')));
         movements.push({
           receiptNumber: r.receiptNumber,
           ndNumber: d.ndNumber,
+          ndLabel: ndLabel,
           date: r.receiptDate,
           client: r.accountName,
           solicitante: r.solicitante || '-',
@@ -983,7 +990,7 @@ window.reportsModule = {
               ${movements.length > 0 ? movements.map(m => `
                 <tr>
                   <td class="font-mono" style="font-weight: 700;">REC #${m.receiptNumber}</td>
-                  <td class="font-mono" style="color: #0369a1; font-weight: 600;">ND #${m.ndNumber}</td>
+                  <td class="font-mono" style="color: #0369a1; font-weight: 600;">${m.ndLabel || ('ND #' + m.ndNumber)}</td>
                   <td class="font-mono">${m.date}</td>
                   <td><strong>${m.client}</strong></td>
                   <td>${m.solicitante}</td>
