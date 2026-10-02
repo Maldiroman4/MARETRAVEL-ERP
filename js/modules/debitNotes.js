@@ -1686,10 +1686,6 @@ window.debitNotesModule = {
                 </div>
                 <div class="nd-item-col nd-col-right">
                   <div class="nd-kv-row">
-                    <span class="nd-k" style="width: 120px;">Fec. Trámite :</span>
-                    <span class="nd-v font-bold">${ticketDate}</span>
-                  </div>
-                  <div class="nd-kv-row" style="margin-top: 3px;">
                     <span class="nd-k" style="width: 120px;">Cita Consular :</span>
                     <span class="nd-v font-bold font-mono" style="color: #dc2626;">${appDate} ${appTime}</span>
                   </div>
