@@ -187,12 +187,51 @@ async function readDb() {
 }
 
 /**
+ * Normalización preventiva: asegura que cualquier cuenta registrada en bankAccounts
+ * exista y esté sincronizada en financialAccounts antes de persistir en SQLite/Turso.
+ */
+function ensureFinancialAccountsSync(data) {
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data.bankAccounts)) {
+    if (!Array.isArray(data.financialAccounts)) data.financialAccounts = [];
+    for (const bnk of data.bankAccounts) {
+      if (!bnk || !bnk.id) continue;
+      const idx = data.financialAccounts.findIndex(f => f.id === bnk.id);
+      const finObj = {
+        id: bnk.id,
+        type: bnk.type || 'BANCO',
+        bankName: bnk.bankName || '',
+        accountNumber: bnk.accountNumber || '',
+        accountType: bnk.accountType || 'CORRIENTE',
+        titularName: bnk.titularName || '',
+        currency: bnk.currency || 'BOB',
+        isActive: bnk.isActive !== false,
+        currentBalance: bnk.currentBalance ?? bnk.initialBalance ?? 0,
+        initialBalance: bnk.initialBalance ?? bnk.currentBalance ?? 0,
+        deleted: bnk.deleted === true,
+        deletedAt: bnk.deletedAt || null,
+        deletedBy: bnk.deletedBy || null,
+        createdAt: bnk.createdAt || new Date().toLocaleString(),
+        updatedAt: bnk.updatedAt || new Date().toLocaleString()
+      };
+      if (idx !== -1) {
+        data.financialAccounts[idx] = { ...data.financialAccounts[idx], ...finObj };
+      } else {
+        data.financialAccounts.push(finObj);
+      }
+    }
+  }
+}
+
+/**
  * Guarda sincrónica y atómicamente la base de datos en la base de datos SQL (Turso o SQLite).
  */
 async function saveDb(data) {
   if (!data || typeof data !== 'object') {
     throw new Error('Datos inválidos para persistencia en base de datos.');
   }
+  ensureFinancialAccountsSync(data);
+
   // 1. Persistencia transaccional (Turso nube o SQLite local según capa activa)
   const resultado = await persistence.saveFullState(data);
   if (resultado && resultado.omitidos && resultado.omitidos.length) {

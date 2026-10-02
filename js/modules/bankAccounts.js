@@ -293,6 +293,27 @@ window.bankAccountsModule = {
           isActive,
           updatedAt: now
         };
+        // Sincronizar en financialAccounts (fuente relacional persistente)
+        if (!data.financialAccounts) data.financialAccounts = [];
+        const finIndex = data.financialAccounts.findIndex(f => f.id === this.editingAccountId);
+        const finPayload = {
+          id: this.editingAccountId,
+          type: type || 'BANCO',
+          bankName,
+          accountNumber,
+          accountType,
+          titularName,
+          currency,
+          isActive,
+          currentBalance: initialBalance,
+          initialBalance,
+          updatedAt: now
+        };
+        if (finIndex !== -1) {
+          data.financialAccounts[finIndex] = { ...data.financialAccounts[finIndex], ...finPayload };
+        } else {
+          data.financialAccounts.push(finPayload);
+        }
         window.db.save(data);
         window.app.showToast('Cuenta bancaria actualizada exitosamente.', 'success');
       }
@@ -312,6 +333,22 @@ window.bankAccountsModule = {
         updatedAt: now
       };
       data.bankAccounts.unshift(newAccount);
+      // Sincronizar simultáneamente en financialAccounts para persistencia en SQLite/Turso
+      if (!data.financialAccounts) data.financialAccounts = [];
+      data.financialAccounts.unshift({
+        id: newAccount.id,
+        type: newAccount.type || 'BANCO',
+        bankName: newAccount.bankName,
+        accountNumber: newAccount.accountNumber,
+        accountType: newAccount.accountType,
+        titularName: newAccount.titularName,
+        currency: newAccount.currency,
+        isActive: newAccount.isActive,
+        currentBalance: newAccount.initialBalance,
+        initialBalance: newAccount.initialBalance,
+        createdAt: newAccount.createdAt,
+        updatedAt: newAccount.updatedAt
+      });
       window.db.save(data);
       window.app.showToast('Nueva cuenta bancaria registrada en el sistema.', 'success');
     }
@@ -330,6 +367,13 @@ window.bankAccountsModule = {
 
     acc.isActive = !acc.isActive;
     acc.updatedAt = new Date().toLocaleString();
+
+    if (!data.financialAccounts) data.financialAccounts = [];
+    const finAcc = data.financialAccounts.find(f => f.id === id);
+    if (finAcc) {
+      finAcc.isActive = acc.isActive;
+      finAcc.updatedAt = acc.updatedAt;
+    }
 
     window.db.save(data);
     const statusText = acc.isActive ? 'ACTIVADA (se mostrará en documentos e impresiones)' : 'DESACTIVADA (oculta en documentos)';
@@ -361,7 +405,7 @@ window.bankAccountsModule = {
     acc.deletedBy = (data.currentUser && data.currentUser.name) || 'Administrador';
     // La cuenta bancaria vive realmente en financial_accounts (type='BANCO') y bankAccounts
     // es una proyección: marcar también la fuente para que el soft-delete persista en la BD.
-    const finCopy = (data.financialAccounts || []).find(f => f.id === acc.id && f.type === 'BANCO');
+    const finCopy = (data.financialAccounts || []).find(f => f.id === acc.id);
     if (finCopy) {
       finCopy.deleted = true;
       finCopy.deletedAt = acc.deletedAt;

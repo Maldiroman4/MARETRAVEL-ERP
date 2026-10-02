@@ -499,7 +499,7 @@ const tursoDatabase = {
       ],
       paymentMethods: paymentMethods.length > 0 ? paymentMethods : [],
       financialAccounts,
-      bankAccounts: financialAccounts.filter(a => a.type === 'BANCO'),
+      bankAccounts: financialAccounts.filter(a => (a.type || 'BANCO') === 'BANCO'),
       accounts,
       accountHistory,
       companyContacts: kv.companyContacts,
@@ -543,6 +543,37 @@ const tursoDatabase = {
           sql: 'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
           args: [k, JSON.stringify(state[k])]
         });
+      }
+    }
+
+    // Unificación preventiva: las cuentas bancarias se persisten en financial_accounts
+    if (Array.isArray(state.bankAccounts)) {
+      if (!Array.isArray(state.financialAccounts)) state.financialAccounts = [];
+      for (const bnk of state.bankAccounts) {
+        if (!bnk || !bnk.id) continue;
+        const idx = state.financialAccounts.findIndex(f => f.id === bnk.id);
+        const finObj = {
+          id: bnk.id,
+          type: bnk.type || 'BANCO',
+          bankName: bnk.bankName || '',
+          accountNumber: bnk.accountNumber || '',
+          accountType: bnk.accountType || 'CORRIENTE',
+          titularName: bnk.titularName || '',
+          currency: bnk.currency || 'BOB',
+          isActive: bnk.isActive !== false,
+          currentBalance: bnk.currentBalance ?? bnk.initialBalance ?? 0,
+          initialBalance: bnk.initialBalance ?? bnk.currentBalance ?? 0,
+          deleted: bnk.deleted === true,
+          deletedAt: bnk.deletedAt || null,
+          deletedBy: bnk.deletedBy || null,
+          createdAt: bnk.createdAt || new Date().toLocaleString(),
+          updatedAt: bnk.updatedAt || new Date().toLocaleString()
+        };
+        if (idx !== -1) {
+          state.financialAccounts[idx] = { ...state.financialAccounts[idx], ...finObj };
+        } else {
+          state.financialAccounts.push(finObj);
+        }
       }
     }
 
