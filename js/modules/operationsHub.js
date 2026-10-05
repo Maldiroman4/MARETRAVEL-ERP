@@ -1411,11 +1411,11 @@ class OperationsHubModule {
                     style="text-align: right;" required>
                 </div>
 
-                <!-- 2. % Comisión (Input editable) -->
+                <!-- 2. % Comisión (Input editable, hasta 4 decimales: 12.3750%) -->
                 <div>
                   <label class="form-label font-bold" style="font-size: 0.75rem;">% Comisión:</label>
-                  <input type="number" step="0.01" class="form-control font-mono" 
-                    value="${item.providerCommissionRate || 0}" 
+                  <input type="number" step="0.0001" min="0" class="form-control font-mono" 
+                    value="${Number(item.providerCommissionRate || 0).toFixed(4)}" 
                     oninput="window.operationsHubModule.onInsuranceFieldChange(${idx}, 'providerCommissionRate', this.value)" 
                     style="text-align: right;">
                 </div>
@@ -1909,6 +1909,10 @@ class OperationsHubModule {
     const fare = parseFloat(item.fareAmount) || 0;
     const rate = parseFloat(item.providerCommissionRate) || 0;
     const fee = parseFloat(item.feeAmount) || 0;
+    // El item de Seguro no tiene input de "costo de proveedor": el unico precio es el de la
+    // poliza. Sin esto grossCost se queda en 0 y lo que se guarda (netCostToProvider) no
+    // coincide con el "Neto a proveedor" que muestra la pantalla.
+    item.grossCost = fare;
     const comm = fare * (rate / 100);
     const total = fare + fee;
     const isGross = (item.settlementModel === 'CONSOLIDADOR_BRUTO');

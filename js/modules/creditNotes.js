@@ -305,12 +305,34 @@ window.creditNotesModule = {
       // proveedor dejan su Cuenta por Pagar en vez de evaporarse en el `continue` de mas abajo,
       // pero una operacion 100% fee no inventa una deuda. El fee es margen de la agencia:
       // no se le debe a nadie, asi que nunca puede ser el monto de la Cuenta por Pagar.
-      const bruto = esUsd
-        ? (item.grossCost || item.fareAmount || 0)
-        : (item.grossCostBob || item.grossCost || item.fareAmountBob || item.fareAmount || 0);
-      if (!bruto) g.sinCostoBruto = true;
-      if (esUsd) g.brutoUsd += (bruto || Math.max(0, (item.totalAmountUsd || item.totalAmount || 0) - (item.feeAmountUsd || item.feeAmount || 0)));
-      else g.brutoBob += (bruto || Math.max(0, (item.totalAmountBob || item.totalAmount || 0) - (item.feeAmountBob || item.feeAmount || 0)));
+      let bruto;
+      if (item.serviceType === 'SEGURO_VIAJE') {
+        // El SEGURO cobra comision por sobre el precio de la poliza: al proveedor se le debe el
+        // precio MENOS la comision. `grossCost` no sirve para eso: el modulo de seguro no tiene
+        // input de costo de proveedor (queda en 0), y el generador caia al `fallback` de
+        // fareAmount para debitarle al proveedor el precio COMPLETO. En produccion asi se emitio
+        // #ncSV001 en 475.17 cuando correspondian 308.91. Aca el monto es el que es, sin
+        // `fallback`: con 100% de comision el 0 es un 0 de verdad y no puede convertirse en el
+        // precio entero.
+        const precio = esUsd ? (item.fareAmount || 0) : (item.fareAmountBob || item.fareAmount || 0);
+        if (precio) {
+          bruto = Math.max(0, precio - precio * ((Number(item.providerCommissionRate) || 0) / 100));
+        } else {
+          // Sin precio de poliza no hay comision que descontar: se respeta el costo de proveedor
+          // que venga cargado (Notas de Debito viejas o armadas fuera del modulo de Seguro).
+          const costo = esUsd ? (item.grossCost || 0) : (item.grossCostBob || item.grossCost || 0);
+          if (!costo) g.sinCostoBruto = true;
+          bruto = costo;
+        }
+      } else {
+        const costo = esUsd
+          ? (item.grossCost || item.fareAmount || 0)
+          : (item.grossCostBob || item.grossCost || item.fareAmountBob || item.fareAmount || 0);
+        if (!costo) g.sinCostoBruto = true;
+        bruto = costo || Math.max(0, (esUsd ? (item.totalAmountUsd || item.totalAmount || 0) : (item.totalAmountBob || item.totalAmount || 0)) - (esUsd ? (item.feeAmountUsd || item.feeAmount || 0) : (item.feeAmountBob || item.feeAmount || 0)));
+      }
+      if (esUsd) g.brutoUsd += bruto;
+      else g.brutoBob += bruto;
     });
 
     let ncDeLaNota = 0;
