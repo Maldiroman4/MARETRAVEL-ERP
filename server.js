@@ -550,7 +550,7 @@ const server = http.createServer(async (req, res) => {
       // Las cuentas bancarias viven en financial_accounts (type='BANCO'): al purgar una,
       // se quita también la fila financiera de origen, o la cuenta reaparecería en el próximo read.
       if (body.type === 'bankAccounts') {
-        state.financialAccounts = (state.financialAccounts || []).filter(f => !(f.id === body.id && f.type === 'BANCO'));
+        state.financialAccounts = (state.financialAccounts || []).filter(f => f.id !== body.id);
       }
       await saveDb(state); // snapshot JSON + upserts (el prune conserva filas con flag soft-delete)
 

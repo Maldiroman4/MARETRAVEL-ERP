@@ -1031,7 +1031,7 @@ const sqlDatabase = {
       ],
       paymentMethods: paymentMethods.length > 0 ? paymentMethods : [],
       financialAccounts,
-      bankAccounts: financialAccounts.filter(a => (a.type || 'BANCO') === 'BANCO'),
+      bankAccounts: financialAccounts.filter(a => ['BANCO', 'EFECTIVO', 'BINANCE'].includes(a.type || 'BANCO')),
       accounts,
       accountHistory,
       companyContacts: kv.companyContacts,

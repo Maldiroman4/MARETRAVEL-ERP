@@ -2484,40 +2484,49 @@
   <div class="modal-overlay" id="modal-bank-account">
     <div class="modal-box" style="max-width: 640px;">
       <div class="modal-header">
-        <h3 class="modal-title" id="bank-account-modal-title">Registrar Cuenta Bancaria</h3>
+        <h3 class="modal-title" id="bank-account-modal-title">Registrar Nueva Cuenta Bancaria o Caja</h3>
         <button class="modal-close" data-close-modal="modal-bank-account">&times;</button>
       </div>
       <form id="bank-account-form">
         <div class="modal-content">
           <div class="form-group">
-            <label class="form-label">Entidad Bancaria:</label>
-            <select id="bank-name-select" class="form-control" required>
-              <option value="">-- Seleccionar Banco o Plataforma --</option>
-              <option value="Banco Ganadero S.A.">Banco Ganadero S.A.</option>
-              <option value="Binance (USDT / P2P Billetera Cripto)">Binance (USDT / P2P Billetera Cripto)</option>
-              <option value="Banco Mercantil Santa Cruz (BMSC)">Banco Mercantil Santa Cruz (BMSC)</option>
-              <option value="Banco Bisa S.A.">Banco Bisa S.A.</option>
-              <option value="Banco Nacional de Bolivia (BNB)">Banco Nacional de Bolivia (BNB)</option>
-              <option value="Banco de Crédito de Bolivia (BCP)">Banco de Crédito de Bolivia (BCP)</option>
-              <option value="Banco Unión S.A.">Banco Unión S.A.</option>
-              <option value="Banco Económico S.A.">Banco Económico S.A.</option>
-              <option value="Banco FIE S.A.">Banco FIE S.A.</option>
-              <option value="Banco Solidario S.A. (BancoSol)">Banco Solidario S.A. (BancoSol)</option>
-              <option value="Banco Fortaleza S.A.">Banco Fortaleza S.A.</option>
+            <label class="form-label" id="bank-name-label">Entidad Bancaria, Billetera o Caja:</label>
+            <select id="bank-name-select" class="form-control" required onchange="window.bankAccountsModule.onEntitySelectChange(this.value)">
+              <option value="">-- Seleccionar Banco, Plataforma o Caja --</option>
+              <optgroup label="💵 Cajas de Efectivo Físico">
+                <option value="Caja Efectivo BOB">💵 Efectivo Moneda Nacional (Caja BOB)</option>
+                <option value="Caja Efectivo USD">💵 Efectivo Dólares Americanos (Caja USD)</option>
+              </optgroup>
+              <optgroup label="🏦 Bancos Oficiales de Bolivia">
+                <option value="Banco Ganadero S.A.">Banco Ganadero S.A.</option>
+                <option value="Banco Mercantil Santa Cruz (BMSC)">Banco Mercantil Santa Cruz (BMSC)</option>
+                <option value="Banco Bisa S.A.">Banco Bisa S.A.</option>
+                <option value="Banco Nacional de Bolivia (BNB)">Banco Nacional de Bolivia (BNB)</option>
+                <option value="Banco de Crédito de Bolivia (BCP)">Banco de Crédito de Bolivia (BCP)</option>
+                <option value="Banco Unión S.A.">Banco Unión S.A.</option>
+                <option value="Banco Económico S.A.">Banco Económico S.A.</option>
+                <option value="Banco FIE S.A.">Banco FIE S.A.</option>
+                <option value="Banco Solidario S.A. (BancoSol)">Banco Solidario S.A. (BancoSol)</option>
+                <option value="Banco Fortaleza S.A.">Banco Fortaleza S.A.</option>
+              </optgroup>
+              <optgroup label="🟡 Billeteras Digitales / Cripto">
+                <option value="Binance (USDT / P2P Billetera Cripto)">Binance (USDT / P2P Billetera Cripto)</option>
+              </optgroup>
             </select>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
             <div style="grid-column: span 2;">
-              <label class="form-label">Número de Cuenta Bancaria / ID Wallet:</label>
+              <label class="form-label" id="bank-account-number-label">Número de Cuenta Bancaria / ID Wallet:</label>
               <input type="text" id="bank-account-number" class="form-control font-mono" placeholder="Ej: 100-29384-2 o Pay ID Binance" required>
             </div>
-            <div>
+            <div id="bank-account-type-group">
               <label class="form-label">Tipo de Cuenta:</label>
               <select id="bank-account-type" class="form-control">
                 <option value="CORRIENTE">Cuenta Corriente</option>
                 <option value="AHORROS">Caja de Ahorros</option>
                 <option value="BILLETERA_DIGITAL">Billetera Digital / P2P</option>
+                <option value="EFECTIVO">Caja Física / Efectivo</option>
               </select>
             </div>
           </div>
@@ -2531,13 +2540,13 @@
               </select>
             </div>
             <div style="grid-column: span 2;">
-              <label class="form-label">Titular Oficial Registrado:</label>
+              <label class="form-label" id="bank-titular-label">Titular Oficial Registrado:</label>
               <input type="text" id="bank-titular" class="form-control" value="MARETRAVEL S.R.L." required>
             </div>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
-            <div>
+            <div id="bank-type-group">
               <label class="form-label">Tipo de Origen:</label>
               <select id="bank-type" class="form-control">
                 <option value="BANCO">Banco</option>

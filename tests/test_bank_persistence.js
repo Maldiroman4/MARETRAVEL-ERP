@@ -67,18 +67,49 @@ async function runTest() {
 
   console.log(' -> Edición y cambio de estado persistidos correctamente.');
 
-  // 5. Limpieza del registro de prueba
-  console.log('[TEST 4] Limpiando registro de prueba...');
-  reloaded2.bankAccounts = reloaded2.bankAccounts.filter(a => a.id !== testId);
-  reloaded2.financialAccounts = reloaded2.financialAccounts.filter(a => a.id !== testId);
+  // 5. Test de persistencia de Cajas de Efectivo (type: 'EFECTIVO')
+  console.log('[TEST 4] Probando persistencia y proyección de Caja Efectivo (type: EFECTIVO)...');
+  const cashTestId = 'CSH-TEST-' + Date.now().toString(36).toUpperCase();
+  const testCashAccount = {
+    id: cashTestId,
+    type: 'EFECTIVO',
+    bankName: 'Caja Efectivo BOB',
+    accountNumber: 'CAJA-BOB',
+    accountType: 'EFECTIVO',
+    currency: 'BOB',
+    titularName: 'Cajero Principal',
+    initialBalance: 5000,
+    isActive: true,
+    createdAt: new Date().toLocaleString(),
+    updatedAt: new Date().toLocaleString()
+  };
+
+  reloaded2.bankAccounts.unshift(testCashAccount);
   sqlDatabase.saveFullState(reloaded2);
 
+  const reloadedWithCash = sqlDatabase.getFullState();
+  const foundCashInBank = (reloadedWithCash.bankAccounts || []).find(a => a.id === cashTestId);
+  const foundCashInFin = (reloadedWithCash.financialAccounts || []).find(a => a.id === cashTestId);
+
+  assert(foundCashInFin, `ERROR: La caja ${cashTestId} no se guardó en financialAccounts!`);
+  assert(foundCashInBank, `ERROR: La caja ${cashTestId} (type EFECTIVO) no se proyectó en bankAccounts tras recarga!`);
+  assert.strictEqual(foundCashInBank.bankName, 'Caja Efectivo BOB');
+  assert.strictEqual(foundCashInBank.accountNumber, 'CAJA-BOB');
+  assert.strictEqual(foundCashInBank.type, 'EFECTIVO');
+  console.log(' -> Caja de efectivo persistida y proyectada en bankAccounts correctamente.');
+
+  // 6. Limpieza de registros de prueba
+  console.log('[TEST 5] Limpiando registros de prueba...');
+  reloadedWithCash.bankAccounts = reloadedWithCash.bankAccounts.filter(a => a.id !== testId && a.id !== cashTestId);
+  reloadedWithCash.financialAccounts = reloadedWithCash.financialAccounts.filter(a => a.id !== testId && a.id !== cashTestId);
+  sqlDatabase.saveFullState(reloadedWithCash);
+
   const finalCheck = sqlDatabase.getFullState();
-  assert(!finalCheck.bankAccounts.some(a => a.id === testId), 'El registro de prueba debe haber sido limpiado');
+  assert(!finalCheck.bankAccounts.some(a => a.id === testId || a.id === cashTestId), 'Los registros de prueba deben haber sido limpiados');
 
   console.log('================================================================');
   console.log('>>> [PASS] TODOS LOS CHECKS DE PERSISTENCIA PASARON CON ÉXITO.');
-  console.log('    Las cuentas bancarias se persisten físicamente y no se borran.');
+  console.log('    Tanto cuentas bancarias como cajas de efectivo se persisten y proyectan.');
   console.log('================================================================');
 }
 

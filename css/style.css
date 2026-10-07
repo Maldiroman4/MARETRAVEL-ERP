@@ -1325,6 +1325,11 @@ body {
   color: #15803d;
 }
 
+.bank-icon-avatar.icon-cash {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .bank-name {
   font-size: 0.95rem;
   font-weight: 700;
