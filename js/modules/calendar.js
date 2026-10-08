@@ -586,6 +586,11 @@ window.calendarModule = {
       msg += `🕐 *Hora:* ${r.departureTime || 'Por confirmar'}\n`;
       if (r.airline) msg += `📄 *Tipo de Visa:* ${r.airline}\n`;
       msg += `\nLleve su pasaporte vigente y los documentos solicitados por la embajada, preséntese con anticipación.\n\n`;
+      msg += `⚠️ IMPORTANTE – VIAJE CON MENORES
+Si viaja con un menor de edad, recuerde verificar y tramitar con anticipación el permiso de viaje correspondiente, tanto para viajes nacionales como internacionales.
+Recomendamos verificar los requisitos según su caso para evitar inconvenientes al momento del viaje.
+
+`;
       msg += `¡Quedamos a su disposición!`;
 
       const urlVisa = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
@@ -602,7 +607,14 @@ window.calendarModule = {
     }
     if (r.ticketNumber) msg += `🎫 *Nro. Boleto:* ${r.ticketNumber}\n`;
     if (r.hotelName && r.hotelName !== '-') msg += `🏨 *Alojamiento:* ${r.hotelName}\n`;
-    msg += `\nRecuerde presentarse en el aeropuerto con 2 horas de anticipación para vuelos nacionales y 3 horas para internacionales llevando su documento de identidad vigente.\n\n`;
+    msg += `\nRecuerde presentarse en el aeropuerto con 2 horas de anticipación para vuelos nacionales y 3 horas para internacionales llevando su documento de identidad vigente.
+
+`;
+    msg += `⚠️ IMPORTANTE – VIAJE CON MENORES
+Si viaja con un menor de edad, recuerde verificar y tramitar con anticipación el permiso de viaje correspondiente, tanto para viajes nacionales como internacionales.
+Recomendamos verificar los requisitos según su caso para evitar inconvenientes al momento del viaje.
+
+`;
     msg += `¡Le deseamos un excelente vuelo! Quedamos a su disposición.`;
 
     const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
