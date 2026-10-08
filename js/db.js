@@ -160,6 +160,11 @@ class LocalDatabase {
           const fileData = await res.json();
           if (fileData && fileData.systemSettings) {
             this.serverOnline = true;
+            const h1 = this.healMultiCurrencyData(fileData);
+            const h2 = this.healCreditNoteBalances(fileData);
+            if (h1 || h2) {
+              this.save(fileData);
+            }
             this.cachedData = fileData;
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(DB_KEY, JSON.stringify(fileData));
@@ -240,6 +245,49 @@ class LocalDatabase {
     return changed;
   }
 
+  healCreditNoteBalances(data) {
+    if (!data || !Array.isArray(data.creditNotes)) return false;
+    let changed = false;
+    data.creditNotes.forEach(nc => {
+      const tc = Number(nc.frozenExchangeRate) || 6.96;
+      const pagado = Number(nc.paidAmount || 0);
+      const isUsd = (nc.currency === 'USD');
+      const total = Number(nc.totalAmount || 0);
+      const totalBob = Number(nc.totalAmountBob || (isUsd ? total * tc : total));
+      const totalUsd = Number(nc.totalAmountUsd || (isUsd ? total : total / tc));
+
+      if (pagado <= 0.001) {
+        if (nc.balance !== total || nc.saldo_pendiente !== total || nc.balanceBob !== totalBob || nc.balanceUsd !== totalUsd) {
+          nc.balance = total;
+          nc.saldo_pendiente = total;
+          nc.balanceBob = totalBob;
+          nc.balanceUsd = totalUsd;
+          if (nc.status !== 'ANULADA' && nc.estado !== 'ANULADA') {
+            nc.status = 'IMPAGA';
+            nc.estado = 'IMPAGA';
+          }
+          changed = true;
+        }
+      } else {
+        const saldo = Math.max(0, parseFloat((total - pagado).toFixed(2)));
+        const saldoBob = parseFloat((isUsd ? saldo * tc : saldo).toFixed(2));
+        const saldoUsd = parseFloat((isUsd ? saldo : saldo / tc).toFixed(2));
+        if (nc.balance !== saldo || nc.balanceBob !== saldoBob || nc.balanceUsd !== saldoUsd) {
+          nc.balance = saldo;
+          nc.saldo_pendiente = saldo;
+          nc.balanceBob = saldoBob;
+          nc.balanceUsd = saldoUsd;
+          if (nc.status !== 'ANULADA' && nc.estado !== 'ANULADA') {
+            nc.status = saldo > 0.01 ? 'PARCIAL' : 'PAGADA';
+            nc.estado = nc.status;
+          }
+          changed = true;
+        }
+      }
+    });
+    return changed;
+  }
+
   _load() {
     if (this.cachedData) {
       return this.cachedData;
@@ -249,7 +297,9 @@ class LocalDatabase {
       const data = localStorage.getItem(DB_KEY);
       if (data) {
         this.cachedData = JSON.parse(data);
-        if (this.healMultiCurrencyData(this.cachedData)) {
+        const h1 = this.healMultiCurrencyData(this.cachedData);
+        const h2 = this.healCreditNoteBalances(this.cachedData);
+        if (h1 || h2) {
           localStorage.setItem(DB_KEY, JSON.stringify(this.cachedData));
         }
         return this.cachedData;
@@ -258,6 +308,7 @@ class LocalDatabase {
 
     this.cachedData = JSON.parse(JSON.stringify(initialDatabase));
     this.healMultiCurrencyData(this.cachedData);
+    this.healCreditNoteBalances(this.cachedData);
     return this.cachedData;
   }
 

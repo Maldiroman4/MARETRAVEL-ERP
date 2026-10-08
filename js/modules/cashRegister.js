@@ -121,16 +121,18 @@ window.cashRegisterModule = {
       }
     } else {
       // NC Proveedor
+      const pagado = Number(doc.paidAmount || 0);
+      const isUnpaid = pagado <= 0.001;
       if (isDocUsd) {
         totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
         totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (totalUsd * rate));
-        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (doc.balance !== undefined ? doc.balance : (doc.saldo_pendiente || 0)));
-        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (balanceUsd * rate));
+        balanceUsd = isUnpaid ? totalUsd : Number(doc.balance !== undefined && doc.balance !== null ? doc.balance : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (doc.balanceUsd || 0)));
+        balanceBob = isUnpaid ? totalBob : parseFloat((balanceUsd * rate).toFixed(2));
       } else {
         totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
         totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (totalBob / rate));
-        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (doc.balance !== undefined ? doc.balance : (doc.saldo_pendiente || 0)));
-        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (balanceBob / rate));
+        balanceBob = isUnpaid ? totalBob : Number(doc.balance !== undefined && doc.balance !== null ? doc.balance : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (doc.balanceBob || 0)));
+        balanceUsd = isUnpaid ? totalUsd : parseFloat((balanceBob / rate).toFixed(2));
       }
     }
 

@@ -409,13 +409,17 @@ window.creditNotesModule = {
           const choca = (data.creditNotes || []).some(o => o.id !== yaExiste.id && !o.deleted && o.ncCode === mirrorNcCode);
           if (!choca) yaExiste.ncCode = mirrorNcCode;
         }
-        Object.assign(yaExiste, campos, { paidAmount: pagado, balance: saldo, saldo_pendiente: saldo });
-        if (pagado > 0) {
-          yaExiste.status = saldo > 0.01 ? 'PARCIAL' : 'PAGADA';
-          yaExiste.estado = yaExiste.status;
-          yaExiste.balanceBob = parseFloat((ncCurrency === 'USD' ? saldo * sellRate : saldo).toFixed(2));
-          yaExiste.balanceUsd = parseFloat((ncCurrency === 'USD' ? saldo : saldo / sellRate).toFixed(2));
-        }
+        const saldoBob = parseFloat((ncCurrency === 'USD' ? saldo * sellRate : saldo).toFixed(2));
+        const saldoUsd = parseFloat((ncCurrency === 'USD' ? saldo : saldo / sellRate).toFixed(2));
+        Object.assign(yaExiste, campos, {
+          paidAmount: pagado,
+          balance: saldo,
+          saldo_pendiente: saldo,
+          balanceBob: saldoBob,
+          balanceUsd: saldoUsd,
+          status: pagado > 0 ? (saldo > 0.01 ? 'PARCIAL' : 'PAGADA') : 'IMPAGA',
+          estado: pagado > 0 ? (saldo > 0.01 ? 'PARCIAL' : 'PAGADA') : 'IMPAGA'
+        });
       } else {
         // El codigo espejo no puede pisar el de otra NC. En produccion hay #ncBA004 a #ncBA007
         // repetidos porque al CREAR una NC nunca se miro si el codigo ya estaba tomado (solo al
