@@ -99,41 +99,41 @@ window.cashRegisterModule = {
   // HELPER: OBTENCIÓN NORMALIZADA DE SALDOS EN BOB Y USD (ND Y NC)
   // =========================================================================
   getDocumentNormalizedBalances(doc, isNd, tc = 6.96) {
+    const rate = Number(tc) > 0 ? Number(tc) : 6.96;
+    const isDocUsd = (doc.currency === 'USD');
+
     let totalBob = 0;
     let totalUsd = 0;
     let balanceBob = 0;
     let balanceUsd = 0;
 
-    const rate = tc > 0 ? tc : 6.96;
-    const isDocUsd = (doc.currency === 'USD');
+    const pagado = Number(doc.paidAmount || doc.paidAmountBob || doc.paidAmountUsd || doc.monto_acumulado_pagado || 0);
+    const isUnpaid = pagado <= 0.001;
 
-    if (isNd) {
-      if (isDocUsd) {
-        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.total_documento || (Number(doc.totalAmountBob || 0) / rate)));
-        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (totalUsd * rate));
-        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (Number(doc.balanceBob || 0) / rate)));
-        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (balanceUsd * rate));
-      } else {
-        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.total_documento || 0));
-        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (totalBob / rate));
-        balanceBob = Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : 0));
-        balanceUsd = Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (balanceBob / rate));
+    if (isDocUsd) {
+      // Documento emitido nativamente en USD (Dólares es la moneda ancla)
+      totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.totalAmount ?? doc.total_documento ?? 0));
+      if (totalUsd <= 0 && doc.totalAmountBob) {
+        totalUsd = parseFloat((Number(doc.totalAmountBob) / rate).toFixed(2));
       }
+      balanceUsd = isUnpaid
+        ? totalUsd
+        : Number(doc.balanceUsd !== undefined && doc.balanceUsd !== null ? doc.balanceUsd : (doc.balance ?? doc.saldo_pendiente ?? Math.max(0, totalUsd - (doc.paidAmountUsd || pagado))));
+
+      totalBob = parseFloat((totalUsd * rate).toFixed(2));
+      balanceBob = parseFloat((balanceUsd * rate).toFixed(2));
     } else {
-      // NC Proveedor
-      const pagado = Number(doc.paidAmount || 0);
-      const isUnpaid = pagado <= 0.001;
-      if (isDocUsd) {
-        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
-        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (totalUsd * rate));
-        balanceUsd = isUnpaid ? totalUsd : Number(doc.balance !== undefined && doc.balance !== null ? doc.balance : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (doc.balanceUsd || 0)));
-        balanceBob = isUnpaid ? totalBob : parseFloat((balanceUsd * rate).toFixed(2));
-      } else {
-        totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.totalAmount !== undefined ? doc.totalAmount : (doc.total_documento || 0)));
-        totalUsd = Number(doc.totalAmountUsd !== undefined && doc.totalAmountUsd !== null ? doc.totalAmountUsd : (totalBob / rate));
-        balanceBob = isUnpaid ? totalBob : Number(doc.balance !== undefined && doc.balance !== null ? doc.balance : (doc.saldo_pendiente !== undefined ? doc.saldo_pendiente : (doc.balanceBob || 0)));
-        balanceUsd = isUnpaid ? totalUsd : parseFloat((balanceBob / rate).toFixed(2));
+      // Documento emitido nativamente en BOB (Bolivianos es la moneda ancla)
+      totalBob = Number(doc.totalAmountBob !== undefined && doc.totalAmountBob !== null ? doc.totalAmountBob : (doc.totalAmount ?? doc.total_documento ?? 0));
+      if (totalBob <= 0 && doc.totalAmountUsd) {
+        totalBob = parseFloat((Number(doc.totalAmountUsd) * rate).toFixed(2));
       }
+      balanceBob = isUnpaid
+        ? totalBob
+        : Number(doc.balanceBob !== undefined && doc.balanceBob !== null ? doc.balanceBob : (doc.balance ?? doc.saldo_pendiente ?? Math.max(0, totalBob - (doc.paidAmountBob || pagado))));
+
+      totalUsd = parseFloat((totalBob / rate).toFixed(2));
+      balanceUsd = parseFloat((balanceBob / rate).toFixed(2));
     }
 
     return {
@@ -171,7 +171,7 @@ window.cashRegisterModule = {
     }
 
     const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
-    const sellRate = doc.frozenExchangeRate || rates.sellRate || 6.96;
+    const sellRate = (rates.sellRate && rates.sellRate > 0) ? rates.sellRate : (doc.frozenExchangeRate || 6.96);
     const tcInput = document.getElementById('pay-exchange-rate');
     if (tcInput) tcInput.value = sellRate.toFixed(2);
 
@@ -319,6 +319,41 @@ window.cashRegisterModule = {
         amtInput.value = balanceBob.toFixed(2);
       }
     }
+    this.onModalPaymentAmountChange();
+  },
+
+  onModalExchangeRateChange() {
+    const data = window.db.get();
+    const docType = document.getElementById('pay-doc-type')?.value;
+    const docId = document.getElementById('pay-doc-id')?.value;
+    const isNd = (docType === 'ND');
+    const doc = isNd
+      ? (data.debitNotes || []).find(n => n.id === docId)
+      : (data.creditNotes || []).find(c => c.id === docId);
+    if (!doc) return;
+
+    const curr = document.getElementById('pay-currency')?.value || doc.currency || 'BOB';
+    const tc = parseFloat(document.getElementById('pay-exchange-rate')?.value) || 0;
+    if (tc <= 0) return;
+
+    // 1. Actualizar títulos de cabecera (TOTAL y SALDO PENDIENTE) con el nuevo T/C
+    this.updatePaymentSummaryDisplay(curr);
+
+    // 2. Si es cobro/pago multimoneda o el usuario está liquidando el total, recalcular monto a amortizar
+    const amtInput = document.getElementById('pay-amount-input');
+    const { balanceBob, balanceUsd } = this.getDocumentNormalizedBalances(doc, isNd, tc);
+    const targetBalance = (curr === 'USD') ? balanceUsd : balanceBob;
+
+    if (amtInput) {
+      const isDocUsd = (doc.currency === 'USD');
+      const isCrossCurrency = (isDocUsd && curr === 'BOB') || (!isDocUsd && curr === 'USD');
+      const currentVal = parseFloat(amtInput.value) || 0;
+      if (isCrossCurrency || currentVal <= 0 || Math.abs(currentVal - targetBalance) < 1.0) {
+        amtInput.value = targetBalance.toFixed(2);
+      }
+    }
+
+    // 3. Recalcular contravalor, preview de saldo restante y glosa
     this.onModalPaymentAmountChange();
   },
 

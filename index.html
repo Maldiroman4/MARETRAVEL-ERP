@@ -3148,7 +3148,7 @@
             </div>
             <div>
               <label class="form-label font-bold" style="font-size: 0.78rem;">Tipo de Cambio:</label>
-              <input type="number" step="0.01" id="pay-exchange-rate" class="form-control font-mono font-bold" style="text-align: right; height: 33px;" value="6.96" oninput="window.cashRegisterModule.onModalPaymentAmountChange()">
+              <input type="number" step="0.01" id="pay-exchange-rate" class="form-control font-mono font-bold" style="text-align: right; height: 33px;" value="6.96" oninput="window.cashRegisterModule.onModalExchangeRateChange()" onchange="window.cashRegisterModule.onModalExchangeRateChange()">
             </div>
           </div>
 
@@ -3240,7 +3240,7 @@
   <script src="js/modules/gds.js?v=20260925_v21"></script>
   <script src="js/modules/debitNotes.js?v=20261002_v32"></script>
   <script src="js/modules/creditNotes.js?v=20261008_v35"></script>
-  <script src="js/modules/cashRegister.js?v=20261008_v31"></script>
+  <script src="js/modules/cashRegister.js?v=20261009_v32"></script>
   <script src="js/modules/otherIncomes.js?v=20260922_v20"></script>
   <script src="js/modules/reports.js?v=20260929_v25"></script>
   <script src="js/modules/calendar.js?v=20261008_v22"></script>
