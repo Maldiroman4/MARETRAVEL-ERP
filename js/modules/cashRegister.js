@@ -173,7 +173,7 @@ window.cashRegisterModule = {
     const rates = window.financialGuard ? window.financialGuard.getExchangeRates() : { sellRate: 6.96 };
     const sellRate = (rates.sellRate && rates.sellRate > 0) ? rates.sellRate : (doc.frozenExchangeRate || 6.96);
     const tcInput = document.getElementById('pay-exchange-rate');
-    if (tcInput) tcInput.value = sellRate.toFixed(2);
+    if (tcInput) tcInput.value = sellRate;
 
     const docNumLabel = isNd ? (doc.ndCode || `ND #${doc.ndNumber}`) : (doc.ncCode || `NC #${doc.ncNumber}`);
     const entityName = isNd ? (doc.accountName || 'Cliente General') : (doc.providerName || 'Proveedor');
@@ -380,11 +380,13 @@ window.cashRegisterModule = {
     if (curr === 'BOB') {
       amtBob = amtVal;
       amtUsd = tc > 0 ? (amtVal / tc) : 0;
-      counterPreview = `≈ USD ${amtUsd.toFixed(2)} (T/C: ${tc.toFixed(2)})`;
+      const tcFormatted = Number(tc).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+      counterPreview = `≈ USD ${amtUsd.toFixed(2)} (T/C: ${tcFormatted})`;
     } else {
       amtUsd = amtVal;
       amtBob = amtVal * tc;
-      counterPreview = `≈ BOB ${amtBob.toFixed(2)} (T/C: ${tc.toFixed(2)})`;
+      const tcFormatted = Number(tc).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+      counterPreview = `≈ BOB ${amtBob.toFixed(2)} (T/C: ${tcFormatted})`;
     }
 
     const counterEl = document.getElementById('pay-countervalue-preview');

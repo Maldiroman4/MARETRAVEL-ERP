@@ -100,8 +100,8 @@ window.settingsModule = {
       tcTbody.innerHTML = (data.exchangeRates || []).map(tc => `
         <tr>
           <td class="font-mono">${tc.date}</td>
-          <td class="font-mono" style="font-weight: 700; color: #15803d;">BOB ${Number(tc.buyRate).toFixed(4)}</td>
-          <td class="font-mono" style="font-weight: 700; color: #0369a1;">BOB ${Number(tc.sellRate).toFixed(4)}</td>
+          <td class="font-mono" style="font-weight: 700; color: #15803d;">BOB ${Number(tc.buyRate).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
+          <td class="font-mono" style="font-weight: 700; color: #0369a1;">BOB ${Number(tc.sellRate).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
           <td style="font-size: 0.75rem;">${tc.createdByName || 'Admin'}</td>
           <td class="font-mono" style="font-size: 0.75rem;">${tc.createdAt}</td>
         </tr>

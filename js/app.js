@@ -486,8 +486,8 @@ window.app = {
 
     const buyEl = document.getElementById('topbar-tc-buy');
     const sellEl = document.getElementById('topbar-tc-sell');
-    if (buyEl) buyEl.textContent = Number(buy).toFixed(2);
-    if (sellEl) sellEl.textContent = Number(sell).toFixed(2);
+    if (buyEl) buyEl.textContent = Number(buy).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    if (sellEl) sellEl.textContent = Number(sell).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   },
 
   updateTopbarDate() {
@@ -935,8 +935,8 @@ window.app = {
 
     const buyInp = document.getElementById('quick-tc-buy');
     const sellInp = document.getElementById('quick-tc-sell');
-    if (buyInp) buyInp.value = Number(buy).toFixed(2);
-    if (sellInp) sellInp.value = Number(sell).toFixed(2);
+    if (buyInp) buyInp.value = buy;
+    if (sellInp) sellInp.value = sell;
 
     this.openModal('modal-quick-exchange-rate');
     setTimeout(() => {
