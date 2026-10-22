@@ -1642,13 +1642,58 @@ class OperationsHubModule {
           </div>
         </div>
       `;
-    } else if (srv === 'PAQUETE_TURISTICO' || srv === 'PAQUETE_CRUCERO' || srv === 'PAQUETE_CONCIERTO') {
+    } else if (srv === 'PAQUETE_CRUCERO') {
       return `
-        <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
+        <div class="form-row" style="grid-template-columns: 1.2fr 1.5fr 1.3fr; gap: 8px;">
           <div>
-            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino / Itinerario / Evento:</label>
-            <input type="text" class="form-control" placeholder="Ej: Cancún Todo Incluido 5D/4N o Crucero Caribe" value="${d.tourDestination || d.destination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourDestination', this.value)">
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Naviera / Barco:</label>
+            <input type="text" class="form-control font-bold" placeholder="Ej: Royal Caribbean / Icon of the Seas" value="${d.cruiseShip || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'cruiseShip', this.value)">
           </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Itinerario / Ruta:</label>
+            <input type="text" class="form-control" placeholder="Ej: Caribe Occidental 7 Noches" value="${d.cruiseItinerary || d.tourDestination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'cruiseItinerary', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourDestination', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Puerto de Salida:</label>
+            <input type="text" class="form-control" placeholder="Ej: Miami, Florida" value="${d.departurePort || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'departurePort', this.value)">
+          </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 6px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Tipo de Cabina:</label>
+            <input type="text" class="form-control" placeholder="Ej: Balcón / Exterior / Suite" value="${d.cabinType || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'cabinType', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Régimen a Bordo:</label>
+            <input type="text" class="form-control" placeholder="Ej: Pensión Completa / All Inc." value="${d.cruiseBoard || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'cruiseBoard', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Embarque:</label>
+            <input type="date" class="form-control font-mono" value="${d.embarkDate || d.tourStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'embarkDate', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourStartDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Desembarque:</label>
+            <input type="date" class="form-control font-mono" value="${d.disembarkDate || d.tourEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'disembarkDate', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourEndDate', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'PAQUETE_TURISTICO') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino / Nombre Paquete:</label>
+            <input type="text" class="form-control font-bold" placeholder="Ej: Cancún Todo Incluido 5D/4N" value="${d.tourDestination || d.tourName || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourDestination', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourName', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Qué Incluye:</label>
+            <input type="text" class="form-control" placeholder="Ej: Vuelos + Hotel + Traslados + Tours" value="${d.includes || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'includes', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Cantidad Pax:</label>
+            <input type="text" class="form-control" placeholder="Ej: 2 Adultos" value="${d.paxCount || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'paxCount', this.value)">
+          </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 6px;">
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Inicio:</label>
             <input type="date" class="form-control font-mono" value="${d.tourStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourStartDate', this.value)">
@@ -1656,6 +1701,41 @@ class OperationsHubModule {
           <div>
             <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha Fin:</label>
             <input type="date" class="form-control font-mono" value="${d.tourEndDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'tourEndDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Destino Específico:</label>
+            <input type="text" class="form-control" placeholder="Ej: Riviera Maya / México" value="${d.destination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'destination', this.value)">
+          </div>
+        </div>
+      `;
+    } else if (srv === 'PAQUETE_CONCIERTO') {
+      return `
+        <div class="form-row" style="grid-template-columns: 1.5fr 1.5fr; gap: 8px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Artista / Evento:</label>
+            <input type="text" class="form-control font-bold" placeholder="Ej: Shakira - Las Mujeres Ya No Lloran" value="${d.concertArtist || d.tourDestination || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'concertArtist', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourDestination', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Recinto / Estadio / Ciudad:</label>
+            <input type="text" class="form-control" placeholder="Ej: Estadio Nacional, Lima" value="${d.concertVenue || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'concertVenue', this.value)">
+          </div>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr 0.8fr 1fr 1.2fr; gap: 8px; margin-top: 6px;">
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Sector / Ubicación:</label>
+            <input type="text" class="form-control" placeholder="Ej: Campo A / VIP" value="${d.ticketSector || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'ticketSector', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Cantidad Entradas:</label>
+            <input type="text" class="form-control font-mono" placeholder="Ej: 2" value="${d.concertQty || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'concertQty', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Fecha del Evento:</label>
+            <input type="date" class="form-control font-mono" value="${d.concertDate || d.tourStartDate || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'concertDate', this.value); window.operationsHubModule.onItemDetailChange(${idx}, 'tourStartDate', this.value)">
+          </div>
+          <div>
+            <label class="form-label font-mono" style="font-size: 0.72rem;">Adicionales Incluidos:</label>
+            <input type="text" class="form-control" placeholder="Ej: Entrada Oficial + Traslado" value="${d.concertIncludes || ''}" oninput="window.operationsHubModule.onItemDetailChange(${idx}, 'concertIncludes', this.value)">
           </div>
         </div>
       `;

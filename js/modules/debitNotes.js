@@ -1436,11 +1436,11 @@ window.debitNotesModule = {
 
           // 3. PAQUETE_TURISTICO
           case 'PAQUETE_TURISTICO': {
-            const tourName = (sd.tourName || it.tourName || it.description || 'PAQUETE TURÍSTICO').toUpperCase();
-            const destination = (sd.destination || it.destination || '-').toUpperCase();
+            const tourName = (sd.tourName || sd.tourDestination || it.tourName || it.description || 'PAQUETE TURÍSTICO').toUpperCase();
+            const destination = (sd.destination || sd.tourDestination || it.destination || '-').toUpperCase();
             const tourStart = sd.tourStartDate ? this.formatSlashDate(sd.tourStartDate) : (it.startDate ? this.formatSlashDate(it.startDate) : ticketDate);
             const tourEnd = sd.tourEndDate ? this.formatSlashDate(sd.tourEndDate) : (it.endDate ? this.formatSlashDate(it.endDate) : '-');
-            const tourIncludes = (sd.includes || it.includes || 'VUELOS + HOTEL + TRASLADOS').toUpperCase();
+            const tourIncludes = (sd.includes || it.includes || '').trim().toUpperCase();
             const paxCount = (sd.paxCount || it.paxCount || '1 PAX').toUpperCase();
 
             return `
@@ -1459,7 +1459,7 @@ window.debitNotesModule = {
                     <div class="nd-v nd-service-details font-bold">
                       <div class="nd-srv-line" style="color: #d97706;">PAQUETE TURÍSTICO: ${tourName}</div>
                       <div class="nd-srv-line">DESTINO: ${destination}</div>
-                      <div class="nd-srv-line">INCLUYE: ${tourIncludes}</div>
+                      ${tourIncludes ? `<div class="nd-srv-line">INCLUYE: ${tourIncludes}</div>` : ''}
                     </div>
                   </div>
                 </div>
@@ -1507,12 +1507,14 @@ window.debitNotesModule = {
           // 4. PAQUETE_CRUCERO
           case 'PAQUETE_CRUCERO': {
             const cruiseShip = (sd.cruiseShip || it.cruiseShip || opName).toUpperCase();
-            const cruiseItinerary = (sd.cruiseItinerary || it.cruiseItinerary || it.description || '-').toUpperCase();
+            const cruiseItinerary = (sd.cruiseItinerary || sd.tourDestination || it.cruiseItinerary || it.description || 'CRUCERO').toUpperCase();
             const cruisePort = (sd.departurePort || it.departurePort || '-').toUpperCase();
-            const cruiseCabin = (sd.cabinType || it.cabinType || 'BALCÓN').toUpperCase();
-            const embark = sd.embarkDate ? this.formatSlashDate(sd.embarkDate) : (it.embarkDate ? this.formatSlashDate(it.embarkDate) : ticketDate);
-            const disembark = sd.disembarkDate ? this.formatSlashDate(sd.disembarkDate) : (it.disembarkDate ? this.formatSlashDate(it.disembarkDate) : '-');
-            const board = (sd.cruiseBoard || it.cruiseBoard || 'PENSIÓN COMPLETA').toUpperCase();
+            const cruiseCabin = (sd.cabinType || it.cabinType || '').trim().toUpperCase();
+            const embarkRaw = sd.embarkDate || sd.tourStartDate || it.embarkDate || it.tourStartDate || '';
+            const embark = embarkRaw ? this.formatSlashDate(embarkRaw) : (ticketDate || '-');
+            const disembarkRaw = sd.disembarkDate || sd.tourEndDate || it.disembarkDate || it.tourEndDate || '';
+            const disembark = disembarkRaw ? this.formatSlashDate(disembarkRaw) : '-';
+            const board = (sd.cruiseBoard || it.cruiseBoard || '').trim().toUpperCase();
 
             return `
               <div class="nd-item-block" ${idx > 0 ? 'style="margin-top: 10px;"' : ''}>
@@ -1529,8 +1531,8 @@ window.debitNotesModule = {
                     <span class="nd-k" style="width: 100px;">Servicio :</span>
                     <div class="nd-v nd-service-details font-bold">
                       <div class="nd-srv-line" style="color: #0284c7;">CRUCERO: ${cruiseItinerary}</div>
-                      <div class="nd-srv-line">CABINA: ${cruiseCabin}</div>
-                      <div class="nd-srv-line">RÉGIMEN: ${board}</div>
+                      ${cruiseCabin ? `<div class="nd-srv-line">CABINA: ${cruiseCabin}</div>` : ''}
+                      ${board ? `<div class="nd-srv-line">RÉGIMEN: ${board}</div>` : ''}
                     </div>
                   </div>
                 </div>
@@ -1577,9 +1579,10 @@ window.debitNotesModule = {
 
           // 5. PAQUETE_CONCIERTO
           case 'PAQUETE_CONCIERTO': {
-            const artist = (sd.concertArtist || it.concertArtist || it.description || 'CONCIERTO').toUpperCase();
+            const artist = (sd.concertArtist || sd.tourDestination || it.concertArtist || it.description || 'CONCIERTO').toUpperCase();
             const venue = (sd.concertVenue || it.concertVenue || '-').toUpperCase();
-            const showDate = sd.concertDate ? this.formatSlashDate(sd.concertDate) : (it.concertDate ? this.formatSlashDate(it.concertDate) : ticketDate);
+            const showDateRaw = sd.concertDate || sd.tourStartDate || it.concertDate || it.tourStartDate || '';
+            const showDate = showDateRaw ? this.formatSlashDate(showDateRaw) : ticketDate;
             const sector = (sd.ticketSector || it.ticketSector || 'SECTOR GENERAL').toUpperCase();
             const qty = sd.concertQty || it.concertQty || '1';
             const includes = (sd.concertIncludes || it.concertIncludes || 'ENTRADA OFICIAL').toUpperCase();

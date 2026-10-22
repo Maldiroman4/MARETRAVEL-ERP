@@ -234,6 +234,40 @@ window.app = {
         return false;
       }
 
+      // USUARIOS CON PERMISOS
+      if (username === 'daniela' && password === '595959') {
+        await finalizeLogin({
+          username: 'daniela',
+          name: 'Daniela',
+          role: 'Jefa',
+          fullAccess: true,
+          loginTime: new Date().toLocaleString()
+        }, '¡Bienvenido al sistema MARETRAVEL ERP, Daniela!');
+        return false;
+      }
+      if (username === 'sergio' && password === '575757') {
+        await finalizeLogin({
+          username: 'sergio',
+          name: 'Sergio',
+          role: 'Verificador',
+          readOnly: true,
+          allowCalendar: true,
+          loginTime: new Date().toLocaleString()
+        }, '¡Bienvenido al sistema MARETRAVEL ERP, Sergio!');
+        return false;
+      }
+      if (username === 'mario' && password === '898989') {
+        await finalizeLogin({
+          username: 'mario',
+          name: 'Mario',
+          role: 'Verificador',
+          readOnly: true,
+          allowCalendar: true,
+          loginTime: new Date().toLocaleString()
+        }, '¡Bienvenido al sistema MARETRAVEL ERP, Mario!');
+        return false;
+      }
+
       // SÚPER USUARIO: entra por el MISMO formulario de login, sin revelar su existencia.
       const res = await fetch('/api/super/login', {
         method: 'POST',
@@ -248,6 +282,7 @@ window.app = {
           name: 'Súper Usuario',
           role: 'Súper Usuario',
           isSuper: true,
+          fullAccess: true,
           loginTime: new Date().toLocaleString()
         }, '¡Bienvenido, Súper Usuario!');
         return false;
